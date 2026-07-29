@@ -27,6 +27,7 @@ import { translations } from '@/shared/i18n';
 import type { ExportDialogConfig, ExportProgressState } from '@/features/file-io';
 import type { ImportPreparationOverlayState } from './hooks/useFileImport';
 import { useAssetImportFromUrl } from './hooks/useAssetImportFromUrl';
+import { useMeshPreviewFromUrl } from './hooks/useMeshPreviewFromUrl';
 import {
   preloadAIConversationConnector,
   preloadAIInspectionConnector,
@@ -145,6 +146,14 @@ export function AppContent({ extensions, onExposeActions }: AppContentProps = {}
     onImportComplete: (success) => {
       if (success) {
         showToast(t.addedFilesToAssetLibrary.replace('{count}', '1'), 'success');
+      }
+    },
+  });
+  useMeshPreviewFromUrl({
+    handleImport,
+    onImportComplete: (success) => {
+      if (!success) {
+        showToast(t.importFailedCheckFiles, 'error');
       }
     },
   });

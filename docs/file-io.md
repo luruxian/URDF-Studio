@@ -1,6 +1,6 @@
 # 导入导出与 Workspace 链路
 
-> 最后更新：2026-07-17 | 覆盖源码：`src/app/hooks/`、`src/app/hooks/file-export/`、`src/app/hooks/workspace-source-sync/`、`src/app/hooks/workspace-mutations/`、`src/app/utils/`、`src/app/workers/`、`src/app/components/BotWorldImportOverlay.tsx`、`src/core/parsers/format_detection.ts`、`src/core/robot/assemblySceneProjection.ts`、`src/features/file-io/`、`src/features/robot-tree/`、`src/features/assembly/`、`src/features/property-editor/`、`src/shared/utils/popupHandoffProtocol.ts`、`src/shared/hostIntegrationState.ts`
+> 最后更新：2026-07-29 | 覆盖源码：`src/app/hooks/`、`src/app/hooks/file-export/`、`src/app/hooks/workspace-source-sync/`、`src/app/hooks/workspace-mutations/`、`src/app/utils/`、`src/app/workers/`、`src/app/components/BotWorldImportOverlay.tsx`、`src/core/parsers/format_detection.ts`、`src/core/robot/assemblySceneProjection.ts`、`src/features/file-io/`、`src/features/robot-tree/`、`src/features/assembly/`、`src/features/property-editor/`、`src/shared/utils/popupHandoffProtocol.ts`、`src/shared/utils/meshPreviewFromUrl.ts`、`src/shared/hostIntegrationState.ts`
 > 交叉引用：[viewer.md](viewer.md)、[architecture.md](architecture.md)
 
 ## 1. 职责拆分
@@ -147,6 +147,39 @@ infra（URL 参数解析、BroadcastChannel 已有-tab 认领、并发下载与�
 | `src/app/hooks/usePluginLaunch.ts` | 插件激活 hook：BroadcastChannel 已有 tab 认领 + `openTool(key)`（见路径 C） |
 | `src/shared/utils/popupHandoffProtocol.ts` | 协议常量、origin 白名单（env 驱动 + 通配）、URL 参数 helper、BroadcastChannel 消息类型 |
 | `src/shared/hostIntegrationState.ts` | 宿主注入态：资产下载端点 resolver、AI 后端 / 资产下载服务令牌 provider；`src/hostIntegrations.ts` 为其窄 facade |
+
+### 路径 B — 同源 GLB/GLTF mesh 预览
+
+适用于与 Studio 部署在同一服务器（或同 origin）的上游应用：上游生成 GLB 后，通过 HTTP 暴露文件，再用 URL 参数打开 Studio 并自动导入。
+
+```text
+上游应用生成 GLB → Nginx/API 提供 HTTP 访问（如 /api/preview/job-123.glb）
+  → window.open('/urdf-studio/?mesh=' + encodeURIComponent('/api/preview/job-123.glb'))
+  → useMeshPreviewFromUrl 检测 ?mesh= 参数，立即消费（从 URL 移除）
+  → 校验同源 + .glb/.gltf 扩展名
+  → fetch(meshUrl, { credentials: 'same-origin' }) → File → handleImport(files)
+```
+
+- 参数名：`mesh`；值为**浏览器可 fetch 的 HTTP(S) URL**，可以是相对路径（推荐同域）或完整同源 URL
+- **不能**传服务器磁盘绝对路径（如 `/var/www/data/robot.glb`）；必须由 Nginx 或上游 API 映射为 HTTP 资源
+- 默认只允许与当前页面 **same-origin**；跨子域可通过 `VITE_MESH_PREVIEW_ALLOWED_ORIGINS`（逗号分隔，支持 `*` 通配）扩展
+- 单文件大小上限 512MB；失败时 toast `importFailedCheckFiles`
+- 不走 BroadcastChannel 已有 tab 认领；每次打开带 `?mesh=` 的新标签页由该 tab 自行导入
+
+**上游预览按钮示例：**
+
+```javascript
+const glbUrl = `/api/preview/${jobId}.glb`;
+const studioUrl = `/urdf-studio/?mesh=${encodeURIComponent(glbUrl)}`;
+window.open(studioUrl, '_blank');
+```
+
+**关键文件：**
+
+| 文件 | 用途 |
+|------|------|
+| `src/app/hooks/useMeshPreviewFromUrl.ts` | 启动时读取 `?mesh=`、fetch GLB/GLTF、调用 `handleImport` |
+| `src/shared/utils/meshPreviewFromUrl.ts` | URL 解析、同源校验、参数剥离、文件名推断 |
 
 ### 路径 C — 插件激活
 
