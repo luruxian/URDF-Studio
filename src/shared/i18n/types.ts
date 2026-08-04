@@ -318,6 +318,11 @@ export interface TranslationKeys extends TranslationWorkflowKeys {
   cameraProjectionPerspective: string;
   cameraProjectionOrthographic: string;
   cameraProjectionHint: string;
+  renderQuality: string;
+  renderQualityPerformance: string;
+  renderQualityBalanced: string;
+  renderQualityHigh: string;
+  renderQualityUltra: string;
   viewerNavigation: string;
   zoomSensitivity: string;
   rotateSensitivity: string;
@@ -572,6 +577,11 @@ export interface TranslationKeys extends TranslationWorkflowKeys {
   positionCopied: string;
   positionPasted: string;
   positionClipboardError: string;
+  copyAxis: string;
+  pasteAxis: string;
+  axisCopied: string;
+  axisPasted: string;
+  axisClipboardError: string;
   fileBrowser: string;
   dropOrImport: string;
   dropFilesToImport: string;
