@@ -6,7 +6,11 @@ import {
   isAiBackendEnabled,
   streamAiBackendChat,
 } from './aiBackendTransport';
-import { resolveAiRuntimeEnv } from './aiRuntimeEnv';
+import { resolveAiRuntimeEnv, resolveOpenAiClientBaseUrl } from './aiRuntimeEnv';
+import {
+  resolveOpenAiChatExtraBody,
+  stripModelThinkingContent,
+} from './openAiRequestOptions';
 
 export interface ConversationHistoryTurn {
   role: 'user' | 'assistant';
@@ -68,7 +72,7 @@ const getBaseUrl = (): string => {
 const createOpenAIClient = (apiKey: string): OpenAI => {
   return new OpenAI({
     apiKey,
-    baseURL: getBaseUrl(),
+    baseURL: resolveOpenAiClientBaseUrl(getBaseUrl()),
     dangerouslyAllowBrowser: true,
   });
 };
@@ -250,9 +254,11 @@ export const sendConversationTurnStream = async ({
 
   const openai = createOpenAIClient(apiKey);
   const modelName = getModelName();
+  const extraBody = resolveOpenAiChatExtraBody(modelName);
   const messages = buildConversationMessages(history, trimmedMessage);
   const requestMessages = [{ role: 'system' as const, content: systemPrompt }, ...messages];
   let reply = '';
+  let strippedReplyLength = 0;
 
   try {
     const stream = await openai.chat.completions.create(
@@ -261,6 +267,7 @@ export const sendConversationTurnStream = async ({
         messages: requestMessages,
         temperature: 0.3,
         stream: true,
+        ...(extraBody ? { extra_body: extraBody } : {}),
       },
       {
         signal,
@@ -274,10 +281,15 @@ export const sendConversationTurnStream = async ({
       }
 
       reply += delta;
-      onReplyDelta?.(delta);
+      const strippedReply = stripModelThinkingContent(reply, { trim: false });
+      const visibleDelta = strippedReply.slice(strippedReplyLength);
+      strippedReplyLength = strippedReply.length;
+      if (visibleDelta) {
+        onReplyDelta?.(visibleDelta);
+      }
     }
 
-    const normalizedReply = reply.trim();
+    const normalizedReply = stripModelThinkingContent(reply.trim());
     if (!normalizedReply) {
       return {
         reply: '',

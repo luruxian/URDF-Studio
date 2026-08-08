@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveAiRuntimeEnv } from './aiRuntimeEnv';
+import { resolveAiRuntimeEnv, resolveOpenAiClientBaseUrl } from './aiRuntimeEnv';
 
 test('resolveAiRuntimeEnv reads Vite-prefixed browser env first', () => {
   const runtimeEnv = resolveAiRuntimeEnv(
@@ -50,4 +50,15 @@ test('resolveAiRuntimeEnv falls back to legacy process env names', () => {
   assert.equal(runtimeEnv.apiKey, 'process-openai-key');
   assert.equal(runtimeEnv.baseUrl, 'https://api.openai.com/v1');
   assert.equal(runtimeEnv.model, 'bce/deepseek-v3.2');
+});
+
+test('resolveOpenAiClientBaseUrl resolves same-origin proxy paths for the OpenAI SDK', () => {
+  assert.equal(
+    resolveOpenAiClientBaseUrl('/api/llm-proxy/v1', 'http://localhost:3000'),
+    'http://localhost:3000/api/llm-proxy/v1',
+  );
+  assert.equal(
+    resolveOpenAiClientBaseUrl('https://api.minimaxi.com/v1/'),
+    'https://api.minimaxi.com/v1',
+  );
 });

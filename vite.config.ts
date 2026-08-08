@@ -174,14 +174,21 @@ const OPTIMIZE_DEPS_INCLUDE = [
 ];
 
 function resolveAiRuntimeEnv(env: Record<string, string | undefined>): Record<string, string> {
-  const apiKey = env.API_KEY?.trim() || env.OPENAI_API_KEY?.trim() || env.GEMINI_API_KEY?.trim() || '';
+  const apiKey =
+    env.VITE_API_KEY?.trim() ||
+    env.VITE_OPENAI_API_KEY?.trim() ||
+    env.VITE_GEMINI_API_KEY?.trim() ||
+    env.API_KEY?.trim() ||
+    env.OPENAI_API_KEY?.trim() ||
+    env.GEMINI_API_KEY?.trim() ||
+    '';
 
   return {
     API_KEY: apiKey,
-    GEMINI_API_KEY: env.GEMINI_API_KEY?.trim() || '',
-    OPENAI_API_KEY: env.OPENAI_API_KEY?.trim() || '',
-    OPENAI_BASE_URL: env.OPENAI_BASE_URL?.trim() || '',
-    OPENAI_MODEL: env.OPENAI_MODEL?.trim() || '',
+    GEMINI_API_KEY: env.VITE_GEMINI_API_KEY?.trim() || env.GEMINI_API_KEY?.trim() || '',
+    OPENAI_API_KEY: env.VITE_OPENAI_API_KEY?.trim() || env.OPENAI_API_KEY?.trim() || '',
+    OPENAI_BASE_URL: env.VITE_OPENAI_BASE_URL?.trim() || env.OPENAI_BASE_URL?.trim() || '',
+    OPENAI_MODEL: env.VITE_OPENAI_MODEL?.trim() || env.OPENAI_MODEL?.trim() || '',
   };
 }
 
@@ -215,6 +222,36 @@ function resolveDevServerAllowedHosts(
     .filter(Boolean);
 
   return allowedHosts.length > 0 ? allowedHosts : undefined;
+}
+
+/** Dev/preview proxy for OpenAI-compatible LLM APIs that block browser CORS (e.g. MiniMax). */
+function resolveLlmDevProxy(
+  env: Record<string, string | undefined>,
+): NonNullable<ServerOptions['proxy']> | undefined {
+  const upstream = env.URDF_STUDIO_LLM_UPSTREAM?.trim();
+  if (!upstream) {
+    return undefined;
+  }
+
+  let targetOrigin: string;
+  try {
+    const parsed = new URL(upstream);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return undefined;
+    }
+    targetOrigin = parsed.origin;
+  } catch {
+    return undefined;
+  }
+
+  return {
+    '/api/llm-proxy': {
+      target: targetOrigin,
+      changeOrigin: true,
+      secure: true,
+      rewrite: (path) => path.replace(/^\/api\/llm-proxy/, ''),
+    },
+  };
 }
 
 function shouldIgnoreWatchPath(watchPath: string): boolean {
@@ -348,6 +385,7 @@ export default defineConfig(({ mode }) => {
   const devServerAllowedHosts = resolveDevServerAllowedHosts(env);
   const aiRuntimeEnv = resolveAiRuntimeEnv(env);
   const viteCacheDir = resolveViteCacheDir(env);
+  const llmDevProxy = resolveLlmDevProxy(env);
 
   return {
     cacheDir: viteCacheDir,
@@ -356,6 +394,7 @@ export default defineConfig(({ mode }) => {
       strictPort: false,
       host: resolveDevServerHost(env),
       ...(devServerAllowedHosts ? { allowedHosts: devServerAllowedHosts } : {}),
+      ...(llmDevProxy ? { proxy: llmDevProxy } : {}),
       // Optimized dependency URLs can retain the same Vite browser hash across
       // a no-reload optimizer update. Revalidate their ETags on page reload so
       // an old wrapper cannot keep importing chunks from a replaced cache graph.

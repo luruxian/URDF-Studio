@@ -11,9 +11,17 @@ AI 功能（生成 / 审查 / 对话）有两种互斥的运行模式，由环�
 
 ```env
 VITE_OPENAI_API_KEY=your_key
-VITE_OPENAI_BASE_URL=https://api.openai.com/v1
-VITE_OPENAI_MODEL=deepseek-v3
+VITE_OPENAI_MODEL=MiniMax-M3
+URDF_STUDIO_LLM_UPSTREAM=https://api.minimaxi.com
+VITE_OPENAI_BASE_URL=/api/llm-proxy/v1
 ```
+
+MiniMax 等 Provider 不允许浏览器直连（OpenAI SDK 的 `x-stainless-*` 头会触发 CORS）。
+本地开发请把 `VITE_OPENAI_BASE_URL` 设为同源代理 `/api/llm-proxy/v1`，并用 `URDF_STUDIO_LLM_UPSTREAM`
+指定真实上游（仅 Vite dev server 读取）。改 env 后需重启 `npm run dev`。
+国际区上游：`https://api.minimax.io`；国内：`https://api.minimaxi.com`。
+MiniMax 模型默认通过 `extra_body` 关闭 thinking（`thinking.type=disabled`），并在前端过滤
+`` 等残留标签；可用 `VITE_OPENAI_EXTRA_BODY` JSON 覆盖。
 
 **托管模式（backend transport，官网部署）** —— 设置后端 AI 代理地址后，三个 AI 功能改为把
 **结构化上下文**（robot 快照、审查项、对话历史等）POST 给后端，提示词模板与 Provider key

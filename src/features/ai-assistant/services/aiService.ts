@@ -27,7 +27,11 @@ import {
   isAiBackendEnabled,
   requestAiBackendContent,
 } from './aiBackendTransport'
-import { resolveAiRuntimeEnv } from './aiRuntimeEnv'
+import { resolveAiRuntimeEnv, resolveOpenAiClientBaseUrl } from './aiRuntimeEnv'
+import {
+  resolveOpenAiChatExtraBody,
+  stripModelThinkingContent,
+} from './openAiRequestOptions'
 
 export type RobotInspectionStage =
   | 'preparing-context'
@@ -88,7 +92,7 @@ const createOpenAIClient = (): OpenAI => {
 
   return new OpenAI({
     apiKey: resolveAiRuntimeEnv().apiKey,
-    baseURL: resolveAiRuntimeEnv().baseUrl,
+    baseURL: resolveOpenAiClientBaseUrl(resolveAiRuntimeEnv().baseUrl),
     dangerouslyAllowBrowser: true,
   })
 }
@@ -129,9 +133,11 @@ const requestGenerationContent = async ({
   }
 
   const openai = createOpenAIClient()
+  const modelName = getModelName()
+  const extraBody = resolveOpenAiChatExtraBody(modelName)
   const systemPrompt = getGenerationSystemPrompt({ robot, motorLibrary })
   const response = await openai.chat.completions.create({
-    model: getModelName(),
+    model: modelName,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: prompt }
@@ -139,9 +145,11 @@ const requestGenerationContent = async ({
     response_format: {
       type: 'json_object'
     },
-    temperature: 0.7
+    temperature: 0.7,
+    ...(extraBody ? { extra_body: extraBody } : {}),
   })
-  return response.choices[0]?.message?.content
+  const content = response.choices[0]?.message?.content
+  return typeof content === 'string' ? stripModelThinkingContent(content) : content
 }
 
 interface InspectionContentRequest {
@@ -171,10 +179,12 @@ const requestInspectionContent = async ({
   }
 
   const openai = createOpenAIClient()
+  const modelName = getModelName()
+  const extraBody = resolveOpenAiChatExtraBody(modelName)
   const systemPrompt = getInspectionSystemPrompt(lang, { criteriaDescription, inspectionNotes })
   const response = await openai.chat.completions.create(
     {
-      model: getModelName(),
+      model: modelName,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: `Inspect this robot structure:\n${JSON.stringify(robot)}` }
@@ -182,13 +192,15 @@ const requestInspectionContent = async ({
       response_format: {
         type: 'json_object'
       },
-      temperature: 0.7
+      temperature: 0.7,
+      ...(extraBody ? { extra_body: extraBody } : {}),
     },
     {
       signal,
     },
   )
-  return response.choices[0]?.message?.content
+  const content = response.choices[0]?.message?.content
+  return typeof content === 'string' ? stripModelThinkingContent(content) : content
 }
 
 /**

@@ -46,6 +46,32 @@ const firstNonEmpty = (...values: Array<string | undefined>): string => {
   return '';
 };
 
+/** OpenAI SDK requires an absolute base URL; resolve same-origin proxy paths in the browser. */
+export function resolveOpenAiClientBaseUrl(
+  baseUrl: string,
+  pageOrigin?: string,
+): string {
+  const trimmed = baseUrl.trim();
+  if (!trimmed) {
+    return 'https://api.openai.com/v1';
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed.replace(/\/+$/, '');
+  }
+
+  if (trimmed.startsWith('/')) {
+    const origin =
+      pageOrigin ?? (typeof window !== 'undefined' ? window.location.origin : undefined);
+    if (!origin) {
+      return trimmed;
+    }
+    return new URL(trimmed, origin).href.replace(/\/+$/, '');
+  }
+
+  return trimmed;
+}
+
 export function resolveAiRuntimeEnv(
   viteEnv: AiRuntimeEnvSource = readImportMetaEnv(),
   processEnv: AiRuntimeEnvSource = readProcessEnv(),
