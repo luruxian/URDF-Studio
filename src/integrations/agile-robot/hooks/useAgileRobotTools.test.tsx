@@ -7,8 +7,8 @@ import { JSDOM } from 'jsdom';
 
 import { useAgileRobotTools } from './useAgileRobotTools.ts';
 import { BOOTSTRAP_STORAGE_KEY } from '../constants.ts';
-import { AGILE_ROBOT_PREVIEW_ASSET_KEY } from '../meshReload.ts';
 import { useAssetsStore } from '@/store';
+import type { MeshReloadImportPort } from '../meshReload.ts';
 import type { AIConversationToolsConfig, ParsedToolCall } from '../types.ts';
 
 const validBootstrap = {
@@ -81,8 +81,19 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
+/** Build a MeshReloadImportPort that records the GLB files routed to it. */
+function createReloadMeshSpy(): { port: MeshReloadImportPort; imported: File[] } {
+  const imported: File[] = [];
+  const port: MeshReloadImportPort = {
+    importMeshFile: async (file: File) => {
+      imported.push(file);
+    },
+  };
+  return { port, imported };
+}
+
 /** Render the hook inside a React root so useCallback/useRef have a dispatcher. */
-async function renderHook() {
+async function renderHook(options?: Parameters<typeof useAgileRobotTools>[0]) {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -90,7 +101,7 @@ async function renderHook() {
   let current: AIConversationToolsConfig | null | undefined;
 
   function Probe() {
-    current = useAgileRobotTools();
+    current = useAgileRobotTools(options);
     return null;
   }
 
@@ -198,6 +209,7 @@ test('parseToolCalls returns null for invalid JSON arguments', async () => {
   assert.equal(result, null);
   await rendered.cleanup();
 });
+
 
 test('parseToolCalls returns null when the tool name is missing', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
@@ -372,7 +384,8 @@ test('onExecute returns unknown-tool message for an unhandled tool', async () =>
 
 test('onExecute edit_robot_appearance runs jimeng → hunyuan → mesh reload', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
-  const rendered = await renderHook();
+  const { port, imported } = createReloadMeshSpy();
+  const rendered = await renderHook({ reloadMesh: port });
   const config = rendered.current;
   assert.notEqual(config, null);
 
@@ -392,17 +405,15 @@ test('onExecute edit_robot_appearance runs jimeng → hunyuan → mesh reload', 
   assert.equal(result.success, true);
   assert.equal(result.message, '3D 模型已更新');
   assert.equal(spy.calls.length, 4);
-  const asset = useAssetsStore.getState().getAsset(AGILE_ROBOT_PREVIEW_ASSET_KEY);
-  assert.ok(
-    asset !== undefined && asset.startsWith('blob:'),
-    'preview mesh should be stored as a blob URL',
-  );
+  assert.equal(imported.length, 1, 'expected the regenerated GLB to be routed through the reload port');
+  assert.equal(imported[0]?.name, 'updated_model.glb');
   await rendered.cleanup();
 });
 
 test('onExecute regenerate_robot_3d runs hunyuan → mesh reload', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
-  const rendered = await renderHook();
+  const { port, imported } = createReloadMeshSpy();
+  const rendered = await renderHook({ reloadMesh: port });
   const config = rendered.current;
   assert.notEqual(config, null);
 
@@ -421,6 +432,7 @@ test('onExecute regenerate_robot_3d runs hunyuan → mesh reload', async () => {
   assert.equal(result.success, true);
   assert.equal(result.message, '3D 模型已更新');
   assert.equal(spy.calls.length, 3);
+  assert.equal(imported.length, 1, 'expected the regenerated GLB to be routed through the reload port');
   await rendered.cleanup();
 });
 
@@ -449,7 +461,8 @@ test('onExecute reports the job error message when the job fails', async () => {
 
 test('onExecute propagates a generic error message when the mesh reload fails', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
-  const rendered = await renderHook();
+  const { port } = createReloadMeshSpy();
+  const rendered = await renderHook({ reloadMesh: port });
   const config = rendered.current;
   assert.notEqual(config, null);
 

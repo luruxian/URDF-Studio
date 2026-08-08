@@ -1,7 +1,7 @@
 import { AIConversationModal } from '@/features/ai-assistant';
 import type { AIConversationLaunchContext } from '@/features/ai-assistant';
 import type { Language } from '@/shared/i18n';
-import { useAgileRobotTools } from '@/integrations/agile-robot';
+import { useAgileRobotTools, type MeshReloadImportPort } from '@/integrations/agile-robot';
 
 interface AIConversationConnectorProps {
   isOpen: boolean;
@@ -9,6 +9,8 @@ interface AIConversationConnectorProps {
   lang: Language;
   launchContext: AIConversationLaunchContext | null;
   onStartNewConversation: (launchContext: AIConversationLaunchContext) => void;
+  /** Routes a regenerated GLB through the app file-import pipeline so the 3D viewport updates. */
+  reloadMesh: MeshReloadImportPort;
 }
 
 export function AIConversationConnector({
@@ -17,8 +19,9 @@ export function AIConversationConnector({
   lang,
   launchContext,
   onStartNewConversation,
+  reloadMesh,
 }: AIConversationConnectorProps) {
-  const toolsConfig = useAgileRobotTools();
+  const toolsConfig = useAgileRobotTools({ reloadMesh });
 
   return (
     <AIConversationModal

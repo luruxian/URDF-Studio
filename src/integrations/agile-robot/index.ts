@@ -6,7 +6,7 @@
 
 export { useAgileRobotBootstrap } from './hooks/useAgileRobotBootstrap';
 export { useAgileRobotTools } from './hooks/useAgileRobotTools';
-export { reloadMeshFromUrl } from './meshReload';
+export { reloadMeshFromUrl, type MeshReloadImportPort } from './meshReload';
 export { hasBootstrap, getBootstrap, clearBootstrap } from './bootstrap';
 export type {
   RobotsStudioBootstrap,

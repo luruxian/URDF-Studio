@@ -22,6 +22,7 @@ import type {
 import type { ExportDialogConfig, ExportProgressState } from '@/features/file-io';
 import type { InspectionReport, RobotState } from '@/types';
 import type { Language } from '@/shared/i18n';
+import type { MeshReloadImportPort } from '@/integrations/agile-robot';
 
 export interface DisconnectedWorkspaceUrdfDialogState {
   config: ExportDialogConfig;
@@ -71,6 +72,8 @@ interface AppOverlayLayerProps {
   lang: Language;
   loadingLabel: string;
   projectExportProgress: ExportProgressState | null;
+  /** Routes a regenerated GLB through the app file-import pipeline so the 3D viewport updates. */
+  reloadMesh: MeshReloadImportPort;
   setDisconnectedWorkspaceUrdfDialog: Dispatch<
     SetStateAction<DisconnectedWorkspaceUrdfDialogState | null>
   >;
@@ -103,6 +106,7 @@ export function AppOverlayLayer({
   lang,
   loadingLabel,
   projectExportProgress,
+  reloadMesh,
   setDisconnectedWorkspaceUrdfDialog,
   setIsAIConversationOpen,
   setIsAIInspectionOpen,
@@ -141,6 +145,7 @@ export function AppOverlayLayer({
             lang={lang}
             launchContext={aiConversationLaunchContext}
             onStartNewConversation={handleStartNewAIConversation}
+            reloadMesh={reloadMesh}
           />
         </Suspense>
       )}

@@ -1,14 +1,9 @@
-import test, { afterEach, beforeEach } from 'node:test';
+import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { useAssetsStore } from '@/store';
-import { AGILE_ROBOT_PREVIEW_ASSET_KEY, reloadMeshFromUrl } from './meshReload.ts';
+import { reloadMeshFromUrl, type MeshReloadImportPort } from './meshReload.ts';
 
 const originalFetch = globalThis.fetch;
-
-beforeEach(() => {
-  useAssetsStore.getState().clearAssets();
-});
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
@@ -35,51 +30,56 @@ function installFetchMock(responses: Response[]): { calls: FetchCall[] } {
   return { calls };
 }
 
-test('reloadMeshFromUrl fetches the URL and stores a blob URL in assetsStore', async () => {
+/** Build a MeshReloadImportPort that records the GLB files routed to it. */
+function createImportSpy(): { port: MeshReloadImportPort; imported: File[] } {
+  const imported: File[] = [];
+  const port: MeshReloadImportPort = {
+    importMeshFile: async (file: File) => {
+      imported.push(file);
+    },
+  };
+  return { port, imported };
+}
+
+test('reloadMeshFromUrl fetches the URL and routes the GLB through the import port', async () => {
   const mockBlob = new Blob(['fake-glb-data'], { type: 'model/gltf-binary' });
   const { calls } = installFetchMock([new Response(mockBlob, { status: 200 })]);
+  const { port, imported } = createImportSpy();
 
-  await reloadMeshFromUrl('https://api.example.com/preview?token=x');
+  await reloadMeshFromUrl('https://api.example.com/preview?token=x', port);
 
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, 'https://api.example.com/preview?token=x');
-
-  const storedUrl = useAssetsStore.getState().assets[AGILE_ROBOT_PREVIEW_ASSET_KEY];
-  assert.ok(storedUrl, 'expected a blob URL stored for the preview key');
-  assert.match(storedUrl, /^blob:/);
+  assert.equal(imported.length, 1, 'expected the GLB to be routed through the import port');
+  assert.equal(imported[0]?.name, 'updated_model.glb');
+  assert.equal(imported[0]?.type, 'model/gltf-binary');
+  assert.equal(imported[0]?.size, mockBlob.size);
 });
 
 test('reloadMeshFromUrl throws when the response is not ok', async () => {
   installFetchMock([new Response(null, { status: 404 })]);
+  const { port } = createImportSpy();
 
   await assert.rejects(
-    () => reloadMeshFromUrl('https://api.example.com/bad'),
+    () => reloadMeshFromUrl('https://api.example.com/bad', port),
     /Failed to fetch mesh/,
   );
 });
 
 test('reloadMeshFromUrl throws when the response body is empty', async () => {
   installFetchMock([new Response(new Blob([]), { status: 200 })]);
+  const { port } = createImportSpy();
 
   await assert.rejects(
-    () => reloadMeshFromUrl('https://api.example.com/empty'),
+    () => reloadMeshFromUrl('https://api.example.com/empty', port),
     /Empty mesh response/,
   );
 });
 
-test('reloadMeshFromUrl replaces the stored URL when called again', async () => {
-  installFetchMock([
-    new Response(new Blob(['glb-v1'], { type: 'model/gltf-binary' }), { status: 200 }),
-    new Response(new Blob(['glb-v2'], { type: 'model/gltf-binary' }), { status: 200 }),
-  ]);
+test('reloadMeshFromUrl does not call the import port when the fetch fails', async () => {
+  installFetchMock([new Response(null, { status: 500 })]);
+  const { port, imported } = createImportSpy();
 
-  await reloadMeshFromUrl('https://api.example.com/v1');
-  const firstUrl = useAssetsStore.getState().assets[AGILE_ROBOT_PREVIEW_ASSET_KEY];
-
-  await reloadMeshFromUrl('https://api.example.com/v2');
-  const secondUrl = useAssetsStore.getState().assets[AGILE_ROBOT_PREVIEW_ASSET_KEY];
-
-  assert.ok(firstUrl, 'expected a blob URL after the first reload');
-  assert.ok(secondUrl, 'expected a blob URL after the second reload');
-  assert.notEqual(secondUrl, firstUrl, 'expected the stored URL to point at the new mesh');
+  await assert.rejects(() => reloadMeshFromUrl('https://api.example.com/bad', port));
+  assert.equal(imported.length, 0);
 });

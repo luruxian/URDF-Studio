@@ -11,7 +11,7 @@
 import { useCallback, useRef } from 'react';
 import { hasBootstrap, getBootstrap } from '../bootstrap';
 import { jimengEdit, hunyuanSubmit, hunyuanPollJob, AgileRobotApiError } from '../api';
-import { reloadMeshFromUrl } from '../meshReload';
+import { reloadMeshFromUrl, type MeshReloadImportPort } from '../meshReload';
 import type {
   AIConversationToolsConfig,
   AIConversationToolDef,
@@ -127,8 +127,18 @@ function parseToolCalls(rawToolCalls: RawToolCall[]): ParsedToolCall | null {
 // Hook
 // ============================================================
 
-export function useAgileRobotTools(): AIConversationToolsConfig | null {
+export interface UseAgileRobotToolsOptions {
+  /** Port that routes a regenerated GLB through the app file-import pipeline so
+   *  the 3D viewport updates. Required for hot-reload; without it a successful
+   *  regeneration cannot swap the visible model. */
+  reloadMesh?: MeshReloadImportPort | null;
+}
+
+export function useAgileRobotTools(options: UseAgileRobotToolsOptions = {}): AIConversationToolsConfig | null {
+  const { reloadMesh = null } = options;
   const abortRef = useRef<AbortController | null>(null);
+  const reloadMeshRef = useRef<MeshReloadImportPort | null>(reloadMesh);
+  reloadMeshRef.current = reloadMesh;
 
   const onExecute = useCallback(
     async (toolCall: ParsedToolCall): Promise<ToolResult> => {
@@ -157,7 +167,14 @@ export function useAgileRobotTools(): AIConversationToolsConfig | null {
           const job = await hunyuanPollJob(signal);
 
           if (job.status === 'done' && job.preview_url) {
-            await reloadMeshFromUrl(job.preview_url);
+            const reloadMesh = reloadMeshRef.current;
+            if (!reloadMesh) {
+              return {
+                success: false,
+                message: '3D 模型已生成，但预览刷新未接入',
+              };
+            }
+            await reloadMeshFromUrl(job.preview_url, reloadMesh);
             return { success: true, message: '3D 模型已更新' };
           }
 
@@ -172,7 +189,14 @@ export function useAgileRobotTools(): AIConversationToolsConfig | null {
           const job = await hunyuanPollJob(signal);
 
           if (job.status === 'done' && job.preview_url) {
-            await reloadMeshFromUrl(job.preview_url);
+            const reloadMesh = reloadMeshRef.current;
+            if (!reloadMesh) {
+              return {
+                success: false,
+                message: '3D 模型已生成，但预览刷新未接入',
+              };
+            }
+            await reloadMeshFromUrl(job.preview_url, reloadMesh);
             return { success: true, message: '3D 模型已更新' };
           }
 

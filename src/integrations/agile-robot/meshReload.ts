@@ -1,21 +1,28 @@
-import { useAssetsStore } from '@/store';
-
 // ============================================================
 // Mesh hot-reload
 // ============================================================
 
-/** assetsStore key under which the hot-reloaded GLB blob URL is stored. The
- *  viewer reads this key and re-renders when the blob URL changes. */
-export const AGILE_ROBOT_PREVIEW_ASSET_KEY = '__agile_robot_preview__/updated_model.glb';
+/** Port injected by the app layer so a regenerated GLB can be routed through
+ *  the standard file-import pipeline (which swaps the model in the 3D
+ *  viewport). The integration layer must not depend on app/features, so the
+ *  app layer supplies this narrow contract instead of the integration importing
+ *  handleImport directly. */
+export interface MeshReloadImportPort {
+  /** Import a GLB File as the current robot, replacing the visible model. */
+  importMeshFile: (file: File) => Promise<unknown>;
+}
 
 /**
- * Fetch a GLB from the given preview_url and hot-reload it into the viewer.
- * Creates a blob URL and stores it in assetsStore under
- * AGILE_ROBOT_PREVIEW_ASSET_KEY, replacing any previously stored mesh. Throws
- * when the response is not OK or the body is empty. Cleanup of the replaced
- * blob URL is handled by assetsStore.addAsset, which revokes it.
+ * Fetch a GLB from the given preview_url and route it through the app's
+ * file-import pipeline so the 3D viewport shows the regenerated model.
+ * Throws when the response is not OK or the body is empty. The provided port
+ * owns the actual import (the app layer reuses handleImport with
+ * forceLoadRobot, matching how ?mesh= loads a GLB into the workspace).
  */
-export async function reloadMeshFromUrl(previewUrl: string): Promise<void> {
+export async function reloadMeshFromUrl(
+  previewUrl: string,
+  port: MeshReloadImportPort,
+): Promise<void> {
   const response = await fetch(previewUrl);
   if (!response.ok) {
     throw new Error(`Failed to fetch mesh: ${response.status}`);
@@ -30,6 +37,5 @@ export async function reloadMeshFromUrl(previewUrl: string): Promise<void> {
     type: 'model/gltf-binary',
   });
 
-  const blobUrl = URL.createObjectURL(file);
-  useAssetsStore.getState().addAsset(AGILE_ROBOT_PREVIEW_ASSET_KEY, blobUrl);
+  await port.importMeshFile(file);
 }
