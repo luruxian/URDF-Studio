@@ -1,6 +1,7 @@
 import { AIConversationModal } from '@/features/ai-assistant';
 import type { AIConversationLaunchContext } from '@/features/ai-assistant';
 import type { Language } from '@/shared/i18n';
+import { useAgileRobotTools } from '@/integrations/agile-robot';
 
 interface AIConversationConnectorProps {
   isOpen: boolean;
@@ -17,6 +18,8 @@ export function AIConversationConnector({
   launchContext,
   onStartNewConversation,
 }: AIConversationConnectorProps) {
+  const toolsConfig = useAgileRobotTools();
+
   return (
     <AIConversationModal
       isOpen={isOpen}
@@ -24,6 +27,7 @@ export function AIConversationConnector({
       lang={lang}
       launchContext={launchContext}
       onStartNewConversation={onStartNewConversation}
+      toolsConfig={toolsConfig}
     />
   );
 }
