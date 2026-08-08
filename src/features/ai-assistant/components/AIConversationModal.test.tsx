@@ -291,6 +291,71 @@ const sendFirstPrompt = async (container: ParentNode) => {
   await clickButton(findButtonByText(container, firstPrompt));
 };
 
+/** A plain assistant reply stream that produces no tool_calls. */
+const PLAIN_REPLY_CHUNKS: Array<Record<string, unknown>> = [
+  { choices: [{ delta: { content: '好的，已为你处理' } }] },
+  { choices: [{ finish_reason: 'stop' }] },
+];
+
+/** Replace OpenAI create with a queue of chunk-arrays, one per call. */
+const installOpenAICreateMockSequence = (
+  sequence: Array<Array<Record<string, unknown>>>,
+): OpenAICreateMock => {
+  const originalCreate = OpenAI.Chat.Completions.prototype.create;
+  let captured: unknown;
+  let index = 0;
+
+  OpenAI.Chat.Completions.prototype.create = async function mockCreate(
+    this: unknown,
+    params: { tools?: unknown },
+  ) {
+    captured = params.tools;
+    const chunks = sequence[index] ?? [];
+    index += 1;
+    return {
+      async *[Symbol.asyncIterator]() {
+        for (const chunk of chunks) {
+          yield chunk;
+        }
+      },
+    } as AsyncIterable<unknown>;
+  } as unknown as typeof OpenAI.Chat.Completions.prototype.create;
+
+  return {
+    capturedTools: () => captured,
+    restore: () => {
+      OpenAI.Chat.Completions.prototype.create = originalCreate;
+    },
+  };
+};
+
+/** Simulate typing into the controlled textarea and pressing send. */
+const typeAndSend = async (container: ParentNode, text: string) => {
+  const textarea = getTextarea(container);
+  const prototype = textarea.ownerDocument.defaultView?.HTMLTextAreaElement.prototype;
+  const valueSetter = prototype
+    ? Object.getOwnPropertyDescriptor(prototype, 'value')?.set
+    : undefined;
+  assert.ok(valueSetter, 'HTMLTextAreaElement value setter should exist');
+
+  const reactPropsKey = Object.keys(textarea).find((key) => key.startsWith('__reactProps$'));
+  assert.ok(reactPropsKey, 'React props key should exist on rendered textarea');
+  const reactProps = (textarea as unknown as Record<string, unknown>)[
+    reactPropsKey
+  ] as Record<string, unknown>;
+  const onChange = reactProps.onChange;
+  assert.equal(typeof onChange, 'function', 'React onChange handler should exist');
+
+  await act(async () => {
+    valueSetter.call(textarea, text);
+    (onChange as (event: { target: HTMLTextAreaElement; currentTarget: HTMLTextAreaElement }) => void)({
+      target: textarea,
+      currentTarget: textarea,
+    });
+  });
+  await clickButton(findButtonByText(container, '发送'));
+};
+
 test('AIConversationModal opens at the front and remains front when activated', async () => {
   const previousApiKey = process.env.API_KEY;
   process.env.API_KEY = '';
@@ -921,6 +986,122 @@ test('cancel dismisses the banner and appends 已取消 to the chat', async () =
     assert.equal(container.textContent?.includes('已取消'), true);
     assert.equal(container.textContent?.includes('将机身改成橙色'), false);
     assert.equal(container.textContent?.includes('确认'), false);
+  } finally {
+    openaiMock.restore();
+    restoreDirectAiEnv(directEnv);
+    await act(async () => {
+      root.unmount();
+    });
+    dom.window.close();
+  }
+});
+
+test('done banner auto-dismisses after 3 seconds', async () => {
+  const directEnv = setDirectAiEnv();
+  const openaiMock = installOpenAICreateMock(TOOL_CALL_STREAM_CHUNKS);
+  const toolsConfig = createToolsConfig({
+    onExecute: async () => ({ success: true, message: '改图任务已提交' }),
+  });
+  const dom = installDom();
+  const container = dom.window.document.getElementById('root');
+  assert.ok(container, 'root container should exist');
+
+  const { AIConversationModal } = await import('./AIConversationModal.tsx');
+  const root = createRoot(container);
+
+  try {
+    await act(async () => {
+      root.render(
+        <AIConversationModal
+          isOpen
+          onClose={() => {}}
+          lang="zh"
+          launchContext={createLaunchContext()}
+          onStartNewConversation={() => {}}
+          toolsConfig={toolsConfig}
+        />,
+      );
+    });
+    await flush();
+
+    await sendFirstPrompt(container);
+    await flush();
+    await flush();
+
+    await clickButton(findButtonByText(container, '确认'));
+    await flush();
+    await flush();
+
+    assert.equal(container.textContent?.includes('改图任务已提交'), true);
+
+    // Wait past the 3s auto-dismiss timeout.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 3200));
+    });
+    await flush();
+
+    assert.equal(container.textContent?.includes('改图任务已提交'), false);
+    assert.equal(container.textContent?.includes('确认'), false);
+    assert.equal(container.textContent?.includes('取消'), false);
+  } finally {
+    openaiMock.restore();
+    restoreDirectAiEnv(directEnv);
+    await act(async () => {
+      root.unmount();
+    });
+    dom.window.close();
+  }
+});
+
+test('starting a new send clears a stale tool-confirmation banner', async () => {
+  const directEnv = setDirectAiEnv();
+  const openaiMock = installOpenAICreateMockSequence([
+    TOOL_CALL_STREAM_CHUNKS,
+    PLAIN_REPLY_CHUNKS,
+  ]);
+  const toolsConfig = createToolsConfig({
+    onExecute: async () => ({ success: true, message: '改图任务已提交' }),
+  });
+  const dom = installDom();
+  const container = dom.window.document.getElementById('root');
+  assert.ok(container, 'root container should exist');
+
+  const { AIConversationModal } = await import('./AIConversationModal.tsx');
+  const root = createRoot(container);
+
+  try {
+    await act(async () => {
+      root.render(
+        <AIConversationModal
+          isOpen
+          onClose={() => {}}
+          lang="zh"
+          launchContext={createLaunchContext()}
+          onStartNewConversation={() => {}}
+          toolsConfig={toolsConfig}
+        />,
+      );
+    });
+    await flush();
+
+    await sendFirstPrompt(container);
+    await flush();
+    await flush();
+
+    await clickButton(findButtonByText(container, '确认'));
+    await flush();
+    await flush();
+    assert.equal(container.textContent?.includes('改图任务已提交'), true);
+
+    // A second send must drop the stale success banner immediately, before any
+    // new tool_calls stream arrives.
+    await typeAndSend(container, '再来一次');
+    await flush();
+    await flush();
+
+    assert.equal(container.textContent?.includes('改图任务已提交'), false);
+    assert.equal(container.textContent?.includes('确认'), false);
+    assert.equal(container.textContent?.includes('取消'), false);
   } finally {
     openaiMock.restore();
     restoreDirectAiEnv(directEnv);

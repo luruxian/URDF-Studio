@@ -201,6 +201,7 @@ export function AIConversationModal({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const doneTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isComposingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const skipNextSessionResetRef = useRef(false);
@@ -239,6 +240,10 @@ export function AIConversationModal({
     (options?: { preserveMessages?: boolean; startNewConversation?: boolean }) => {
       abortControllerRef.current?.abort();
       abortControllerRef.current = null;
+      if (doneTimeoutRef.current) {
+        clearTimeout(doneTimeoutRef.current);
+        doneTimeoutRef.current = null;
+      }
       requestIdRef.current += 1;
       setMessages((currentMessages) => {
         if (!options?.preserveMessages) {
@@ -275,6 +280,10 @@ export function AIConversationModal({
       if (copiedTimerRef.current) {
         clearTimeout(copiedTimerRef.current);
         copiedTimerRef.current = null;
+      }
+      if (doneTimeoutRef.current) {
+        clearTimeout(doneTimeoutRef.current);
+        doneTimeoutRef.current = null;
       }
     };
   }, []);
@@ -410,6 +419,16 @@ export function AIConversationModal({
       requestIdRef.current === requestId &&
       abortControllerRef.current === abortController;
 
+    // A new send supersedes any pending tool-confirmation banner so stale
+    // confirm/cancel buttons from a previous turn don't linger.
+    if (doneTimeoutRef.current) {
+      clearTimeout(doneTimeoutRef.current);
+      doneTimeoutRef.current = null;
+    }
+    setToolConfirmState('idle');
+    setPendingToolCall(null);
+    setToolResult(null);
+
     setLastSubmittedTurn({
       history: history.map((message) => ({ ...message })),
       userMessage: trimmedMessage,
@@ -540,6 +559,19 @@ export function AIConversationModal({
     const result = await toolsConfig.onExecute(pendingToolCall);
     setToolResult(result);
     setToolConfirmState(result.success ? 'done' : 'error');
+    if (result.success) {
+      // Auto-dismiss the success banner after a short delay. Identity-guard the
+      // state updates so a newer tool call or a new send is never clobbered by
+      // this stale timer.
+      if (doneTimeoutRef.current) {
+        clearTimeout(doneTimeoutRef.current);
+      }
+      doneTimeoutRef.current = setTimeout(() => {
+        setToolConfirmState((current) => (current === 'done' ? 'idle' : current));
+        setPendingToolCall((current) => (current === pendingToolCall ? null : current));
+        setToolResult((current) => (current === result ? null : current));
+      }, 3000);
+    }
   }, [pendingToolCall, toolsConfig]);
 
   const handleToolCancel = useCallback(() => {
