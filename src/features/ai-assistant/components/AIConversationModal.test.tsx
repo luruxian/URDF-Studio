@@ -7,6 +7,8 @@ import { JSDOM } from 'jsdom';
 
 import { DEFAULT_MANAGED_WINDOW_ORDER, useUIStore } from '@/store';
 import { GeometryType, JointType, type RobotState } from '@/types';
+import OpenAI from 'openai';
+import type { AIConversationToolsConfig, ParsedToolCall } from '@/integrations/agile-robot/types';
 import type { AIConversationLaunchContext } from '../types';
 import { buildConversationPromptSuggestions } from '../utils/conversationPromptSuggestions';
 
@@ -152,6 +154,141 @@ const clickButton = async (button: HTMLButtonElement) => {
   await act(async () => {
     button.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
   });
+};
+
+const API_KEY_ENV_NAMES = ['API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY'] as const;
+
+const captureApiKeyEnv = (): Record<(typeof API_KEY_ENV_NAMES)[number], string | undefined> => ({
+  API_KEY: process.env.API_KEY,
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+});
+
+const restoreApiKeyEnv = (
+  snapshot: Record<(typeof API_KEY_ENV_NAMES)[number], string | undefined>,
+) => {
+  for (const envName of API_KEY_ENV_NAMES) {
+    const value = snapshot[envName];
+    if (value === undefined) {
+      delete process.env[envName];
+      continue;
+    }
+
+    process.env[envName] = value;
+  }
+};
+
+interface DirectAiEnv {
+  apiKeySnapshot: Record<(typeof API_KEY_ENV_NAMES)[number], string | undefined>;
+  previousBackendUrl: string | undefined;
+}
+
+const setDirectAiEnv = (): DirectAiEnv => {
+  const apiKeySnapshot = captureApiKeyEnv();
+  const previousBackendUrl = process.env.AI_BACKEND_URL;
+  delete process.env.API_KEY;
+  process.env.OPENAI_API_KEY = 'test-openai-key';
+  delete process.env.GEMINI_API_KEY;
+  delete process.env.AI_BACKEND_URL;
+  return { apiKeySnapshot, previousBackendUrl };
+};
+
+const restoreDirectAiEnv = (env: DirectAiEnv) => {
+  restoreApiKeyEnv(env.apiKeySnapshot);
+  if (env.previousBackendUrl === undefined) {
+    delete process.env.AI_BACKEND_URL;
+    return;
+  }
+
+  process.env.AI_BACKEND_URL = env.previousBackendUrl;
+};
+
+const createToolsConfig = (
+  overrides?: Partial<AIConversationToolsConfig>,
+): AIConversationToolsConfig => ({
+  tools: [
+    {
+      type: 'function',
+      function: {
+        name: 'edit_appearance',
+        description: '改图',
+        parameters: { type: 'object', properties: { prompt: { type: 'string' } } },
+      },
+    },
+  ],
+  parseToolCalls: (calls) => {
+    const named = calls.find((call) => call.function.name === 'edit_appearance');
+    if (!named) {
+      return null;
+    }
+
+    return { toolName: 'edit_appearance', args: {}, summary: '将机身改成橙色' };
+  },
+  onExecute: async () => ({ success: true, message: '改图任务已提交' }),
+  ...overrides,
+});
+
+const TOOL_CALL_STREAM_CHUNKS: Array<Record<string, unknown>> = [
+  {
+    choices: [
+      {
+        delta: {
+          tool_calls: [
+            { index: 0, id: 'call_1', function: { name: 'edit_appearance' } },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    choices: [
+      {
+        delta: { tool_calls: [{ index: 0, function: { arguments: '{"prompt":"把机身改成橙色"}' } }] },
+      },
+    ],
+  },
+  { choices: [{ finish_reason: 'tool_calls' }] },
+];
+
+interface OpenAICreateMock {
+  capturedTools: () => unknown;
+  restore: () => void;
+}
+
+const installOpenAICreateMock = (chunks: Array<Record<string, unknown>>): OpenAICreateMock => {
+  const originalCreate = OpenAI.Chat.Completions.prototype.create;
+  let captured: unknown;
+
+  OpenAI.Chat.Completions.prototype.create = async function mockCreate(
+    this: unknown,
+    params: { tools?: unknown },
+  ) {
+    captured = params.tools;
+    return {
+      async *[Symbol.asyncIterator]() {
+        for (const chunk of chunks) {
+          yield chunk;
+        }
+      },
+    } as AsyncIterable<unknown>;
+  } as unknown as typeof OpenAI.Chat.Completions.prototype.create;
+
+  return {
+    capturedTools: () => captured,
+    restore: () => {
+      OpenAI.Chat.Completions.prototype.create = originalCreate;
+    },
+  };
+};
+
+const sendFirstPrompt = async (container: ParentNode) => {
+  const [firstPrompt] = buildConversationPromptSuggestions({
+    lang: 'zh',
+    isReportFollowup: false,
+    selectedEntityName: null,
+  });
+  assert.ok(firstPrompt, 'expected at least one prompt suggestion');
+  await clickButton(findButtonByText(container, firstPrompt));
 };
 
 test('AIConversationModal opens at the front and remains front when activated', async () => {
@@ -600,6 +737,193 @@ test('suggested prompts expose hover and focus border highlight styles', async (
       'suggested prompt label should stay emphasized for keyboard focus',
     );
   } finally {
+    await act(async () => {
+      root.unmount();
+    });
+    dom.window.close();
+  }
+});
+
+test('without toolsConfig a tool_calls stream renders no confirmation banner', async () => {
+  const directEnv = setDirectAiEnv();
+  const openaiMock = installOpenAICreateMock(TOOL_CALL_STREAM_CHUNKS);
+  const dom = installDom();
+  const container = dom.window.document.getElementById('root');
+  assert.ok(container, 'root container should exist');
+
+  const { AIConversationModal } = await import('./AIConversationModal.tsx');
+  const root = createRoot(container);
+
+  try {
+    await act(async () => {
+      root.render(
+        <AIConversationModal
+          isOpen
+          onClose={() => {}}
+          lang="zh"
+          launchContext={createLaunchContext()}
+          onStartNewConversation={() => {}}
+        />,
+      );
+    });
+    await flush();
+
+    await sendFirstPrompt(container);
+    await flush();
+    await flush();
+
+    assert.equal(container.textContent?.includes('将机身改成橙色'), false);
+    assert.equal(container.textContent?.includes('确认'), false);
+  } finally {
+    openaiMock.restore();
+    restoreDirectAiEnv(directEnv);
+    await act(async () => {
+      root.unmount();
+    });
+    dom.window.close();
+  }
+});
+
+test('toolsConfig passes tools to the stream and renders the confirmation banner on tool_calls', async () => {
+  const directEnv = setDirectAiEnv();
+  const openaiMock = installOpenAICreateMock(TOOL_CALL_STREAM_CHUNKS);
+  const toolsConfig = createToolsConfig();
+  const dom = installDom();
+  const container = dom.window.document.getElementById('root');
+  assert.ok(container, 'root container should exist');
+
+  const { AIConversationModal } = await import('./AIConversationModal.tsx');
+  const root = createRoot(container);
+
+  try {
+    await act(async () => {
+      root.render(
+        <AIConversationModal
+          isOpen
+          onClose={() => {}}
+          lang="zh"
+          launchContext={createLaunchContext()}
+          onStartNewConversation={() => {}}
+          toolsConfig={toolsConfig}
+        />,
+      );
+    });
+    await flush();
+
+    await sendFirstPrompt(container);
+    await flush();
+    await flush();
+
+    assert.deepEqual(openaiMock.capturedTools(), toolsConfig.tools);
+    assert.equal(container.textContent?.includes('将机身改成橙色'), true);
+    assert.ok(findButtonByText(container, '确认'), 'expected a confirm action in the banner');
+    assert.ok(findButtonByText(container, '取消'), 'expected a cancel action in the banner');
+  } finally {
+    openaiMock.restore();
+    restoreDirectAiEnv(directEnv);
+    await act(async () => {
+      root.unmount();
+    });
+    dom.window.close();
+  }
+});
+
+test('confirm executes the confirmed tool and renders its success result', async () => {
+  const directEnv = setDirectAiEnv();
+  const openaiMock = installOpenAICreateMock(TOOL_CALL_STREAM_CHUNKS);
+  const executedCalls: ParsedToolCall[] = [];
+  const toolsConfig = createToolsConfig({
+    onExecute: async (call) => {
+      executedCalls.push(call);
+      return { success: true, message: '改图任务已提交' };
+    },
+  });
+  const dom = installDom();
+  const container = dom.window.document.getElementById('root');
+  assert.ok(container, 'root container should exist');
+
+  const { AIConversationModal } = await import('./AIConversationModal.tsx');
+  const root = createRoot(container);
+
+  try {
+    await act(async () => {
+      root.render(
+        <AIConversationModal
+          isOpen
+          onClose={() => {}}
+          lang="zh"
+          launchContext={createLaunchContext()}
+          onStartNewConversation={() => {}}
+          toolsConfig={toolsConfig}
+        />,
+      );
+    });
+    await flush();
+
+    await sendFirstPrompt(container);
+    await flush();
+    await flush();
+
+    await clickButton(findButtonByText(container, '确认'));
+    await flush();
+    await flush();
+
+    assert.equal(executedCalls.length, 1);
+    assert.equal(executedCalls[0]?.toolName, 'edit_appearance');
+    assert.equal(container.textContent?.includes('改图任务已提交'), true);
+    assert.equal(container.textContent?.includes('将机身改成橙色'), false);
+  } finally {
+    openaiMock.restore();
+    restoreDirectAiEnv(directEnv);
+    await act(async () => {
+      root.unmount();
+    });
+    dom.window.close();
+  }
+});
+
+test('cancel dismisses the banner and appends 已取消 to the chat', async () => {
+  const directEnv = setDirectAiEnv();
+  const openaiMock = installOpenAICreateMock(TOOL_CALL_STREAM_CHUNKS);
+  const toolsConfig = createToolsConfig();
+  const dom = installDom();
+  const container = dom.window.document.getElementById('root');
+  assert.ok(container, 'root container should exist');
+
+  const { AIConversationModal } = await import('./AIConversationModal.tsx');
+  const root = createRoot(container);
+
+  try {
+    await act(async () => {
+      root.render(
+        <AIConversationModal
+          isOpen
+          onClose={() => {}}
+          lang="zh"
+          launchContext={createLaunchContext()}
+          onStartNewConversation={() => {}}
+          toolsConfig={toolsConfig}
+        />,
+      );
+    });
+    await flush();
+
+    await sendFirstPrompt(container);
+    await flush();
+    await flush();
+
+    assert.equal(container.textContent?.includes('将机身改成橙色'), true);
+
+    await clickButton(findButtonByText(container, '取消'));
+    await flush();
+    await flush();
+
+    assert.equal(container.textContent?.includes('已取消'), true);
+    assert.equal(container.textContent?.includes('将机身改成橙色'), false);
+    assert.equal(container.textContent?.includes('确认'), false);
+  } finally {
+    openaiMock.restore();
+    restoreDirectAiEnv(directEnv);
     await act(async () => {
       root.unmount();
     });

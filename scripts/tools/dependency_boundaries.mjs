@@ -356,6 +356,7 @@ function classifyLayer(relPath) {
   }
   const rest = relPath.slice(SRC.length + 1);
   if (rest.startsWith('app/')) return 'app';
+  if (rest.startsWith('integrations/')) return 'integrations';
   if (rest.startsWith('store/')) return 'store';
   if (rest.startsWith('shared/')) return 'shared';
   if (rest.startsWith('core/')) return 'core';
@@ -405,7 +406,10 @@ function checkBoundary(importerRel, importerLayer, targetLayer, spec, resolvedRe
   if (importerLayer === 'core') {
     if (targetLayer === 'react-ui') {
       reason = 'core must stay pure: no React / @react-three';
-    } else if (['app', 'store', 'shared', 'lib'].includes(targetLayer) || targetFeature) {
+    } else if (
+      ['app', 'integrations', 'store', 'shared', 'lib'].includes(targetLayer) ||
+      targetFeature
+    ) {
       reason = `core must not import ${targetLayer} (core sits below shared/store/features)`;
     }
   } else if (importerFeature) {
@@ -414,16 +418,23 @@ function checkBoundary(importerRel, importerLayer, targetLayer, spec, resolvedRe
     } else if (targetFeature && targetFeature !== importerFeature) {
       reason = `cross-feature import: features talk via store, not feature:${targetFeature}`;
     }
+  } else if (importerLayer === 'integrations') {
+    // integrations sits below features and above store (app -> features ->
+    // integrations -> store -> shared -> core -> types): it may reach down into
+    // store/shared/core/types, but must not orchestrate back up into app/features.
+    if (targetLayer === 'app' || targetFeature) {
+      reason = `integrations must not import ${targetLayer}`;
+    }
   } else if (importerLayer === 'shared') {
-    if (targetLayer === 'app' || targetLayer === 'store' || targetFeature) {
+    if (targetLayer === 'app' || targetLayer === 'store' || targetLayer === 'integrations' || targetFeature) {
       reason = `shared must not import ${targetLayer}`;
     }
   } else if (importerLayer === 'store') {
-    if (targetLayer === 'app' || targetFeature) {
+    if (targetLayer === 'app' || targetLayer === 'integrations' || targetFeature) {
       reason = `store must not import ${targetLayer}`;
     }
   } else if (importerLayer === 'lib') {
-    if (targetLayer === 'app' || targetLayer === 'store' || targetFeature) {
+    if (targetLayer === 'app' || targetLayer === 'store' || targetLayer === 'integrations' || targetFeature) {
       reason = `lib must not import ${targetLayer}`;
     }
   }

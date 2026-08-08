@@ -40,6 +40,13 @@ import {
   startNewConversationTimeline,
 } from '../utils/conversationTimeline';
 import type { AIConversationLaunchContext, AIConversationMessage } from '../types';
+import { ToolConfirmBanner } from '@/integrations/agile-robot/components/ToolConfirmBanner';
+import type {
+  AIConversationToolsConfig,
+  ParsedToolCall,
+  ToolResult,
+  ToolConfirmState,
+} from '@/integrations/agile-robot/types';
 
 interface AIConversationModalProps {
   isOpen: boolean;
@@ -47,6 +54,8 @@ interface AIConversationModalProps {
   lang: Language;
   launchContext: AIConversationLaunchContext | null;
   onStartNewConversation: (launchContext: AIConversationLaunchContext) => void;
+  // Optional Agile-Robot tool calling. When omitted, behavior is unchanged.
+  toolsConfig?: AIConversationToolsConfig | null;
 }
 
 interface ConversationSubmissionState {
@@ -141,6 +150,7 @@ export function AIConversationModal({
   lang,
   launchContext,
   onStartNewConversation,
+  toolsConfig,
 }: AIConversationModalProps) {
   const t = translations[lang];
   const conversationWindowLayer = useManagedWindowLayer('aiConversation');
@@ -182,6 +192,9 @@ export function AIConversationModal({
     null,
   );
   const [requestError, setRequestError] = useState<string | null>(null);
+  const [toolConfirmState, setToolConfirmState] = useState<ToolConfirmState>('idle');
+  const [pendingToolCall, setPendingToolCall] = useState<ParsedToolCall | null>(null);
+  const [toolResult, setToolResult] = useState<ToolResult | null>(null);
 
   const isMountedRef = useRef(false);
   const requestIdRef = useRef(0);
@@ -244,6 +257,9 @@ export function AIConversationModal({
       setLastSubmittedTurn(null);
       setPendingResetAction(null);
       setRequestError(null);
+      setToolConfirmState('idle');
+      setPendingToolCall(null);
+      setToolResult(null);
       isComposingRef.current = false;
     },
     [],
@@ -436,6 +452,19 @@ export function AIConversationModal({
 
           setMessages((prev) => appendTrailingAssistantDelta(prev, delta));
         },
+        ...(toolsConfig
+          ? {
+              tools: toolsConfig.tools,
+              onToolCalls: (rawToolCalls) => {
+                const parsed = toolsConfig.parseToolCalls(rawToolCalls);
+                if (parsed) {
+                  setPendingToolCall(parsed);
+                  setToolConfirmState('parsed');
+                  setToolResult(null);
+                }
+              },
+            }
+          : {}),
       });
 
       if (!isRequestActive()) {
@@ -501,6 +530,29 @@ export function AIConversationModal({
       replaceCurrentConversation: true,
     });
   };
+
+  const handleToolConfirm = useCallback(async () => {
+    if (!pendingToolCall || !toolsConfig) {
+      return;
+    }
+
+    setToolConfirmState('executing');
+    const result = await toolsConfig.onExecute(pendingToolCall);
+    setToolResult(result);
+    setToolConfirmState(result.success ? 'done' : 'error');
+  }, [pendingToolCall, toolsConfig]);
+
+  const handleToolCancel = useCallback(() => {
+    setToolConfirmState('cancelled');
+    setPendingToolCall(null);
+    setToolResult(null);
+    // Reflect the dismissed tool request as an explicit assistant message.
+    setMessages((prev) => [...prev, createConversationMessage('assistant', '已取消')]);
+  }, []);
+
+  const handleToolRetry = useCallback(() => {
+    void handleToolConfirm();
+  }, [handleToolConfirm]);
 
   if (!isOpen || !launchContext) {
     return null;
@@ -732,6 +784,21 @@ export function AIConversationModal({
                 </div>
               )}
             </div>
+
+            {toolsConfig && pendingToolCall && (
+              <div className="shrink-0 border-t border-border-black bg-element-bg px-4 py-3">
+                <ToolConfirmBanner
+                  state={toolConfirmState}
+                  toolCall={pendingToolCall}
+                  result={toolResult ?? undefined}
+                  onConfirm={() => {
+                    void handleToolConfirm();
+                  }}
+                  onCancel={handleToolCancel}
+                  onRetry={toolConfirmState === 'error' ? handleToolRetry : undefined}
+                />
+              </div>
+            )}
 
             <div
               className={`shrink-0 border-t border-border-black bg-element-bg ${
