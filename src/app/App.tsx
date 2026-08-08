@@ -24,6 +24,7 @@ import { resolveExportErrorMessage } from './utils/exportErrorMessage';
 import { useUIStore, useAssetsStore } from '@/store';
 import type { InspectionReport, RobotFile, RobotState } from '@/types';
 import { translations } from '@/shared/i18n';
+import { useAgileRobotBootstrap } from '@/integrations/agile-robot';
 import type { ExportDialogConfig, ExportFormat, ExportProgressState } from '@/features/file-io';
 import { EXPORT_FORMATS } from '@/features/file-io/components/ExportDialog/config';
 import type { ImportPreparationOverlayState } from './hooks/useFileImport';
@@ -61,6 +62,9 @@ function preloadOverlay(label: string, preload: () => Promise<unknown>): void {
 
 export function AppContent({ extensions, onExposeActions }: AppContentProps = {}) {
   useUnsavedChangesPrompt();
+
+  // NEW — listen for robots:studio-bootstrap postMessage
+  useAgileRobotBootstrap();
 
   // Refs for file inputs
   const importInputRef = useRef<HTMLInputElement>(null);
