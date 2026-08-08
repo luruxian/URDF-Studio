@@ -114,6 +114,10 @@ function parseToolCalls(rawToolCalls: RawToolCall[]): ParsedToolCall | null {
     return null;
   }
 
+  // JSON.parse may legitimately return null or a scalar; buildSummary needs an
+  // object to read args.prompt, so treat anything non-object as non-executable.
+  if (args === null || typeof args !== 'object') return null;
+
   if (!tc.function.name) return null;
 
   return {

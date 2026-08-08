@@ -210,6 +210,24 @@ test('parseToolCalls returns null for invalid JSON arguments', async () => {
   await rendered.cleanup();
 });
 
+test('parseToolCalls returns null when arguments parse to a non-object value', async () => {
+  sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
+  const rendered = await renderHook();
+  const config = rendered.current;
+  assert.notEqual(config, null);
+
+  const nullResult = config!.parseToolCalls([
+    { function: { name: 'edit_robot_appearance', arguments: 'null' } },
+  ]);
+  const scalarResult = config!.parseToolCalls([
+    { function: { name: 'edit_robot_appearance', arguments: '123' } },
+  ]);
+
+  assert.equal(nullResult, null, 'null arguments should not be treated as a tool call');
+  assert.equal(scalarResult, null, 'scalar arguments should not be treated as a tool call');
+  await rendered.cleanup();
+});
+
 
 test('parseToolCalls returns null when the tool name is missing', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
