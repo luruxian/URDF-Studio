@@ -2,12 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  accumulateToolCallDeltas,
   buildConversationMessages,
   extractConversationDelta,
   isConversationAbortError,
   sendConversationTurn,
   sendConversationTurnStream,
   serializeConversationHistory,
+  type ConversationToolCall,
+  type ConversationToolDefinition,
 } from './conversationService.ts';
 import OpenAI from 'openai';
 
@@ -132,6 +135,52 @@ test('extractConversationDelta concatenates streamed content fragments', () => {
 
   assert.equal(delta, 'First second');
   assert.equal(extractConversationDelta(undefined), '');
+});
+
+test('accumulateToolCallDeltas accumulates tool_call fragments across chunks by index', () => {
+  const acc = new Map<number, { id?: string; name?: string; arguments: string }>();
+
+  accumulateToolCallDeltas(acc, {
+    choices: [
+      {
+        delta: {
+          tool_calls: [{ index: 0, id: 'call_1', function: { name: 'look_up_motor' } }],
+        },
+      },
+    ],
+  });
+  accumulateToolCallDeltas(acc, {
+    choices: [
+      {
+        delta: {
+          tool_calls: [{ index: 0, function: { arguments: '{"name":' } }],
+        },
+      },
+    ],
+  });
+  accumulateToolCallDeltas(acc, {
+    choices: [
+      {
+        delta: {
+          tool_calls: [{ index: 0, function: { arguments: '"J10"}' } }],
+        },
+      },
+    ],
+  });
+
+  assert.deepEqual(Array.from(acc.values()), [
+    { id: 'call_1', name: 'look_up_motor', arguments: '{"name":"J10"}' },
+  ]);
+
+  // Null / undefined / empty chunks are no-ops and do not disturb the map.
+  accumulateToolCallDeltas(acc, undefined);
+  accumulateToolCallDeltas(acc, null);
+  accumulateToolCallDeltas(acc, { choices: [] });
+  accumulateToolCallDeltas(acc, { choices: [{ delta: { content: 'text' } }] });
+  assert.equal(acc.size, 1);
+  assert.deepEqual(Array.from(acc.values()), [
+    { id: 'call_1', name: 'look_up_motor', arguments: '{"name":"J10"}' },
+  ]);
 });
 
 test('isConversationAbortError recognizes SDK abort errors and AbortError names', () => {
@@ -319,5 +368,145 @@ test('sendConversationTurnStream maps backend 401 to a login-required error', as
     } else {
       process.env.AI_BACKEND_URL = previousBackendUrl;
     }
+  }
+});
+
+test('sendConversationTurnStream passes tools and calls onToolCalls when finish_reason is tool_calls', async () => {
+  const envSnapshot = captureApiKeyEnv();
+  const originalCreate = OpenAI.Chat.Completions.prototype.create;
+  const tools: ConversationToolDefinition[] = [
+    {
+      type: 'function',
+      function: {
+        name: 'look_up_motor',
+        description: 'Look up motor specs by name',
+        parameters: { type: 'object', properties: { name: { type: 'string' } } },
+      },
+    },
+  ];
+  let capturedTools: unknown;
+
+  delete process.env.API_KEY;
+  process.env.OPENAI_API_KEY = 'test-openai-key';
+  delete process.env.GEMINI_API_KEY;
+
+  OpenAI.Chat.Completions.prototype.create = async function mockCreate(
+    this: unknown,
+    params: { tools?: unknown },
+  ) {
+    capturedTools = params.tools;
+    return {
+      async *[Symbol.asyncIterator]() {
+        yield {
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  { index: 0, id: 'call_1', function: { name: 'look_up_motor' } },
+                ],
+              },
+            },
+          ],
+        };
+        yield {
+          choices: [
+            {
+              delta: { tool_calls: [{ index: 0, function: { arguments: '{"name":' } }] },
+            },
+          ],
+        };
+        yield {
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  {
+                    index: 0,
+                    function: {
+                      arguments: '"J10"}',
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        };
+        yield {
+          choices: [{ finish_reason: 'tool_calls' }],
+        };
+      },
+    } as AsyncIterable<unknown>;
+  } as unknown as typeof OpenAI.Chat.Completions.prototype.create;
+
+  try {
+    const receivedToolCalls: ConversationToolCall[] = [];
+    const result = await sendConversationTurnStream({
+      mode: 'general',
+      lang: 'en',
+      context: '{"robot":{"name":"demo"}}',
+      history: [],
+      userMessage: 'Look up the motor J10',
+      tools,
+      onToolCalls: (calls) => {
+        receivedToolCalls.push(...calls);
+      },
+    });
+
+    assert.deepEqual(capturedTools, tools);
+    assert.deepEqual(receivedToolCalls, [
+      { function: { name: 'look_up_motor', arguments: '{"name":"J10"}' } },
+    ]);
+    assert.equal(result.status, 'completed');
+    assert.equal(result.reply, '');
+    assert.equal(result.error, null);
+  } finally {
+    OpenAI.Chat.Completions.prototype.create = originalCreate;
+    restoreApiKeyEnv(envSnapshot);
+  }
+});
+
+test('sendConversationTurnStream does not call onToolCalls when tools are omitted', async () => {
+  const envSnapshot = captureApiKeyEnv();
+  const originalCreate = OpenAI.Chat.Completions.prototype.create;
+  let capturedTools: unknown;
+
+  delete process.env.API_KEY;
+  process.env.OPENAI_API_KEY = 'test-openai-key';
+  delete process.env.GEMINI_API_KEY;
+
+  OpenAI.Chat.Completions.prototype.create = async function mockCreate(
+    this: unknown,
+    params: { tools?: unknown },
+  ) {
+    capturedTools = params.tools;
+    return {
+      async *[Symbol.asyncIterator]() {
+        yield { choices: [{ delta: { content: 'Regular answer' } }] };
+        yield { choices: [{ finish_reason: 'stop' }] };
+      },
+    } as AsyncIterable<unknown>;
+  } as unknown as typeof OpenAI.Chat.Completions.prototype.create;
+
+  try {
+    let onToolCallsInvoked = false;
+    const result = await sendConversationTurnStream({
+      mode: 'general',
+      lang: 'en',
+      context: '{"robot":{"name":"demo"}}',
+      history: [],
+      userMessage: 'How should I improve this robot?',
+      onToolCalls: () => {
+        onToolCallsInvoked = true;
+      },
+    });
+
+    assert.equal(capturedTools, undefined);
+    assert.equal(onToolCallsInvoked, false);
+    assert.equal(result.status, 'completed');
+    assert.equal(result.reply, 'Regular answer');
+    assert.equal(result.error, null);
+  } finally {
+    OpenAI.Chat.Completions.prototype.create = originalCreate;
+    restoreApiKeyEnv(envSnapshot);
   }
 });
