@@ -161,8 +161,12 @@ export function useAgileRobotTools(options: UseAgileRobotToolsOptions = {}): AIC
         if (toolCall.toolName === 'edit_robot_appearance') {
           const prompt =
             typeof toolCall.args.prompt === 'string' ? toolCall.args.prompt : '';
-          // Step 1: jimeng edit
-          await jimengEdit(prompt, b.input_image_path);
+          // Step 1: jimeng edit — prefer bootstrap source, then fallback path
+          // (docs/integrations/urdf-studio.md §5). Omit empty strings so the
+          // BFF can apply its own default when neither path is set.
+          const sourcePath =
+            b.input_image_path || b.fallback_input_image_path || undefined;
+          await jimengEdit(prompt, sourcePath);
 
           // Step 2: hunyuan submit
           await hunyuanSubmit('orders/' + b.order_id + '/model_input_customized.png');

@@ -7,7 +7,13 @@
 export { useAgileRobotBootstrap } from './hooks/useAgileRobotBootstrap';
 export { useAgileRobotTools } from './hooks/useAgileRobotTools';
 export { reloadMeshFromUrl, type MeshReloadImportPort } from './meshReload';
-export { hasBootstrap, getBootstrap, clearBootstrap } from './bootstrap';
+export {
+  hasBootstrap,
+  getBootstrap,
+  clearBootstrap,
+  initRobotsStudioBootstrap,
+  decodeBootstrapFromHash,
+} from './bootstrap';
 export type {
   RobotsStudioBootstrap,
   JimengEditRequest,

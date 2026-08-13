@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   ALLOWED_AGILE_ROBOT_ORIGINS,
+  BOOTSTRAP_HASH_PREFIX,
   BOOTSTRAP_STORAGE_KEY,
   HUNYUAN_POLL_INTERVAL_MS,
   HUNYUAN_POLL_TIMEOUT_MS,
@@ -13,6 +14,7 @@ import {
 
 test('bootstrap protocol constants carry the fixed contract values', () => {
   assert.equal(MESSAGE_TYPE, 'robots:studio-bootstrap');
+  assert.equal(BOOTSTRAP_HASH_PREFIX, 'robots-bootstrap');
   assert.equal(BOOTSTRAP_STORAGE_KEY, 'robots_studio_bootstrap');
 });
 

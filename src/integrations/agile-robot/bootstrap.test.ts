@@ -9,8 +9,15 @@ import {
   clearBootstrap,
   storeBootstrap,
   handleBootstrapMessage,
+  decodeBootstrapFromHash,
+  clearBootstrapHashFromUrl,
+  initRobotsStudioBootstrap,
 } from './bootstrap.ts';
-import { BOOTSTRAP_STORAGE_KEY, MESSAGE_TYPE } from './constants.ts';
+import {
+  BOOTSTRAP_HASH_PREFIX,
+  BOOTSTRAP_STORAGE_KEY,
+  MESSAGE_TYPE,
+} from './constants.ts';
 
 const validBootstrap = {
   studio_token: 'test-token',
@@ -141,4 +148,104 @@ test('handleBootstrapMessage returns false when bootstrap is malformed', () => {
   });
   assert.equal(handleBootstrapMessage(event), false);
   assert.equal(hasBootstrap(), false);
+});
+
+function encodeBootstrapHash(bootstrap: typeof validBootstrap): string {
+  return `#${BOOTSTRAP_HASH_PREFIX}=${encodeURIComponent(btoa(JSON.stringify(bootstrap)))}`;
+}
+
+test('decodeBootstrapFromHash decodes a main-site encoded hash payload', () => {
+  const decoded = decodeBootstrapFromHash(encodeBootstrapHash(validBootstrap));
+  assert.notEqual(decoded, null);
+  assert.equal(decoded!.studio_token, 'test-token');
+  assert.equal(decoded!.order_id, 'order-123');
+});
+
+test('decodeBootstrapFromHash returns null for empty or unrelated hashes', () => {
+  assert.equal(decodeBootstrapFromHash(''), null);
+  assert.equal(decodeBootstrapFromHash('#other=1'), null);
+  assert.equal(decodeBootstrapFromHash(`#${BOOTSTRAP_HASH_PREFIX}=not-base64`), null);
+});
+
+test('decodeBootstrapFromHash rejects payloads missing required fields', () => {
+  const bad = encodeBootstrapHash({ ...validBootstrap, studio_token: '' });
+  assert.equal(decodeBootstrapFromHash(bad), null);
+});
+
+test('initRobotsStudioBootstrap persists hash bootstrap and clears the hash', () => {
+  const meshSearch = '?mesh=http%3A%2F%2Flocalhost%3A8000%2Fpreview.glb';
+  const hashDom = new JSDOM('<!doctype html><html><body></body></html>', {
+    url: `http://localhost:3000/${meshSearch}${encodeBootstrapHash(validBootstrap)}`,
+  });
+  Object.defineProperty(globalThis, 'window', {
+    value: hashDom.window,
+    configurable: true,
+  });
+  Object.defineProperty(globalThis, 'sessionStorage', {
+    value: hashDom.window.sessionStorage,
+    configurable: true,
+  });
+
+  const result = initRobotsStudioBootstrap();
+  assert.equal(result?.studio_token, 'test-token');
+  assert.equal(hasBootstrap(), true);
+  assert.equal(hashDom.window.location.hash, '');
+  assert.equal(hashDom.window.location.search, meshSearch);
+
+  // Restore shared test DOM for remaining postMessage tests' storage.
+  Object.defineProperty(globalThis, 'sessionStorage', {
+    value: dom.window.sessionStorage,
+    configurable: true,
+  });
+  Object.defineProperty(globalThis, 'window', {
+    value: dom.window,
+    configurable: true,
+  });
+});
+
+test('initRobotsStudioBootstrap falls back to sessionStorage when hash is absent', () => {
+  const restoreDom = new JSDOM('<!doctype html><html><body></body></html>', {
+    url: 'http://localhost:3000/',
+  });
+  Object.defineProperty(globalThis, 'window', {
+    value: restoreDom.window,
+    configurable: true,
+  });
+  Object.defineProperty(globalThis, 'sessionStorage', {
+    value: restoreDom.window.sessionStorage,
+    configurable: true,
+  });
+  restoreDom.window.sessionStorage.setItem(
+    BOOTSTRAP_STORAGE_KEY,
+    JSON.stringify(validBootstrap),
+  );
+
+  const result = initRobotsStudioBootstrap();
+  assert.equal(result?.order_id, 'order-123');
+
+  Object.defineProperty(globalThis, 'sessionStorage', {
+    value: dom.window.sessionStorage,
+    configurable: true,
+  });
+  Object.defineProperty(globalThis, 'window', {
+    value: dom.window,
+    configurable: true,
+  });
+});
+
+test('clearBootstrapHashFromUrl is a no-op when hash is not robots-bootstrap', () => {
+  const otherDom = new JSDOM('<!doctype html><html><body></body></html>', {
+    url: 'http://localhost:3000/?mesh=x#other=1',
+  });
+  Object.defineProperty(globalThis, 'window', {
+    value: otherDom.window,
+    configurable: true,
+  });
+  clearBootstrapHashFromUrl();
+  assert.equal(otherDom.window.location.hash, '#other=1');
+
+  Object.defineProperty(globalThis, 'window', {
+    value: dom.window,
+    configurable: true,
+  });
 });

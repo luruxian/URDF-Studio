@@ -5,6 +5,12 @@
 /** postMessage 消息类型 — 与 robots 主站契约固定 */
 export const MESSAGE_TYPE = 'robots:studio-bootstrap' as const;
 
+/**
+ * URL hash 键名（主路径）— 与 robots 主站 `buildModelPreviewViewerUrl` 契约固定。
+ * 形式：`#robots-bootstrap=<encodeURIComponent(base64Json)>`
+ */
+export const BOOTSTRAP_HASH_PREFIX = 'robots-bootstrap' as const;
+
 /** sessionStorage key for bootstrap data */
 export const BOOTSTRAP_STORAGE_KEY = 'robots_studio_bootstrap';
 

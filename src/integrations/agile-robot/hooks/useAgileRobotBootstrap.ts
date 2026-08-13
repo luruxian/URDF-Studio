@@ -30,10 +30,13 @@ function getBootstrapSnapshot(): boolean {
 
 /**
  * Mount once (e.g. in AppContent) to listen for `robots:studio-bootstrap`
- * postMessage from the robots main site. The message handler validates origin,
- * type and payload via `handleBootstrapMessage`; when a bootstrap is stored the
- * module-level subscribers are notified so `hasBootstrap` re-renders only the
- * components that read it. Returns `{ hasBootstrap }` for one-off checks.
+ * postMessage from the robots main site (optional fallback for older main-site
+ * builds). Primary bootstrap arrives via `#robots-bootstrap=` and is persisted
+ * by `initRobotsStudioBootstrap()` in `main.tsx` before React mounts.
+ * The message handler validates origin, type and payload via
+ * `handleBootstrapMessage`; when a bootstrap is stored the module-level
+ * subscribers are notified so `hasBootstrap` re-renders only the components
+ * that read it. Returns `{ hasBootstrap }` for one-off checks.
  */
 export function useAgileRobotBootstrap(): { hasBootstrap: boolean } {
   const hasBootstrapValue = useSyncExternalStore(
