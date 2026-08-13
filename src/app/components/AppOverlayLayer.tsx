@@ -63,6 +63,7 @@ interface AppOverlayLayerProps {
   ) => void;
   handleStartNewAIConversation: (currentLaunchContext: AIConversationLaunchContext) => void;
   isAIConversationOpen: boolean;
+  onApplyAIUrdfModification: (componentId: string, proposedUrdf: string) => boolean;
   isAIInspectionOpen: boolean;
   isDisconnectedWorkspaceUrdfExporting: boolean;
   isExportDialogOpen: boolean;
@@ -95,6 +96,7 @@ export function AppOverlayLayer({
   handleOpenConversationWithReport,
   handleStartNewAIConversation,
   isAIConversationOpen,
+  onApplyAIUrdfModification,
   isAIInspectionOpen,
   isDisconnectedWorkspaceUrdfExporting,
   isExportDialogOpen,
@@ -141,6 +143,7 @@ export function AppOverlayLayer({
             lang={lang}
             launchContext={aiConversationLaunchContext}
             onStartNewConversation={handleStartNewAIConversation}
+            onApply={onApplyAIUrdfModification}
           />
         </Suspense>
       )}

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 import { resolveObjAuthoredMaterialsFromAssets } from '@/core/loaders/objMaterialMetadata';
 import { resolveImportedAssetPath } from '@/core/parsers/meshPathUtils';
+import { attachParserRecoveryDiagnostics } from '@/core/parsers/recoveryDiagnostics';
 import {
   DEFAULT_JOINT,
   DEFAULT_LINK,
@@ -10,6 +11,7 @@ import {
   type RobotClosedLoopConstraint,
   type Euler,
   type RobotMaterialState,
+  type RobotImportRecoveryDiagnostic,
   type RobotState,
   type UrdfJoint,
   type UrdfLink,
@@ -138,6 +140,7 @@ interface ParseSdfModelOptions extends ParseSDFOptions {
    * and nested models stay relative to the (now overridden) model frame.
    */
   modelPoseOverride?: ParsedPose;
+  recoveryDiagnostics?: RobotImportRecoveryDiagnostic[];
 }
 
 const AXIS_IMPORT_TYPES = new Set<JointType>([
@@ -179,6 +182,17 @@ function getDirectChildElements(parent: Element, tagName?: string): Element[] {
 
 function getFirstDirectChild(parent: Element, tagName: string): Element | null {
   return getDirectChildElements(parent, tagName)[0] ?? null;
+}
+
+function recordSdfOmission(
+  diagnostics: RobotImportRecoveryDiagnostic[],
+  diagnostic: Omit<RobotImportRecoveryDiagnostic, 'severity' | 'action'>,
+): void {
+  diagnostics.push({
+    ...diagnostic,
+    severity: 'warning',
+    action: 'omitted',
+  });
 }
 
 function parseFloatSafe(value: string | null | undefined, fallback = 0): number {
@@ -571,6 +585,19 @@ function parseSdfGeometry(
     };
   }
 
+  const ellipsoidEl = getFirstDirectChild(geometryEl, 'ellipsoid');
+  if (ellipsoidEl) {
+    const radii = parseVec3(getFirstDirectChild(ellipsoidEl, 'radii')?.textContent);
+    return {
+      type: GeometryType.ELLIPSOID,
+      dimensions: {
+        x: Number.isFinite(radii.x) && radii.x > 0 ? radii.x : 0.1,
+        y: Number.isFinite(radii.y) && radii.y > 0 ? radii.y : 0.1,
+        z: Number.isFinite(radii.z) && radii.z > 0 ? radii.z : 0.1,
+      },
+    };
+  }
+
   return {
     type: GeometryType.NONE,
     dimensions: { x: 0, y: 0, z: 0 },
@@ -642,8 +669,29 @@ function mapSdfJointType(rawType: string | null): JointType {
     case 'planar':
       return JointType.PLANAR;
     case 'fixed':
-    default:
       return JointType.FIXED;
+    case 'screw':
+      console.warn(
+        `[SDF import] Joint type "screw" is not natively supported; degrading to prismatic.`,
+      );
+      return JointType.PRISMATIC;
+    case 'universal':
+      console.warn(
+        `[SDF import] Joint type "universal" is not natively supported; degrading to ball.`,
+      );
+      return JointType.BALL;
+    case 'gearbox':
+      console.warn(
+        `[SDF import] Joint type "gearbox" is not natively supported; degrading to revolute.`,
+      );
+      return JointType.REVOLUTE;
+    case 'revolute2':
+      console.warn(
+        `[SDF import] Joint type "revolute2" is not natively supported; degrading to ball.`,
+      );
+      return JointType.BALL;
+    default:
+      throw new Error(`[SDFParser] Unrecognized joint type "${rawType || ''}".`);
   }
 }
 
@@ -672,43 +720,6 @@ function createEmptyLink(id: string, name = id): UrdfLink {
       mass: 0,
       origin: IDENTITY_POSE,
     },
-  };
-}
-
-function deriveSdfFallbackName(sourcePath?: string | null): string {
-  const normalized = String(sourcePath || '')
-    .trim()
-    .split('/')
-    .filter(Boolean)
-    .pop()
-    ?.replace(/\.[^.]+$/, '');
-  return normalized || 'imported_sdf_model';
-}
-
-function sanitizeSdfSyntheticId(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return 'imported_sdf_model';
-  }
-
-  return trimmed.replace(/[^A-Za-z0-9_.:-]+/g, '_');
-}
-
-function createPlaceholderRobotFromLight(
-  lightEl: Element,
-  { sourcePath }: ParseSDFOptions = {},
-): RobotState {
-  const lightName = lightEl.getAttribute('name')?.trim() || deriveSdfFallbackName(sourcePath);
-  const rootLinkId = `${sanitizeSdfSyntheticId(lightName)}__light_anchor`;
-
-  return {
-    name: lightName,
-    links: {
-      [rootLinkId]: createEmptyLink(rootLinkId, lightName),
-    },
-    joints: {},
-    rootLinkId,
-    selection: { type: 'link', id: rootLinkId },
   };
 }
 
@@ -1157,6 +1168,17 @@ function parseLinkInertial(
 }
 
 function mergeParsedSdfGraph(target: ParsedSdfGraph, source: ParsedSdfGraph): void {
+  for (const linkId of Object.keys(source.links)) {
+    if (target.links[linkId]) {
+      throw new Error(`[SDFParser] Duplicate scoped link name: "${linkId}".`);
+    }
+  }
+  for (const jointId of Object.keys(source.joints)) {
+    if (target.joints[jointId]) {
+      throw new Error(`[SDFParser] Duplicate scoped joint name: "${jointId}".`);
+    }
+  }
+
   Object.assign(target.links, source.links);
   Object.assign(target.joints, source.joints);
   Object.assign(target.materials, source.materials);
@@ -1179,26 +1201,30 @@ function parseIncludedModelGraph(
     namespacePrefix,
     includeStack = new Set<string>(),
     includeResolutionContext = createSdfIncludeResolutionContext(allFileContents),
+    recoveryDiagnostics = [],
   }: ParseSdfModelOptions,
 ): void {
   const includeUri = getFirstDirectChild(includeEl, 'uri')?.textContent?.trim() || '';
   if (!includeUri) {
-    return;
+    throw new Error('[SDFParser] Include element is missing a URI.');
   }
 
   const resolvedInclude = includeResolutionContext.resolve(includeUri, sourcePath);
-  if (!resolvedInclude || includeStack.has(resolvedInclude.path)) {
-    return;
+  if (!resolvedInclude) {
+    throw new Error(`[SDFParser] Included model could not be resolved: "${includeUri}".`);
+  }
+  if (includeStack.has(resolvedInclude.path)) {
+    throw new Error(`[SDFParser] Circular model include detected: "${resolvedInclude.path}".`);
   }
 
   const includeDoc = parseSdfXmlDocument(resolvedInclude.content);
-  if (!includeDoc) {
-    return;
+  if (!includeDoc || includeDoc.documentElement.tagName !== 'sdf') {
+    throw new Error(`[SDFParser] Included model is not valid XML: "${resolvedInclude.path}".`);
   }
 
-  const includeModelEl = includeDoc.querySelector('sdf > model, model');
+  const includeModelEl = getFirstDirectChild(includeDoc.documentElement, 'model');
   if (!includeModelEl) {
-    return;
+    throw new Error(`[SDFParser] Included file has no model: "${resolvedInclude.path}".`);
   }
 
   const includeName =
@@ -1224,12 +1250,14 @@ function parseIncludedModelGraph(
     namespacePrefix: qualifyScopedName(includeName, namespacePrefix),
     includeStack: nextIncludeStack,
     includeResolutionContext,
+    recoveryDiagnostics,
     ...(includePose.specified ? { modelPoseOverride: includePose } : {}),
   });
 
-  if (includeGraph) {
-    mergeParsedSdfGraph(parentGraph, includeGraph);
+  if (!includeGraph) {
+    throw new Error(`[SDFParser] Included model has no links: "${resolvedInclude.path}".`);
   }
+  mergeParsedSdfGraph(parentGraph, includeGraph);
 }
 
 function parseNestedModelGraph(
@@ -1244,6 +1272,7 @@ function parseNestedModelGraph(
     includeStack = new Set<string>(),
     includeResolutionContext = createSdfIncludeResolutionContext(allFileContents),
     sdfVersion,
+    recoveryDiagnostics = [],
   }: ParseSdfModelOptions,
 ): void {
   const nestedModelName = nestedModelEl.getAttribute('name')?.trim() || 'nested_model';
@@ -1259,11 +1288,13 @@ function parseNestedModelGraph(
     includeStack,
     includeResolutionContext,
     sdfVersion,
+    recoveryDiagnostics,
   });
 
-  if (nestedGraph) {
-    mergeParsedSdfGraph(parentGraph, nestedGraph);
+  if (!nestedGraph) {
+    throw new Error(`[SDFParser] Nested model has no links: "${nestedModelName}".`);
   }
+  mergeParsedSdfGraph(parentGraph, nestedGraph);
 }
 
 function parseSdfModel(
@@ -1278,6 +1309,7 @@ function parseSdfModel(
     includeResolutionContext = createSdfIncludeResolutionContext(allFileContents),
     sdfVersion,
     modelPoseOverride,
+    recoveryDiagnostics = [],
   }: ParseSdfModelOptions = {},
 ): ParsedSdfGraph | null {
   const modelPose = modelPoseOverride ?? parsePoseElement(modelEl);
@@ -1296,23 +1328,74 @@ function parseSdfModel(
 
   for (const linkEl of getDirectChildElements(modelEl, 'link')) {
     const linkId = qualifyScopedName(linkEl.getAttribute('name')?.trim(), namespacePrefix);
-    if (linkId) {
-      linkElements.set(linkId, linkEl);
+    if (!linkId) {
+      recordSdfOmission(recoveryDiagnostics, {
+        code: 'sdf_link_missing_name_omitted',
+        category: 'topology',
+        message: 'An SDF <link> without a name was omitted.',
+        source: { tag: 'link', attribute: 'name' },
+      });
+      continue;
     }
+    if (linkElements.has(linkId)) {
+      recordSdfOmission(recoveryDiagnostics, {
+        code: 'sdf_duplicate_link_omitted',
+        category: 'topology',
+        message: `A duplicate SDF link named "${linkId}" was omitted.`,
+        relatedIds: [linkId],
+        source: { tag: 'link', name: linkId, attribute: 'name' },
+      });
+      continue;
+    }
+    linkElements.set(linkId, linkEl);
   }
 
   for (const jointEl of getDirectChildElements(modelEl, 'joint')) {
     const jointId = qualifyScopedName(jointEl.getAttribute('name')?.trim(), namespacePrefix);
-    if (jointId) {
-      jointElements.set(jointId, jointEl);
+    if (!jointId) {
+      recordSdfOmission(recoveryDiagnostics, {
+        code: 'sdf_joint_missing_name_omitted',
+        category: 'topology',
+        message: 'An SDF <joint> without a name was omitted.',
+        source: { tag: 'joint', attribute: 'name' },
+      });
+      continue;
     }
+    if (jointElements.has(jointId)) {
+      recordSdfOmission(recoveryDiagnostics, {
+        code: 'sdf_duplicate_joint_omitted',
+        category: 'topology',
+        message: `A duplicate SDF joint named "${jointId}" was omitted.`,
+        relatedIds: [jointId],
+        source: { tag: 'joint', name: jointId, attribute: 'name' },
+      });
+      continue;
+    }
+    jointElements.set(jointId, jointEl);
   }
 
   for (const frameEl of getDirectChildElements(modelEl, 'frame')) {
     const frameId = qualifyScopedName(frameEl.getAttribute('name')?.trim(), namespacePrefix);
-    if (frameId) {
-      frameElements.set(frameId, frameEl);
+    if (!frameId) {
+      recordSdfOmission(recoveryDiagnostics, {
+        code: 'sdf_frame_missing_name_omitted',
+        category: 'geometry',
+        message: 'An SDF <frame> without a name was omitted.',
+        source: { tag: 'frame', attribute: 'name' },
+      });
+      continue;
     }
+    if (frameElements.has(frameId)) {
+      recordSdfOmission(recoveryDiagnostics, {
+        code: 'sdf_duplicate_frame_omitted',
+        category: 'geometry',
+        message: `A duplicate SDF frame named "${frameId}" was omitted.`,
+        relatedIds: [frameId],
+        source: { tag: 'frame', name: frameId, attribute: 'name' },
+      });
+      continue;
+    }
+    frameElements.set(frameId, frameEl);
   }
 
   const resolvedFrameCache = new Map<string, THREE.Matrix4>();
@@ -1333,397 +1416,492 @@ function parseSdfModel(
     }
 
     if (resolvingFrames.has(normalizedFrame)) {
-      throw new Error(`SDF frame resolution cycle detected at ${normalizedFrame}`);
+      const cycle = [...resolvingFrames, normalizedFrame].join(' -> ');
+      throw new Error(`[SDFParser] Frame resolution cycle detected: ${cycle}`);
     }
 
     resolvingFrames.add(normalizedFrame);
-
     let resolvedFrame: THREE.Matrix4 | null = null;
 
-    const linkEl = linkElements.get(normalizedFrame);
-    if (linkEl) {
-      resolvedFrame = resolvePoseWorldMatrix(
-        parsePoseElement(linkEl),
-        MODEL_FRAME,
-        resolveFrameWorldMatrix,
-      );
-    }
-
-    if (!resolvedFrame) {
-      const jointEl = jointElements.get(normalizedFrame);
-      if (jointEl) {
-        const childLinkId =
-          qualifyScopedReference(
-            getFirstDirectChild(jointEl, 'child')?.textContent?.trim(),
-            namespacePrefix,
-          ) || MODEL_FRAME;
+    try {
+      const linkEl = linkElements.get(normalizedFrame);
+      if (linkEl) {
         resolvedFrame = resolvePoseWorldMatrix(
-          parsePoseElement(jointEl),
-          childLinkId,
+          parsePoseElement(linkEl),
+          MODEL_FRAME,
           resolveFrameWorldMatrix,
         );
       }
-    }
 
-    if (!resolvedFrame) {
-      const frameEl = frameElements.get(normalizedFrame);
-      if (frameEl) {
-        const attachedTo =
-          qualifyScopedReference(frameEl.getAttribute('attached_to')?.trim(), namespacePrefix) ||
-          MODEL_FRAME;
-        resolvedFrame = resolvePoseWorldMatrix(
-          parsePoseElement(frameEl),
-          attachedTo,
-          resolveFrameWorldMatrix,
-        );
+      if (!resolvedFrame) {
+        const jointEl = jointElements.get(normalizedFrame);
+        if (jointEl) {
+          const childLinkId =
+            qualifyScopedReference(
+              getFirstDirectChild(jointEl, 'child')?.textContent?.trim(),
+              namespacePrefix,
+            ) || MODEL_FRAME;
+          resolvedFrame = resolvePoseWorldMatrix(
+            parsePoseElement(jointEl),
+            childLinkId,
+            resolveFrameWorldMatrix,
+          );
+        }
       }
+
+      if (!resolvedFrame) {
+        const frameEl = frameElements.get(normalizedFrame);
+        if (frameEl) {
+          const attachedTo =
+            qualifyScopedReference(frameEl.getAttribute('attached_to')?.trim(), namespacePrefix) ||
+            MODEL_FRAME;
+          resolvedFrame = resolvePoseWorldMatrix(
+            parsePoseElement(frameEl),
+            attachedTo,
+            resolveFrameWorldMatrix,
+          );
+        }
+      }
+    } finally {
+      resolvingFrames.delete(normalizedFrame);
     }
 
-    resolvingFrames.delete(normalizedFrame);
-
     if (!resolvedFrame) {
-      throw new Error(`Unknown SDF frame reference: ${normalizedFrame}`);
+      throw new Error(`[SDFParser] Unknown SDF frame reference: "${normalizedFrame}".`);
     }
 
     resolvedFrameCache.set(normalizedFrame, resolvedFrame);
     return resolvedFrame;
   };
 
-  for (const linkEl of getDirectChildElements(modelEl, 'link')) {
-    const linkName = linkEl.getAttribute('name')?.trim();
-    const linkId = qualifyScopedName(linkName, namespacePrefix);
-    if (!linkId) {
-      continue;
-    }
+  for (const [linkId, linkEl] of linkElements) {
+    try {
+      const baseLink = createEmptyLink(linkId, linkId);
+      const linkPose = parsePoseElement(linkEl);
+      const linkWorldMatrix = resolveFrameWorldMatrix(linkId);
 
-    const baseLink = createEmptyLink(linkId, linkId);
-    const linkPose = parsePoseElement(linkEl);
-    const linkWorldMatrix = resolveFrameWorldMatrix(linkId);
+      const visuals: ParsedSdfVisual[] = [];
+      getDirectChildElements(linkEl, 'visual').forEach((visualEl, index) => {
+        const visualName = visualEl.getAttribute('name')?.trim() || `${linkId}_visual_${index}`;
+        try {
+          const geometryEl = getFirstDirectChild(visualEl, 'geometry');
+          if (!geometryEl) {
+            throw new Error('Visual is missing its geometry element.');
+          }
+          const geometry = parseSdfGeometry(geometryEl, DEFAULT_LINK.visual);
+          if (geometry.type === GeometryType.NONE) {
+            throw new Error('Visual has no supported geometry element.');
+          }
+          const explicitMaterial = parseSdfMaterial(visualEl, {
+            allFileContents,
+            availableFiles,
+            sourcePath,
+          });
+          const meshMaterial = hasParsedMaterialDefinition(explicitMaterial)
+            ? {}
+            : parseObjMeshMaterialDefinition(geometry, {
+                allFileContents,
+                availableFiles,
+                sourcePath,
+              });
 
-    const visuals = getDirectChildElements(linkEl, 'visual').map(
-      (visualEl, index): ParsedSdfVisual => {
-        const geometry = parseSdfGeometry(
-          getFirstDirectChild(visualEl, 'geometry'),
-          DEFAULT_LINK.visual,
-        );
-        const explicitMaterial = parseSdfMaterial(visualEl, {
-          allFileContents,
-          availableFiles,
-          sourcePath,
-        });
-        const meshMaterial = hasParsedMaterialDefinition(explicitMaterial)
-          ? {}
-          : parseObjMeshMaterialDefinition(geometry, {
-              allFileContents,
-              availableFiles,
-              sourcePath,
-            });
+          const heightmapTextures = geometry.sdfHeightmap?.textures;
+          const heightmapMaterial =
+            heightmapTextures && heightmapTextures.length === 1 && heightmapTextures[0].diffuse
+              ? { texture: heightmapTextures[0].diffuse }
+              : {};
 
-        const heightmapTextures = geometry.sdfHeightmap?.textures;
-        const heightmapMaterial =
-          heightmapTextures && heightmapTextures.length === 1 && heightmapTextures[0].diffuse
-            ? { texture: heightmapTextures[0].diffuse }
-            : {};
+          // OGRE/Gazebo box UV convention differs from Three.js BoxGeometry by a
+          // 90° rotation on the major faces. When a Gazebo material with a texture
+          // is applied to a box primitive, rotate the texture to match the expected
+          // orientation.
+          const needsBoxTextureRotation =
+            geometry.type === GeometryType.BOX &&
+            explicitMaterial.materialSource === 'gazebo' &&
+            explicitMaterial.authoredMaterials?.some((m) => m.texture);
 
-        // OGRE/Gazebo box UV convention differs from Three.js BoxGeometry by a
-        // 90° rotation on the major faces. When a Gazebo material with a texture
-        // is applied to a box primitive, rotate the texture to match the expected
-        // orientation.
-        const needsBoxTextureRotation =
-          geometry.type === GeometryType.BOX &&
-          explicitMaterial.materialSource === 'gazebo' &&
-          explicitMaterial.authoredMaterials?.some((m) => m.texture);
+          const authoredMaterials = needsBoxTextureRotation
+            ? explicitMaterial.authoredMaterials?.map((m) =>
+                m.texture ? { ...m, textureRotation: -Math.PI / 2 } : m,
+              )
+            : explicitMaterial.authoredMaterials;
 
-        const authoredMaterials = needsBoxTextureRotation
-          ? explicitMaterial.authoredMaterials?.map((m) =>
-              m.texture ? { ...m, textureRotation: -Math.PI / 2 } : m,
-            )
-          : explicitMaterial.authoredMaterials;
+          visuals.push({
+            name: visualName,
+            geometry,
+            pose: resolvePoseRelativeToFrame(
+              parsePoseElement(visualEl),
+              linkId,
+              linkId,
+              resolveFrameWorldMatrix,
+            ),
+            ...heightmapMaterial,
+            ...meshMaterial,
+            ...explicitMaterial,
+            ...(authoredMaterials ? { authoredMaterials } : {}),
+          });
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          recordSdfOmission(recoveryDiagnostics, {
+            code: 'sdf_visual_omitted',
+            category: 'geometry',
+            message: `SDF visual "${visualName}" on link "${linkId}" was omitted: ${detail}`,
+            relatedIds: [linkId],
+            source: { tag: 'visual', name: visualName },
+          });
+        }
+      });
 
-        return {
-          name: visualEl.getAttribute('name')?.trim() || `${linkId}_visual_${index}`,
-          geometry,
-          pose: resolvePoseRelativeToFrame(
-            parsePoseElement(visualEl),
-            linkId,
-            linkId,
-            resolveFrameWorldMatrix,
-          ),
-          ...heightmapMaterial,
-          ...meshMaterial,
-          ...explicitMaterial,
-          ...(authoredMaterials ? { authoredMaterials } : {}),
-        };
-      },
-    );
+      const collisions: ParsedSdfCollision[] = [];
+      getDirectChildElements(linkEl, 'collision').forEach((collisionEl, index) => {
+        const collisionName =
+          collisionEl.getAttribute('name')?.trim() || `${linkId}_collision_${index}`;
+        try {
+          const geometryEl = getFirstDirectChild(collisionEl, 'geometry');
+          if (!geometryEl) {
+            throw new Error('Collision is missing its geometry element.');
+          }
+          const geometry = parseSdfGeometry(geometryEl, DEFAULT_LINK.collision);
+          if (geometry.type === GeometryType.NONE) {
+            throw new Error('Collision has no supported geometry element.');
+          }
+          collisions.push({
+            geometry,
+            pose: resolvePoseRelativeToFrame(
+              parsePoseElement(collisionEl),
+              linkId,
+              linkId,
+              resolveFrameWorldMatrix,
+            ),
+          });
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          recordSdfOmission(recoveryDiagnostics, {
+            code: 'sdf_collision_omitted',
+            category: 'geometry',
+            message: `SDF collision "${collisionName}" on link "${linkId}" was omitted: ${detail}`,
+            relatedIds: [linkId],
+            source: { tag: 'collision', name: collisionName },
+          });
+        }
+      });
 
-    const collisions = getDirectChildElements(linkEl, 'collision').map(
-      (collisionEl): ParsedSdfCollision => ({
-        geometry: parseSdfGeometry(
-          getFirstDirectChild(collisionEl, 'geometry'),
-          DEFAULT_LINK.collision,
-        ),
-        pose: resolvePoseRelativeToFrame(
-          parsePoseElement(collisionEl),
-          linkId,
-          linkId,
-          resolveFrameWorldMatrix,
-        ),
-      }),
-    );
-
-    const inertial = parseLinkInertial(linkEl, linkId, resolveFrameWorldMatrix);
-    let nextLink: UrdfLink = {
-      ...baseLink,
-      ...(inertial ? { inertial } : {}),
-    };
-
-    if (visuals[0]) {
-      nextLink = applyVisualToLink(nextLink, visuals[0]);
-      nextLink.visualBodies = visuals.slice(1).map((visual) => ({
-        ...DEFAULT_LINK.visual,
-        ...visual.geometry,
-        origin: visual.pose,
-        color:
-          visual.color ??
-          (visual.geometry.type === GeometryType.MESH
-            ? UNAUTHORED_VISUAL_COLOR
-            : DEFAULT_LINK.visual.color),
-        materialSource: visual.materialSource,
-        authoredMaterials: visual.authoredMaterials,
-      }));
-      if (visuals[0].color || visuals[0].colorRgba || visuals[0].texture) {
-        graph.materials[linkId] = {
-          ...(visuals[0].color ? { color: visuals[0].color } : {}),
-          ...(visuals[0].colorRgba ? { colorRgba: visuals[0].colorRgba } : {}),
-          ...(visuals[0].texture ? { texture: visuals[0].texture } : {}),
-        };
+      let inertial: UrdfLink['inertial'] | undefined;
+      if (getFirstDirectChild(linkEl, 'inertial')) {
+        try {
+          inertial = parseLinkInertial(linkEl, linkId, resolveFrameWorldMatrix);
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          recordSdfOmission(recoveryDiagnostics, {
+            code: 'sdf_inertial_omitted',
+            category: 'physical',
+            message: `SDF inertial data on link "${linkId}" was omitted: ${detail}`,
+            relatedIds: [linkId],
+            source: { tag: 'inertial', name: linkId },
+          });
+        }
       }
-    }
+      let nextLink: UrdfLink = {
+        ...baseLink,
+        ...(inertial ? { inertial } : {}),
+      };
 
-    if (collisions[0]) {
-      nextLink = applyCollisionToLink(nextLink, collisions[0]);
-      nextLink.collisionBodies = collisions.slice(1).map((collision) => ({
-        ...DEFAULT_LINK.collision,
-        ...collision.geometry,
-        origin: collision.pose,
-      }));
-    }
+      if (visuals[0]) {
+        nextLink = applyVisualToLink(nextLink, visuals[0]);
+        nextLink.visualBodies = visuals.slice(1).map((visual) => ({
+          ...DEFAULT_LINK.visual,
+          ...visual.geometry,
+          origin: visual.pose,
+          color:
+            visual.color ??
+            (visual.geometry.type === GeometryType.MESH
+              ? UNAUTHORED_VISUAL_COLOR
+              : DEFAULT_LINK.visual.color),
+          materialSource: visual.materialSource,
+          authoredMaterials: visual.authoredMaterials,
+        }));
+        if (visuals[0].color || visuals[0].colorRgba || visuals[0].texture) {
+          graph.materials[linkId] = {
+            ...(visuals[0].color ? { color: visuals[0].color } : {}),
+            ...(visuals[0].colorRgba ? { colorRgba: visuals[0].colorRgba } : {}),
+            ...(visuals[0].texture ? { texture: visuals[0].texture } : {}),
+          };
+        }
+      }
 
-    graph.links[linkId] = nextLink;
-    graph.linkRecords.set(linkId, {
-      parsedPose: linkPose,
-      pose: linkPose.pose,
-      worldMatrix: linkWorldMatrix,
-    });
+      if (collisions[0]) {
+        nextLink = applyCollisionToLink(nextLink, collisions[0]);
+        nextLink.collisionBodies = collisions.slice(1).map((collision) => ({
+          ...DEFAULT_LINK.collision,
+          ...collision.geometry,
+          origin: collision.pose,
+        }));
+      }
+
+      graph.links[linkId] = nextLink;
+      graph.linkRecords.set(linkId, {
+        parsedPose: linkPose,
+        pose: linkPose.pose,
+        worldMatrix: linkWorldMatrix,
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      graph.linkRecords.delete(linkId);
+      delete graph.links[linkId];
+      delete graph.materials[linkId];
+      recordSdfOmission(recoveryDiagnostics, {
+        code: 'sdf_link_omitted',
+        category: 'topology',
+        message: `SDF link "${linkId}" was omitted: ${detail}`,
+        relatedIds: [linkId],
+        source: { tag: 'link', name: linkId },
+      });
+    }
   }
 
   for (const includeEl of getDirectChildElements(modelEl, 'include')) {
-    parseIncludedModelGraph(includeEl, graph, {
-      allFileContents,
-      availableFiles,
-      sourcePath,
-      parentMatrix: modelMatrix,
-      namespacePrefix,
-      includeStack,
-      includeResolutionContext,
-    });
+    try {
+      parseIncludedModelGraph(includeEl, graph, {
+        allFileContents,
+        availableFiles,
+        sourcePath,
+        parentMatrix: modelMatrix,
+        namespacePrefix,
+        includeStack,
+        includeResolutionContext,
+        recoveryDiagnostics,
+      });
+    } catch (error) {
+      const includeUri = includeEl.querySelector('uri')?.textContent?.trim() || '<unnamed>';
+      const detail = error instanceof Error ? error.message : String(error);
+      recordSdfOmission(recoveryDiagnostics, {
+        code: 'sdf_include_omitted',
+        category: 'source',
+        message: `SDF include "${includeUri}" was omitted: ${detail}`,
+        source: { tag: 'include', name: includeUri },
+      });
+    }
   }
 
   for (const nestedModelEl of getDirectChildElements(modelEl, 'model')) {
-    parseNestedModelGraph(nestedModelEl, graph, {
-      allFileContents,
-      availableFiles,
-      sourcePath,
-      parentMatrix: modelMatrix,
-      namespacePrefix,
-      includeStack,
-      includeResolutionContext,
-      sdfVersion,
-    });
+    try {
+      parseNestedModelGraph(nestedModelEl, graph, {
+        allFileContents,
+        availableFiles,
+        sourcePath,
+        parentMatrix: modelMatrix,
+        namespacePrefix,
+        includeStack,
+        includeResolutionContext,
+        sdfVersion,
+        recoveryDiagnostics,
+      });
+    } catch (error) {
+      const nestedName = nestedModelEl.getAttribute('name')?.trim() || '<unnamed>';
+      const detail = error instanceof Error ? error.message : String(error);
+      recordSdfOmission(recoveryDiagnostics, {
+        code: 'sdf_nested_model_omitted',
+        category: 'source',
+        message: `Nested SDF model "${nestedName}" was omitted: ${detail}`,
+        source: { tag: 'model', name: nestedName },
+      });
+    }
   }
 
-  for (const jointEl of getDirectChildElements(modelEl, 'joint')) {
-    const jointName = jointEl.getAttribute('name')?.trim();
-    const jointId = qualifyScopedName(jointName, namespacePrefix);
-    if (!jointId) {
-      continue;
-    }
+  for (const [jointId, jointEl] of jointElements) {
+    try {
+      const rawChildLinkId = getFirstDirectChild(jointEl, 'child')?.textContent?.trim() || '';
+      const rawParentLinkId = getFirstDirectChild(jointEl, 'parent')?.textContent?.trim() || '';
+      if (!rawChildLinkId) {
+        throw new Error('Joint is missing its child link reference.');
+      }
+      if (!rawParentLinkId) {
+        throw new Error('Joint is missing its parent link reference.');
+      }
 
-    const childLinkId = qualifyScopedName(
-      getFirstDirectChild(jointEl, 'child')?.textContent?.trim(),
-      namespacePrefix,
-    );
-    const parentLinkId = qualifyScopedName(
-      getFirstDirectChild(jointEl, 'parent')?.textContent?.trim(),
-      namespacePrefix,
-    );
-    if (!childLinkId || !graph.links[childLinkId]) {
-      continue;
-    }
-    if (parentLinkId && !graph.links[parentLinkId]) {
-      continue;
-    }
+      const childLinkId = qualifyScopedReference(rawChildLinkId, namespacePrefix);
+      const parentFrameId = qualifyScopedReference(rawParentLinkId, namespacePrefix);
+      const parentLinkId =
+        parentFrameId === WORLD_FRAME || parentFrameId === MODEL_FRAME ? '' : parentFrameId;
+      if (!graph.links[childLinkId]) {
+        throw new Error(`Joint references unknown child link "${childLinkId}".`);
+      }
+      if (parentLinkId && !graph.links[parentLinkId]) {
+        throw new Error(`Joint references unknown parent link "${parentLinkId}".`);
+      }
 
-    const childRecord = graph.linkRecords.get(childLinkId);
-    if (!childRecord) {
-      continue;
-    }
+      const childRecord = graph.linkRecords.get(childLinkId);
+      if (!childRecord) {
+        throw new Error(`Joint child link "${childLinkId}" has no resolved frame.`);
+      }
 
-    const jointWorldMatrix = resolveFrameWorldMatrix(jointId);
-    const parentWorldMatrix = parentLinkId
-      ? (graph.linkRecords.get(parentLinkId)?.worldMatrix ?? resolveFrameWorldMatrix(parentLinkId))
-      : new THREE.Matrix4().identity();
-    const relativeMatrix = parentWorldMatrix.clone().invert().multiply(jointWorldMatrix);
-    const origin = matrixToPose(relativeMatrix);
+      const jointWorldMatrix = resolveFrameWorldMatrix(jointId);
+      const parentWorldMatrix = parentLinkId
+        ? (graph.linkRecords.get(parentLinkId)?.worldMatrix ??
+          resolveFrameWorldMatrix(parentLinkId))
+        : new THREE.Matrix4().identity();
+      const relativeMatrix = parentWorldMatrix.clone().invert().multiply(jointWorldMatrix);
+      const origin = matrixToPose(relativeMatrix);
 
-    const jointType = mapSdfJointType(jointEl.getAttribute('type'));
-    const axisEl = getFirstDirectChild(jointEl, 'axis');
-    const limitEl = getFirstDirectChild(axisEl ?? jointEl, 'limit');
-    const limitContainer = limitEl ?? jointEl;
-    const dynamicsEl = getFirstDirectChild(axisEl ?? jointEl, 'dynamics');
-    const mimic = parseJointMimic(axisEl, namespacePrefix);
+      const jointType = mapSdfJointType(jointEl.getAttribute('type'));
+      const axisEl = getFirstDirectChild(jointEl, 'axis');
+      const limitEl = getFirstDirectChild(axisEl ?? jointEl, 'limit');
+      const limitContainer = limitEl ?? jointEl;
+      const dynamicsEl = getFirstDirectChild(axisEl ?? jointEl, 'dynamics');
+      const mimic = parseJointMimic(axisEl, namespacePrefix);
 
-    // SDF revolute joints with no effective angle bounds describe unlimited
-    // rotation. This covers two cases the parser must treat identically:
-    //   1. no <limit> element at all, and
-    //   2. a <limit> element that omits <lower> and <upper> — e.g. youbot
-    //      wheels/casters declare <limit><effort>1.0</effort></limit> with no
-    //      angle bounds, which Gazebo reads as unlimited rotation.
-    // URDF expresses unlimited rotation via the `continuous` joint type with no
-    // limit object; convert to that so the canonical workspace validator does
-    // not reject the -Infinity / +Infinity placeholders that the limit-parsing
-    // fallback below would otherwise produce.
-    const limitContainerEl = limitEl ?? axisEl ?? jointEl;
-    const parsedLower = parseFloatSafe(
-      getFirstDirectChild(limitContainerEl, 'lower')?.textContent,
-      -Infinity,
-    );
-    const parsedUpper = parseFloatSafe(
-      getFirstDirectChild(limitContainerEl, 'upper')?.textContent,
-      Infinity,
-    );
-    const isUnlimitedRevolute =
-      jointType === JointType.REVOLUTE &&
-      (!Number.isFinite(parsedLower) || !Number.isFinite(parsedUpper));
-    const effectiveJointType = isUnlimitedRevolute ? JointType.CONTINUOUS : jointType;
-
-    // Resolve the axis direction.
-    // Modern SDFormat uses <xyz expressed_in="...">. Older Gazebo models use
-    // <use_parent_model_frame>; keep that fallback for source compatibility.
-    // Our internal representation stores the axis in the joint frame.
-    let axis: Vector3 | undefined;
-    if (AXIS_IMPORT_TYPES.has(jointType)) {
-      const xyzEl = getFirstDirectChild(axisEl ?? jointEl, 'xyz');
-      const rawAxis = parseVec3(xyzEl?.textContent || '0 0 1');
-      const expressedInFrame = qualifyScopedReference(
-        xyzEl?.getAttribute('expressed_in')?.trim(),
-        namespacePrefix,
+      // SDF revolute joints with no effective angle bounds describe unlimited
+      // rotation. This covers two cases the parser must treat identically:
+      //   1. no <limit> element at all, and
+      //   2. a <limit> element that omits <lower> and <upper> — e.g. youbot
+      //      wheels/casters declare <limit><effort>1.0</effort></limit> with no
+      //      angle bounds, which Gazebo reads as unlimited rotation.
+      // URDF expresses unlimited rotation via the `continuous` joint type with no
+      // limit object; convert to that so the canonical workspace validator does
+      // not reject the -Infinity / +Infinity placeholders that the limit-parsing
+      // fallback below would otherwise produce.
+      const limitContainerEl = limitEl ?? axisEl ?? jointEl;
+      const parsedLower = parseFloatSafe(
+        getFirstDirectChild(limitContainerEl, 'lower')?.textContent,
+        -Infinity,
       );
-      const useParentModelFrameText = axisEl
-        ? getFirstDirectChild(axisEl, 'use_parent_model_frame')?.textContent?.trim().toLowerCase()
-        : undefined;
-      const useParentModelFrame =
-        useParentModelFrameText !== undefined ? useParentModelFrameText === 'true' : false; // SDF spec: use_parent_model_frame defaults to false
+      const parsedUpper = parseFloatSafe(
+        getFirstDirectChild(limitContainerEl, 'upper')?.textContent,
+        Infinity,
+      );
+      const isUnlimitedRevolute =
+        jointType === JointType.REVOLUTE &&
+        (!Number.isFinite(parsedLower) || !Number.isFinite(parsedUpper));
+      const effectiveJointType = isUnlimitedRevolute ? JointType.CONTINUOUS : jointType;
 
-      if (expressedInFrame) {
-        axis = transformDirectionBetweenFrames(
-          rawAxis,
-          resolveFrameWorldMatrix(expressedInFrame),
-          jointWorldMatrix,
+      // Resolve the axis direction.
+      // Modern SDFormat uses <xyz expressed_in="...">. Older Gazebo models use
+      // <use_parent_model_frame>; keep that fallback for source compatibility.
+      // Our internal representation stores the axis in the joint frame.
+      let axis: Vector3 | undefined;
+      if (AXIS_IMPORT_TYPES.has(jointType)) {
+        const xyzEl = getFirstDirectChild(axisEl ?? jointEl, 'xyz');
+        const rawAxis = parseVec3(xyzEl?.textContent || '0 0 1');
+        const expressedInFrame = qualifyScopedReference(
+          xyzEl?.getAttribute('expressed_in')?.trim(),
+          namespacePrefix,
         );
-      } else if (useParentModelFrame) {
-        axis = transformDirectionBetweenFrames(
-          rawAxis,
-          resolveFrameWorldMatrix(MODEL_FRAME),
-          jointWorldMatrix,
-        );
-      } else {
-        axis = rawAxis;
-      }
-    }
+        const useParentModelFrameText = axisEl
+          ? getFirstDirectChild(axisEl, 'use_parent_model_frame')?.textContent?.trim().toLowerCase()
+          : undefined;
+        const useParentModelFrame =
+          useParentModelFrameText !== undefined ? useParentModelFrameText === 'true' : false; // SDF spec: use_parent_model_frame defaults to false
 
-    const lower = parseOptionalFiniteElement(limitContainer, 'lower');
-    const upper = parseOptionalFiniteElement(limitContainer, 'upper');
-    const effort = parseOptionalFiniteElement(limitContainer, 'effort');
-    const velocity = parseOptionalFiniteElement(limitContainer, 'velocity');
-    const limit = {
-      ...(lower !== undefined ? { lower } : {}),
-      ...(upper !== undefined ? { upper } : {}),
-      ...(effort !== undefined ? { effort } : {}),
-      ...(velocity !== undefined ? { velocity } : {}),
-    };
-    const joint: UrdfJoint = {
-      ...DEFAULT_JOINT,
-      id: jointId,
-      name: jointId,
-      type: effectiveJointType,
-      parentLinkId,
-      childLinkId,
-      origin,
-      axis,
-      limit:
-        LIMIT_IMPORT_TYPES.has(effectiveJointType) && Object.keys(limit).length > 0
-          ? limit
-          : undefined,
-      dynamics: {
-        damping: parseFloatSafe(
-          getFirstDirectChild(dynamicsEl ?? jointEl, 'damping')?.textContent,
-          0,
-        ),
-        friction: parseFloatSafe(
-          getFirstDirectChild(dynamicsEl ?? jointEl, 'friction')?.textContent,
-          0,
-        ),
-      },
-      hardware: {
-        armature: 0,
-        brand: '',
-        motorType: 'None',
-        motorId: '',
-        motorDirection: 1,
-      },
-      mimic,
-    };
-    graph.joints[jointId] = joint;
-
-    // When the joint has a non-identity <pose>, the joint frame is offset from
-    // the child link frame.  In URDF the child link is placed at the joint
-    // frame, but in SDF the link visuals/collisions are authored relative to
-    // the link frame.  To compensate, bake the inverse joint-pose into the
-    // child link's geometry origins so they render at the correct SDF link
-    // position even though the link Object3D sits at the joint frame.
-    const jointParsedPose = parsePoseElement(jointEl);
-    if (jointParsedPose.specified && !isIdentityPose(jointParsedPose.pose)) {
-      const inverseJointPose = poseToMatrix(jointParsedPose.pose).invert();
-      const childLink = graph.links[childLinkId];
-      if (childLink) {
-        const applyOffset = (origin: Pose): Pose =>
-          matrixToPose(inverseJointPose.clone().multiply(poseToMatrix(origin)));
-        childLink.visual = { ...childLink.visual, origin: applyOffset(childLink.visual.origin) };
-        childLink.collision = {
-          ...childLink.collision,
-          origin: applyOffset(childLink.collision.origin),
-        };
-        if (childLink.visualBodies) {
-          childLink.visualBodies = childLink.visualBodies.map((v) => ({
-            ...v,
-            origin: applyOffset(v.origin),
-          }));
-        }
-        if (childLink.collisionBodies) {
-          childLink.collisionBodies = childLink.collisionBodies.map((c) => ({
-            ...c,
-            origin: applyOffset(c.origin),
-          }));
+        if (expressedInFrame) {
+          axis = transformDirectionBetweenFrames(
+            rawAxis,
+            resolveFrameWorldMatrix(expressedInFrame),
+            jointWorldMatrix,
+          );
+        } else if (useParentModelFrame) {
+          axis = transformDirectionBetweenFrames(
+            rawAxis,
+            resolveFrameWorldMatrix(MODEL_FRAME),
+            jointWorldMatrix,
+          );
+        } else {
+          axis = rawAxis;
         }
       }
-    }
 
-    graph.jointRecords.set(jointId, {
-      joint,
-      worldMatrix: jointWorldMatrix.clone(),
-    });
+      const lower = parseOptionalFiniteElement(limitContainer, 'lower');
+      const upper = parseOptionalFiniteElement(limitContainer, 'upper');
+      const effort = parseOptionalFiniteElement(limitContainer, 'effort');
+      const velocity = parseOptionalFiniteElement(limitContainer, 'velocity');
+      const limit = {
+        ...(lower !== undefined ? { lower } : {}),
+        ...(upper !== undefined ? { upper } : {}),
+        ...(effort !== undefined ? { effort } : {}),
+        ...(velocity !== undefined ? { velocity } : {}),
+      };
+      const joint: UrdfJoint = {
+        ...DEFAULT_JOINT,
+        id: jointId,
+        name: jointId,
+        type: effectiveJointType,
+        parentLinkId,
+        childLinkId,
+        origin,
+        axis,
+        limit:
+          LIMIT_IMPORT_TYPES.has(effectiveJointType) && Object.keys(limit).length > 0
+            ? limit
+            : undefined,
+        dynamics: {
+          damping: parseFloatSafe(
+            getFirstDirectChild(dynamicsEl ?? jointEl, 'damping')?.textContent,
+            0,
+          ),
+          friction: parseFloatSafe(
+            getFirstDirectChild(dynamicsEl ?? jointEl, 'friction')?.textContent,
+            0,
+          ),
+        },
+        hardware: {
+          armature: 0,
+          brand: '',
+          motorType: 'None',
+          motorId: '',
+          motorDirection: 1,
+        },
+        mimic,
+      };
+      graph.joints[jointId] = joint;
+
+      // When the joint has a non-identity <pose>, the joint frame is offset from
+      // the child link frame.  In URDF the child link is placed at the joint
+      // frame, but in SDF the link visuals/collisions are authored relative to
+      // the link frame.  To compensate, bake the inverse joint-pose into the
+      // child link's geometry origins so they render at the correct SDF link
+      // position even though the link Object3D sits at the joint frame.
+      const jointParsedPose = parsePoseElement(jointEl);
+      if (jointParsedPose.specified && !isIdentityPose(jointParsedPose.pose)) {
+        const inverseJointPose = poseToMatrix(jointParsedPose.pose).invert();
+        const childLink = graph.links[childLinkId];
+        if (childLink) {
+          const applyOffset = (origin: Pose): Pose =>
+            matrixToPose(inverseJointPose.clone().multiply(poseToMatrix(origin)));
+          childLink.visual = { ...childLink.visual, origin: applyOffset(childLink.visual.origin) };
+          childLink.collision = {
+            ...childLink.collision,
+            origin: applyOffset(childLink.collision.origin),
+          };
+          if (childLink.visualBodies) {
+            childLink.visualBodies = childLink.visualBodies.map((v) => ({
+              ...v,
+              origin: applyOffset(v.origin),
+            }));
+          }
+          if (childLink.collisionBodies) {
+            childLink.collisionBodies = childLink.collisionBodies.map((c) => ({
+              ...c,
+              origin: applyOffset(c.origin),
+            }));
+          }
+        }
+      }
+
+      graph.jointRecords.set(jointId, {
+        joint,
+        worldMatrix: jointWorldMatrix.clone(),
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      delete graph.joints[jointId];
+      graph.jointRecords.delete(jointId);
+      recordSdfOmission(recoveryDiagnostics, {
+        code: 'sdf_joint_omitted',
+        category: 'joint',
+        message: `SDF joint "${jointId}" was omitted: ${detail}`,
+        relatedIds: [jointId],
+        source: { tag: 'joint', name: jointId },
+      });
+    }
   }
 
   const incomingJointIdsByChild = new Map<string, string[]>();
@@ -1792,18 +1970,18 @@ export function isSDF(content: string): boolean {
 
 export function parseSDF(xmlString: string, options: ParseSDFOptions = {}): RobotState | null {
   const xmlDoc = parseSdfXmlDocument(xmlString);
-  if (!xmlDoc) {
+  if (!xmlDoc || xmlDoc.documentElement.tagName !== 'sdf') {
     return null;
   }
 
-  const modelEl = xmlDoc.querySelector('sdf > model, model');
+  const directModelEl = getFirstDirectChild(xmlDoc.documentElement, 'model');
+  const worldEl = getFirstDirectChild(xmlDoc.documentElement, 'world');
+  const modelEl = directModelEl ?? (worldEl ? getFirstDirectChild(worldEl, 'model') : null);
   if (!modelEl) {
-    const lightEl = xmlDoc.querySelector('sdf > light, light');
-    return lightEl ? createPlaceholderRobotFromLight(lightEl, options) : null;
+    return null;
   }
 
-  const sdfEl = xmlDoc.querySelector('sdf');
-  const sdfVersion = sdfEl?.getAttribute('version') || undefined;
+  const sdfVersion = xmlDoc.documentElement.getAttribute('version') || undefined;
 
   const modelName = modelEl.getAttribute('name')?.trim() || 'imported_sdf_model';
   const includeAllFileContents = mergeSdfRobotFileContentsInto(
@@ -1811,11 +1989,13 @@ export function parseSDF(xmlString: string, options: ParseSDFOptions = {}): Robo
     options.availableFiles ?? [],
   );
   const includeResolutionContext = createSdfIncludeResolutionContext(includeAllFileContents);
+  const recoveryDiagnostics: RobotImportRecoveryDiagnostic[] = [];
   const parsedGraph = parseSdfModel(modelEl, {
     ...options,
     allFileContents: includeAllFileContents,
     sdfVersion,
     includeResolutionContext,
+    recoveryDiagnostics,
   });
   if (!parsedGraph) {
     return null;
@@ -1854,7 +2034,7 @@ export function parseSDF(xmlString: string, options: ParseSDFOptions = {}): Robo
     Object.keys(links)[0] ||
     '';
 
-  return {
+  const robot: RobotState = {
     name: modelName,
     links,
     joints,
@@ -1863,4 +2043,5 @@ export function parseSDF(xmlString: string, options: ParseSDFOptions = {}): Robo
     ...(closedLoopConstraints ? { closedLoopConstraints } : {}),
     selection: { type: 'link', id: rootLinkId },
   };
+  return attachParserRecoveryDiagnostics(robot, recoveryDiagnostics);
 }

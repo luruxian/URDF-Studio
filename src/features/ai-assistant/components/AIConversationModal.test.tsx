@@ -5,7 +5,9 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 
-import { DEFAULT_MANAGED_WINDOW_ORDER, useUIStore } from '@/store';
+import { createSingleComponentWorkspace } from '@/core/robot';
+import { __setAgentOpenAIClientFactoryForTests } from '../services/aiAgent';
+import { DEFAULT_MANAGED_WINDOW_ORDER, useSelectionStore, useUIStore, useWorkspaceStore } from '@/store';
 import { GeometryType, JointType, type RobotState } from '@/types';
 import type { AIConversationLaunchContext } from '../types';
 import { buildConversationPromptSuggestions } from '../utils/conversationPromptSuggestions';
@@ -178,6 +180,7 @@ test('AIConversationModal opens at the front and remains front when activated', 
           lang="en"
           launchContext={createLaunchContext()}
           onStartNewConversation={() => {}}
+          onApply={() => true}
         />,
       );
     });
@@ -232,6 +235,7 @@ test('compact conversation layout fits the viewport and keeps content scrollable
           lang="zh"
           launchContext={createLaunchContext()}
           onStartNewConversation={() => {}}
+          onApply={() => true}
         />,
       );
     });
@@ -291,6 +295,7 @@ test('new conversation requires confirmation, preserves history, and inserts a d
           onStartNewConversation={(context) => {
             onStartNewConversationCalls.push(context);
           }}
+          onApply={() => true}
         />,
       );
     });
@@ -361,6 +366,7 @@ test('clear history requires confirmation and removes prior messages after reset
           onStartNewConversation={() => {
             startNewConversationCount += 1;
           }}
+          onApply={() => true}
         />,
       );
     });
@@ -408,7 +414,7 @@ test('clear history requires confirmation and removes prior messages after reset
   }
 });
 
-test('conversation errors render an explicit banner instead of a fake assistant reply', async () => {
+test('missing API key surfaces a real assistant reply instead of a banner', async () => {
   const envSnapshot = {
     API_KEY: process.env.API_KEY,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
@@ -433,6 +439,7 @@ test('conversation errors render an explicit banner instead of a fake assistant 
           lang="zh"
           launchContext={createLaunchContext()}
           onStartNewConversation={() => {}}
+          onApply={() => true}
         />,
       );
     });
@@ -448,10 +455,12 @@ test('conversation errors render an explicit banner instead of a fake assistant 
     await clickButton(findButtonByText(container, firstPrompt));
     await flush();
 
+    // Agent (no key) throws -> falls back to generateRobotFromPrompt, which returns
+    // the apiKeyMissing advice as a real assistant message (no danger banner).
     assert.equal(container.textContent?.includes(firstPrompt), true);
     assert.match(container.textContent || '', /API Key/i);
     assert.equal(container.textContent?.includes('对话服务错误：'), false);
-    assert.equal(getCopyButtons(container).length, 1);
+    assert.equal(getCopyButtons(container).length, 2);
     assert.equal(findButtonByText(container, '重新生成').textContent?.includes('重新生成'), true);
   } finally {
     if (envSnapshot.API_KEY === undefined) {
@@ -496,6 +505,7 @@ test('transparent AI conversation backdrop does not intercept pointer events', a
           lang="zh"
           launchContext={createLaunchContext()}
           onStartNewConversation={() => {}}
+          onApply={() => true}
         />,
       );
     });
@@ -533,6 +543,7 @@ test('suggested prompts expose hover and focus border highlight styles', async (
           lang="zh"
           launchContext={createLaunchContext()}
           onStartNewConversation={() => {}}
+          onApply={() => true}
         />,
       );
     });
@@ -600,6 +611,267 @@ test('suggested prompts expose hover and focus border highlight styles', async (
       'suggested prompt label should stay emphasized for keyboard focus',
     );
   } finally {
+    await act(async () => {
+      root.unmount();
+    });
+    dom.window.close();
+  }
+});
+
+test('agent receives the live (post-launch) robot context', async () => {
+  const previousApiKey = process.env.API_KEY;
+  process.env.API_KEY = 'test-key';
+
+  const capturedSystemPrompts: string[] = [];
+  const mockOpenAiClient = {
+    chat: {
+      completions: {
+        create: async (params: { messages: Array<{ role: string; content: string }> }) => {
+          capturedSystemPrompts.push(params.messages[0]?.content ?? '');
+          return {
+            choices: [
+              {
+                message: { role: 'assistant', content: 'No changes needed.', tool_calls: null },
+                finish_reason: 'stop',
+              },
+            ],
+          };
+        },
+      },
+    },
+  };
+  __setAgentOpenAIClientFactoryForTests(() => mockOpenAiClient as never);
+
+  const dom = installDom();
+  const container = dom.window.document.getElementById('root');
+  assert.ok(container, 'root container should exist');
+
+  const initialRobot = createRobotFixture();
+  const { selection: _initialSelection, ...initialRobotData } = initialRobot;
+  // The fixture assumes an implicit 'world' root link; the workspace validator
+  // rejects dangling parent references, so add it here.
+  initialRobotData.links['world'] = {
+    ...structuredClone(initialRobotData.links['base_link']),
+    id: 'world',
+    name: 'world',
+  };
+  initialRobotData.rootLinkId = 'world';
+  useWorkspaceStore.setState({
+    workspace: createSingleComponentWorkspace(initialRobotData, { componentId: 'arm' }),
+    activeComponentId: 'arm',
+  });
+  useSelectionStore.getState().setSelection(null);
+
+  const launchContext = createLaunchContext();
+  const { AIConversationModal } = await import('./AIConversationModal.tsx');
+  const root = createRoot(container);
+  const initialUiState = useUIStore.getState();
+  const initialWorkspaceState = useWorkspaceStore.getState();
+  const initialSelectionState = useSelectionStore.getState();
+
+  try {
+    useUIStore.setState({ managedWindowOrder: [...DEFAULT_MANAGED_WINDOW_ORDER] });
+    await act(async () => {
+      root.render(
+        <AIConversationModal
+          isOpen
+          onClose={() => {}}
+          lang="en"
+          launchContext={launchContext}
+          onStartNewConversation={() => {}}
+          onApply={() => true}
+        />,
+      );
+    });
+    await flush();
+
+    // Simulate a post-launch workspace edit: add tool_link + tool_joint.
+    const armComponent = useWorkspaceStore.getState().workspace.components['arm'];
+    armComponent.robot.links['tool_link'] = {
+      ...structuredClone(initialRobot.links['base_link']),
+      id: 'tool_link',
+      name: 'tool_link',
+    };
+    armComponent.robot.joints['tool_joint'] = {
+      ...structuredClone(initialRobot.joints['hip_joint']),
+      id: 'tool_joint',
+      name: 'tool_joint',
+      parentLinkId: 'base_link',
+      childLinkId: 'tool_link',
+    };
+
+    const [prompt] = buildConversationPromptSuggestions({
+      lang: 'en',
+      isReportFollowup: false,
+      selectedEntityName: null,
+    });
+    assert.ok(prompt, 'expected at least one suggested prompt');
+    await clickButton(findButtonByText(container, prompt));
+    await flush();
+
+    // The agent re-resolves the live workspace robot at submit time, so its
+    // system prompt must list the link/joint added AFTER the chat was opened.
+    assert.equal(capturedSystemPrompts.length, 1, 'agent must run exactly one turn');
+    const systemPrompt = capturedSystemPrompts[0];
+    assert.ok(
+      systemPrompt.includes('tool_link'),
+      'agent system prompt must include the link added after launch',
+    );
+    assert.ok(
+      systemPrompt.includes('tool_joint'),
+      'agent system prompt must include the joint added after launch',
+    );
+    assert.ok(
+      systemPrompt.includes('base_link -> tool_link'),
+      'agent system prompt must show the joint parent/child wiring',
+    );
+
+    // The launch-time snapshot stays frozen so header lookups remain stable.
+    assert.equal(launchContext.robotSnapshot.links['tool_link'], undefined);
+  } finally {
+    useUIStore.setState(initialUiState);
+    useWorkspaceStore.setState(initialWorkspaceState);
+    useSelectionStore.setState(initialSelectionState);
+    __setAgentOpenAIClientFactoryForTests(null);
+    if (previousApiKey === undefined) {
+      delete process.env.API_KEY;
+    } else {
+      process.env.API_KEY = previousApiKey;
+    }
+    await act(async () => {
+      root.unmount();
+    });
+    dom.window.close();
+  }
+});
+
+test('Auto-apply permission applies the agent edit directly without a confirmation card', async () => {
+  const previousApiKey = process.env.API_KEY;
+  process.env.API_KEY = 'test-key';
+
+  let callIndex = 0;
+  const mockOpenAiClient = {
+    chat: {
+      completions: {
+        create: async () => {
+          callIndex += 1;
+          if (callIndex === 1) {
+            return {
+              choices: [
+                {
+                  message: {
+                    role: 'assistant',
+                    content: null,
+                    tool_calls: [
+                      {
+                        id: 'c1',
+                        type: 'function',
+                        function: {
+                          name: 'update_link_geometry',
+                          arguments: JSON.stringify({
+                            linkId: 'base_link',
+                            geometryType: 'cylinder',
+                            radius: 0.3,
+                          }),
+                        },
+                      },
+                    ],
+                  },
+                  finish_reason: 'tool_calls',
+                },
+              ],
+            };
+          }
+          return {
+            choices: [
+              { message: { role: 'assistant', content: 'Updated base_link radius to 0.3.', tool_calls: null }, finish_reason: 'stop' },
+            ],
+          };
+        },
+      },
+    },
+  };
+  __setAgentOpenAIClientFactoryForTests(() => mockOpenAiClient as never);
+
+  const dom = installDom();
+  const container = dom.window.document.getElementById('root');
+  assert.ok(container, 'root container should exist');
+
+  const initialRobot = createRobotFixture();
+  const { selection: _initialSelection, ...initialRobotData } = initialRobot;
+  initialRobotData.links['world'] = {
+    ...structuredClone(initialRobotData.links['base_link']),
+    id: 'world',
+    name: 'world',
+  };
+  initialRobotData.rootLinkId = 'world';
+  useWorkspaceStore.setState({
+    workspace: createSingleComponentWorkspace(initialRobotData, { componentId: 'arm' }),
+    activeComponentId: 'arm',
+  });
+  useSelectionStore.getState().setSelection(null);
+
+  const { AIConversationModal } = await import('./AIConversationModal.tsx');
+  const root = createRoot(container);
+  const initialUiState = useUIStore.getState();
+  const initialWorkspaceState = useWorkspaceStore.getState();
+  const initialSelectionState = useSelectionStore.getState();
+  const onApplyCalls: Array<{ componentId: string; urdf: string }> = [];
+
+  try {
+    useUIStore.setState({
+      managedWindowOrder: [...DEFAULT_MANAGED_WINDOW_ORDER],
+      aiAutoApplyEdits: true,
+    });
+    await act(async () => {
+      root.render(
+        <AIConversationModal
+          isOpen
+          onClose={() => {}}
+          lang="en"
+          launchContext={createLaunchContext()}
+          onStartNewConversation={() => {}}
+          onApply={(componentId, proposedUrdf) => {
+            onApplyCalls.push({ componentId, urdf: proposedUrdf });
+            return true;
+          }}
+        />,
+      );
+    });
+    await flush();
+
+    const [prompt] = buildConversationPromptSuggestions({
+      lang: 'en',
+      isReportFollowup: false,
+      selectedEntityName: null,
+    });
+    assert.ok(prompt, 'expected at least one suggested prompt');
+    await clickButton(findButtonByText(container, prompt));
+    await flush();
+
+    assert.equal(onApplyCalls.length, 1, 'Auto mode must call onApply directly');
+    assert.ok(
+      onApplyCalls[0].urdf.includes('radius="0.3"'),
+      'applied URDF must contain the new radius',
+    );
+    assert.equal(onApplyCalls[0].componentId, 'arm');
+    // No confirmation card in Auto mode.
+    assert.equal(container.textContent?.includes('AI modification'), false,
+      'Auto mode must not render a confirmation card');
+    assert.ok(
+      container.textContent?.includes('Updated base_link radius to 0.3.'),
+      'Auto mode must surface the agent summary',
+    );
+  } finally {
+    useUIStore.setState(initialUiState);
+    useWorkspaceStore.setState(initialWorkspaceState);
+    useSelectionStore.setState(initialSelectionState);
+    __setAgentOpenAIClientFactoryForTests(null);
+    if (previousApiKey === undefined) {
+      delete process.env.API_KEY;
+    } else {
+      process.env.API_KEY = previousApiKey;
+    }
     await act(async () => {
       root.unmount();
     });

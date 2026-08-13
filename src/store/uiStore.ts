@@ -236,6 +236,10 @@ interface UIState {
   sourceCodeAutoApply: boolean;
   setSourceCodeAutoApply: (enabled: boolean) => void;
 
+  // AI conversation: apply agent edits without a confirmation card.
+  aiAutoApplyEdits: boolean;
+  setAiAutoApplyEdits: (enabled: boolean) => void;
+
   // Floating workbench window z-order. Session-only; intentionally not persisted.
   managedWindowOrder: ManagedWindowId[];
   bringWindowToFront: (windowId: ManagedWindowId) => void;
@@ -256,6 +260,15 @@ interface UIState {
   // Structure tree geometry detail disclosure
   structureTreeShowGeometryDetails: boolean;
   setStructureTreeShowGeometryDetails: (show: boolean) => void;
+
+  /**
+   * Temporarily drive joints past their authored limits, so a wrong limit can be
+   * corrected by posing the joint first. Deliberately excluded from `partialize`
+   * and cleared when the active model changes: leaving it on across sessions
+   * would silently disable limit checks for later edits.
+   */
+  ignoreJointLimits: boolean;
+  setIgnoreJointLimits: (ignore: boolean) => void;
 }
 
 // Default values
@@ -266,7 +279,7 @@ const defaultViewConfig: ViewConfig = {
 
 const defaultViewOptions: ViewOptions = {
   showGrid: true,
-  showAxes: true,
+  showAxes: false,
   showUsageGuide: true,
   showMjcfWorldLink: true,
   showIkHandles: false,
@@ -614,6 +627,10 @@ export const useUIStore = create<UIState>()(
       sourceCodeAutoApply: false,
       setSourceCodeAutoApply: (sourceCodeAutoApply) => set({ sourceCodeAutoApply }),
 
+      // AI conversation
+      aiAutoApplyEdits: false,
+      setAiAutoApplyEdits: (aiAutoApplyEdits) => set({ aiAutoApplyEdits }),
+
       // Floating workbench windows
       managedWindowOrder: [...DEFAULT_MANAGED_WINDOW_ORDER],
       bringWindowToFront: (windowId) =>
@@ -646,10 +663,14 @@ export const useUIStore = create<UIState>()(
       structureTreeShowGeometryDetails: false,
       setStructureTreeShowGeometryDetails: (structureTreeShowGeometryDetails) =>
         set({ structureTreeShowGeometryDetails }),
+
+      // Temporary joint-limit override (never persisted)
+      ignoreJointLimits: false,
+      setIgnoreJointLimits: (ignoreJointLimits) => set({ ignoreJointLimits }),
     }),
     {
       name: 'urdf-studio-ui',
-      version: 22,
+      version: 23,
       migrate: (persistedState: unknown, persistedVersion) => {
         if (!persistedState || typeof persistedState !== 'object') {
           return persistedState;
@@ -706,6 +727,13 @@ export const useUIStore = create<UIState>()(
           migratedViewOptions.showMjcfWorldLink = true;
         }
 
+        // World origin axes are now opt-in. Sessions persisted before v23 carry
+        // the old enabled-by-default value, which keeps the origin gizmo on
+        // screen after upgrading; reset them once to the hidden default.
+        if ((persistedVersion ?? 0) < 23) {
+          migratedViewOptions.showAxes = false;
+        }
+
         return {
           ...state,
           viewOptions: migratedViewOptions,
@@ -748,6 +776,7 @@ export const useUIStore = create<UIState>()(
         codeEditorFontSize: state.codeEditorFontSize,
         codeEditorOpacity: state.codeEditorOpacity,
         sourceCodeAutoApply: state.sourceCodeAutoApply,
+        aiAutoApplyEdits: state.aiAutoApplyEdits,
         rotationDisplayMode: state.rotationDisplayMode,
         massInertiaChangeBehavior: state.massInertiaChangeBehavior,
         detailLinkTab: state.detailLinkTab,

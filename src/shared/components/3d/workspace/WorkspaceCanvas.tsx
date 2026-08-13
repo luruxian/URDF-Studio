@@ -1,5 +1,5 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Canvas, type RootState, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, type RootState, useThree } from '@react-three/fiber';
 import { Environment, GizmoHelper, GizmoViewport, OrthographicCamera } from '@react-three/drei';
 import * as THREE from 'three';
 
@@ -25,7 +25,7 @@ import {
   type SnapshotCaptureAction,
   type SnapshotPreviewAction,
   type WorkspaceOverlayGizmoMargin,
-  useAdaptiveInteractionQuality,
+  useViewportInteractionQuality,
   WorkspaceCanvasInteractionStateProvider,
   WorkspaceOrbitControls,
   resolveCameraFollowLightingStyle,
@@ -42,6 +42,7 @@ import {
   useWorkspaceCanvasTheme,
 } from './workspaceCanvasConfig';
 import type { WorkspaceCameraSnapshot } from './workspaceCameraSnapshot';
+import { attachLateralWheelBlocker } from './lateralWheelBlocker';
 import { WorkspaceCanvasErrorBoundary } from './WorkspaceCanvasErrorBoundary';
 import {
   getWorkspaceCanvasErrorDetail,
@@ -153,13 +154,6 @@ function CanvasRenderKeyInvalidator({ renderKey, dpr }: { renderKey: string; dpr
   return null;
 }
 
-function CanvasInteractionFrameSampler({ onFrame }: { onFrame: (frameTimeMs: number) => void }) {
-  useFrame((_state, delta) => {
-    onFrame(delta * 1000);
-  });
-  return null;
-}
-
 export const WorkspaceCanvas = ({
   theme,
   lang,
@@ -207,7 +201,6 @@ export const WorkspaceCanvas = ({
   gizmoMargin = DEFAULT_WORKSPACE_OVERLAY_GIZMO_MARGIN,
 }: WorkspaceCanvasProps) => {
   const effectiveTheme = useWorkspaceCanvasTheme(theme);
-  const [contextEpoch, setContextEpoch] = useState(0);
   const [canvasFailure, setCanvasFailure] = useState(false);
   const [layoutResizeActive, setLayoutResizeActive] = useState(false);
   const [webglSupport, setWebglSupport] = useState<WorkspaceCanvasWebglSupportState | null>(null);
@@ -223,28 +216,18 @@ export const WorkspaceCanvas = ({
     startX: number;
     startY: number;
   } | null>(null);
-  const {
-    dpr,
-    isInteracting,
-    beginInteraction,
-    endInteraction,
-    pulseInteraction,
-    reportInteractionFrame,
-  } = useAdaptiveInteractionQuality({
-    restingCap: maxDpr,
-    minRenderDpr: minDpr,
-  });
+  const { dpr, isInteracting, beginInteraction, endInteraction, pulseInteraction } =
+    useViewportInteractionQuality({
+      restingCap: maxDpr,
+      minRenderDpr: minDpr,
+    });
 
-  // Render content changes should only invalidate the current frame. Only a real WebGL context
-  // loss should force a full canvas/renderer rebuild. A change in camera projection also
-  // forces a remount because R3F's <Canvas> only reads the `camera` prop at init — switching
+  // Render content changes should only invalidate the current frame. A change in camera
+  // projection forces a remount because R3F's <Canvas> only reads the `camera` prop at init — switching
   // between PerspectiveCamera and OrthographicCamera requires a fresh canvas, which also
   // resets the view (intended: ortho three-views should start from a neutral framing).
-  const canvasResetKey = useMemo(
-    () => `context:${contextEpoch}:proj:${cameraProjection}`,
-    [contextEpoch, cameraProjection],
-  );
-  const failureResetKey = useMemo(() => `${renderKey}:${contextEpoch}`, [renderKey, contextEpoch]);
+  const canvasResetKey = useMemo(() => `proj:${cameraProjection}`, [cameraProjection]);
+  const failureResetKey = renderKey;
   const activeBackgroundColor = effectiveTheme === 'light' ? background.light : background.dark;
   const cameraFollowLightingStyle = resolveCameraFollowLightingStyle(effectiveTheme);
 
@@ -382,17 +365,16 @@ export const WorkspaceCanvas = ({
 
       const handleContextLost = (event: Event) => {
         event.preventDefault();
-        console.error('[WorkspaceCanvas] WebGL context lost; rebuilding 3D canvas renderer.');
+        console.error('[WorkspaceCanvas] WebGL context lost; waiting for browser restoration.');
         if (!contextLossInFlightRef.current) {
           contextLossInFlightRef.current = true;
-          // Force a full renderer rebuild instead of leaving the canvas in a stale state.
-          setContextEpoch((value) => value + 1);
         }
       };
 
       const handleContextRestored = () => {
-        // If the browser restored the context without us remounting, schedule a redraw.
-        // In practice, the epoch-based remount above is the more reliable recovery path.
+        // THREE.WebGLRenderer rebuilds its GPU resources on this event. Keep the same canvas
+        // alive and redraw it; synchronously remounting here creates a fresh context while the
+        // browser is still recovering the old one and can trigger Chrome's context-loss block.
         contextLossInFlightRef.current = false;
         state.invalidate();
       };
@@ -576,6 +558,20 @@ export const WorkspaceCanvas = ({
     return () => window.cancelAnimationFrame(frameId);
   }, [canvasResetKey, shouldRenderCanvas]);
 
+  // Block horizontal trackpad swipes from bubbling out of the viewer into the
+  // document and triggering back/forward navigation on macOS Edge/Chrome
+  // (Chromium issue 745137 — `overscroll-behavior: none` is not honored for
+  // trackpad navigation on macOS, so choke the wheel at the container). The
+  // listener is non-passive so `preventDefault` actually takes effect; React's
+  // synthetic `onWheelCapture` is passive and cannot block it.
+  useEffect(() => {
+    const el = containerRef?.current;
+    if (!el) {
+      return undefined;
+    }
+    return attachLateralWheelBlocker(el);
+  }, [containerRef]);
+
   return (
     <div
       ref={containerRef}
@@ -583,6 +579,7 @@ export const WorkspaceCanvas = ({
       data-interacting={isInteracting ? 'true' : 'false'}
       style={{
         touchAction: 'none',
+        overscrollBehavior: 'none',
         userSelect: 'none',
         backgroundColor: activeBackgroundColor,
       }}
@@ -619,7 +616,6 @@ export const WorkspaceCanvas = ({
             translate="no"
           >
             <WorkspaceCanvasInteractionStateProvider isInteracting={isInteracting}>
-              <CanvasInteractionFrameSampler onFrame={reportInteractionFrame} />
               <SnapshotRenderStateProvider
                 value={{
                   snapshotRenderActive,

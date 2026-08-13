@@ -1,15 +1,30 @@
 import { parseEditableRobotSource } from '@/app/utils/parseEditableRobotSource';
 import type { RobotFile, RobotState } from '@/types';
 import { createRobotSourceSnapshot } from './workspace-source-sync/robot_source_snapshot';
+import { getPreferredNewline, getIndentAt } from '@/core/utils/xmlSourceTextUtils';
+import {
+  applyRootAttributePatch,
+  applyTextReplacements,
+  collectDirectChildren,
+  collectXmlElementBounds,
+  findRootElement,
+  getAttributeValueFromOpenTag,
+  getClosingTagStart,
+  getElementAttribute,
+  getOpenTag,
+  reindentFragment,
+  SourcePreservingExportError,
+} from './source-preserving-export/xmlSourcePatch';
+import type { TextReplacement, XmlElementBounds } from './source-preserving-export/xmlSourcePatch';
+
+export { SourcePreservingExportError } from './source-preserving-export/xmlSourcePatch';
 
 export type SourcePreservingExportFormat = Extract<
   RobotFile['format'],
   'urdf' | 'mjcf' | 'sdf' | 'xacro'
 >;
 
-export type SourcePreservingExportStrategy =
-  | 'source-preserved'
-  | 'generated-from-robot-state';
+export type SourcePreservingExportStrategy = 'source-preserved' | 'generated-from-robot-state';
 
 export interface SourcePreservingExportFile {
   name: string;
@@ -31,19 +46,6 @@ export interface SourcePreservingExportResult {
   strategy: SourcePreservingExportStrategy;
 }
 
-interface XmlElementBounds {
-  tagName: string;
-  startOffset: number;
-  endOffset: number;
-  parentTagName: string | null;
-}
-
-interface TextReplacement {
-  startOffset: number;
-  endOffset: number;
-  text: string;
-}
-
 interface KeyedElement {
   key: string;
   tagName: string;
@@ -51,15 +53,6 @@ interface KeyedElement {
   text: string;
 }
 
-export class SourcePreservingExportError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'SourcePreservingExportError';
-  }
-}
-
-const XML_TOKEN_RE =
-  /<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<!\[CDATA\[[\s\S]*?\]\]>|<\/?([A-Za-z_][\w:.-]*)\b[^>]*?>/g;
 const NAME_ATTR_RE = /\bname\s*=\s*(["'])(.*?)\1/i;
 const PATCHABLE_URDF_LIKE_TAGS = new Set([
   'link',
@@ -81,10 +74,7 @@ const URDF_MODEL_TAGS = new Set([
   'ros2_control',
   'gazebo',
 ]);
-const MANAGED_XACRO_CONTROL_ARG_NAMES = new Set([
-  'ros_profile',
-  'ros_hardware_interface',
-]);
+const MANAGED_XACRO_CONTROL_ARG_NAMES = new Set(['ros_profile', 'ros_hardware_interface']);
 const MANAGED_GAZEBO_CONTROL_PLUGIN_NAMES = new Set([
   'gazebo_ros_control',
   'gazebo_ros2_control',
@@ -102,209 +92,6 @@ const MJCF_MODEL_SECTION_TAGS = new Set([
   'contact',
   'keyframe',
 ]);
-
-function collectXmlElementBounds(xml: string): XmlElementBounds[] {
-  const bounds: XmlElementBounds[] = [];
-  const stack: Array<{
-    tagName: string;
-    startOffset: number;
-    parentTagName: string | null;
-  }> = [];
-
-  XML_TOKEN_RE.lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = XML_TOKEN_RE.exec(xml)) !== null) {
-    const rawTag = match[0];
-    const tagName = match[1];
-
-    if (!tagName) {
-      continue;
-    }
-
-    if (rawTag.startsWith('</')) {
-      const openTag = stack.pop();
-      if (!openTag || openTag.tagName !== tagName) {
-        continue;
-      }
-
-      bounds.push({
-        tagName,
-        startOffset: openTag.startOffset,
-        endOffset: match.index + rawTag.length,
-        parentTagName: openTag.parentTagName,
-      });
-      continue;
-    }
-
-    const parentTagName = stack[stack.length - 1]?.tagName ?? null;
-    const selfClosing = /\/\s*>$/.test(rawTag);
-    if (selfClosing) {
-      bounds.push({
-        tagName,
-        startOffset: match.index,
-        endOffset: match.index + rawTag.length,
-        parentTagName,
-      });
-      continue;
-    }
-
-    stack.push({
-      tagName,
-      startOffset: match.index,
-      parentTagName,
-    });
-  }
-
-  return bounds;
-}
-
-function findRootElement(xml: string, tagName: string): XmlElementBounds | null {
-  return (
-    collectXmlElementBounds(xml).find(
-      (element) => element.tagName === tagName && element.parentTagName === null,
-    ) ?? null
-  );
-}
-
-function findOpenTagEnd(xml: string, element: XmlElementBounds): number {
-  const endOffset = xml.indexOf('>', element.startOffset);
-  return endOffset >= 0 ? endOffset + 1 : element.startOffset;
-}
-
-function getOpenTag(xml: string, element: XmlElementBounds): string {
-  return xml.slice(element.startOffset, findOpenTagEnd(xml, element));
-}
-
-function getAttributeValueFromOpenTag(openTag: string, attrName: string): string | null {
-  const escapedAttrName = escapeRegex(attrName);
-  const match = openTag.match(new RegExp(`\\b${escapedAttrName}\\s*=\\s*(["'])(.*?)\\1`, 'i'));
-  return match?.[2] ?? null;
-}
-
-function getElementAttribute(xml: string, element: XmlElementBounds, attrName: string): string | null {
-  return getAttributeValueFromOpenTag(getOpenTag(xml, element), attrName);
-}
-
-function escapeXmlAttribute(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-function replaceOrInsertAttribute(openTag: string, attrName: string, value: string | null): string {
-  const escapedAttrName = escapeRegex(attrName);
-  const attrRe = new RegExp(`\\b${escapedAttrName}\\s*=\\s*(["'])(.*?)\\1`, 'i');
-
-  if (value == null || value === '') {
-    return openTag.replace(new RegExp(`\\s+${escapedAttrName}\\s*=\\s*(["']).*?\\1`, 'i'), '');
-  }
-
-  const escapedValue = escapeXmlAttribute(value);
-  if (attrRe.test(openTag)) {
-    return openTag.replace(attrRe, `${attrName}="${escapedValue}"`);
-  }
-
-  return openTag.replace(/\s*\/?>$/, (suffix) => ` ${attrName}="${escapedValue}"${suffix}`);
-}
-
-function applyRootAttributePatch(
-  xml: string,
-  sourceRoot: XmlElementBounds,
-  generatedRoot: XmlElementBounds,
-  generatedXml: string,
-  attrNames: string[],
-): string {
-  const sourceOpenTag = getOpenTag(xml, sourceRoot);
-  const generatedOpenTag = getOpenTag(generatedXml, generatedRoot);
-  const patchedOpenTag = attrNames.reduce(
-    (openTag, attrName) =>
-      replaceOrInsertAttribute(
-        openTag,
-        attrName,
-        getAttributeValueFromOpenTag(generatedOpenTag, attrName),
-      ),
-    sourceOpenTag,
-  );
-
-  if (patchedOpenTag === sourceOpenTag) {
-    return xml;
-  }
-
-  return `${xml.slice(0, sourceRoot.startOffset)}${patchedOpenTag}${xml.slice(
-    findOpenTagEnd(xml, sourceRoot),
-  )}`;
-}
-
-function applyTextReplacements(xml: string, replacements: TextReplacement[]): string {
-  return [...replacements]
-    .sort((left, right) => right.startOffset - left.startOffset)
-    .reduce((content, replacement) => {
-      if (replacement.startOffset < 0 || replacement.endOffset < replacement.startOffset) {
-        return content;
-      }
-      return `${content.slice(0, replacement.startOffset)}${replacement.text}${content.slice(
-        replacement.endOffset,
-      )}`;
-    }, xml);
-}
-
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function getClosingTagStart(xml: string, element: XmlElementBounds): number {
-  const fragment = xml.slice(element.startOffset, element.endOffset);
-  const closeTagRe = new RegExp(`</\\s*${escapeRegex(element.tagName)}\\s*>\\s*$`, 'i');
-  const match = fragment.match(closeTagRe);
-  if (!match || match.index == null) {
-    throw new SourcePreservingExportError(`Cannot locate </${element.tagName}> for source patch.`);
-  }
-  return element.startOffset + match.index;
-}
-
-function getLineStart(xml: string, index: number): number {
-  let cursor = index;
-  while (cursor > 0) {
-    const previous = xml[cursor - 1];
-    if (previous === '\n' || previous === '\r') {
-      break;
-    }
-    cursor -= 1;
-  }
-  return cursor;
-}
-
-function getIndentAt(xml: string, index: number): string {
-  const lineStart = getLineStart(xml, index);
-  return xml.slice(lineStart, index).match(/^[ \t]*/)?.[0] ?? '';
-}
-
-function getPreferredNewline(xml: string): string {
-  return xml.includes('\r\n') ? '\r\n' : '\n';
-}
-
-function reindentFragment(fragment: string, targetIndent: string): string {
-  const lines = fragment.split(/\r?\n/);
-  const firstContentLine = lines.find((line) => line.trim().length > 0);
-  const sourceIndent = firstContentLine?.match(/^[ \t]*/)?.[0] ?? '';
-
-  return lines
-    .map((line) => {
-      if (!line.trim()) {
-        return line;
-      }
-      return `${targetIndent}${line.startsWith(sourceIndent) ? line.slice(sourceIndent.length) : line}`;
-    })
-    .join(getPreferredNewline(fragment));
-}
-
-function collectDirectChildren(xml: string, parentTagName: string): XmlElementBounds[] {
-  return collectXmlElementBounds(xml)
-    .filter((element) => element.parentTagName === parentTagName)
-    .sort((left, right) => left.startOffset - right.startOffset);
-}
 
 function resolveElementKey(
   xml: string,
@@ -378,12 +165,15 @@ function isManagedXacroControlChild(child: KeyedElement): boolean {
 
   if (child.tagName === 'xacro:arg') {
     return MANAGED_XACRO_CONTROL_ARG_NAMES.has(
-      getAttributeValueFromOpenTag(getOpenTag(child.text, {
-        tagName: child.tagName,
-        startOffset: 0,
-        endOffset: child.text.length,
-        parentTagName: null,
-      }), 'name') ?? '',
+      getAttributeValueFromOpenTag(
+        getOpenTag(child.text, {
+          tagName: child.tagName,
+          startOffset: 0,
+          endOffset: child.text.length,
+          parentTagName: null,
+        }),
+        'name',
+      ) ?? '',
     );
   }
 
@@ -409,10 +199,7 @@ function collectKeyedChildren(
     }));
 }
 
-function shouldDeleteMissingUrdfLikeChild(
-  format: 'urdf' | 'xacro',
-  child: KeyedElement,
-): boolean {
+function shouldDeleteMissingUrdfLikeChild(format: 'urdf' | 'xacro', child: KeyedElement): boolean {
   if (format !== 'xacro') {
     return URDF_MODEL_TAGS.has(child.tagName);
   }
@@ -445,13 +232,13 @@ function patchMatchingXacroSource(sourceContent: string, generatedContent: strin
     throw new SourcePreservingExportError('Cannot locate <robot> root for xacro export.');
   }
 
-  const patched = applyRootAttributePatch(
-    sourceContent,
+  const patched = applyRootAttributePatch({
+    xml: sourceContent,
     sourceRoot,
     generatedRoot,
-    generatedContent,
-    ['name', 'version', 'xmlns:xacro'],
-  );
+    generatedXml: generatedContent,
+    attrNames: ['name', 'version', 'xmlns:xacro'],
+  });
   const patchedRoot = findRootElement(patched, 'robot');
   if (!patchedRoot) {
     throw new SourcePreservingExportError('Cannot re-locate <robot> root for xacro export.');
@@ -682,13 +469,13 @@ function patchUrdfLikeSource(
   }
 
   const changedKeys = collectChangedUrdfLikeKeys(sourceRobot, generatedRobot);
-  const patched = applyRootAttributePatch(
-    sourceContent,
+  const patched = applyRootAttributePatch({
+    xml: sourceContent,
     sourceRoot,
     generatedRoot,
-    generatedContent,
-    format === 'xacro' ? ['name', 'version', 'xmlns:xacro'] : ['name', 'version'],
-  );
+    generatedXml: generatedContent,
+    attrNames: format === 'xacro' ? ['name', 'version', 'xmlns:xacro'] : ['name', 'version'],
+  });
   const patchedRoot = findRootElement(patched, 'robot');
   if (!patchedRoot) {
     throw new SourcePreservingExportError(`Cannot re-locate <robot> root for ${format} export.`);
@@ -731,7 +518,10 @@ function patchUrdfLikeSource(
       replacements.push({
         startOffset: sourceChild.bounds.startOffset,
         endOffset: sourceChild.bounds.endOffset,
-        text: reindentFragment(generatedChild.text, getIndentAt(patched, sourceChild.bounds.startOffset)),
+        text: reindentFragment(
+          generatedChild.text,
+          getIndentAt(patched, sourceChild.bounds.startOffset),
+        ),
       });
     }
   });
@@ -776,9 +566,13 @@ function patchMjcfSource(sourceContent: string, generatedContent: string): strin
     );
   }
 
-  const patched = applyRootAttributePatch(sourceContent, sourceRoot, generatedRoot, generatedContent, [
-    'model',
-  ]);
+  const patched = applyRootAttributePatch({
+    xml: sourceContent,
+    sourceRoot,
+    generatedRoot,
+    generatedXml: generatedContent,
+    attrNames: ['model'],
+  });
   const patchedRoot = findRootElement(patched, 'mujoco');
   if (!patchedRoot) {
     throw new SourcePreservingExportError('Cannot re-locate <mujoco> root for MJCF export.');
@@ -791,7 +585,9 @@ function patchMjcfSource(sourceContent: string, generatedContent: string): strin
     MJCF_MODEL_SECTION_TAGS.has(tagName),
   );
   const sourceSectionsByKey = new Map(sourceSections.map((section) => [section.key, section]));
-  const generatedSectionsByKey = new Map(generatedSections.map((section) => [section.key, section]));
+  const generatedSectionsByKey = new Map(
+    generatedSections.map((section) => [section.key, section]),
+  );
   const replacements: TextReplacement[] = [];
 
   sourceSections.forEach((sourceSection) => {
@@ -808,7 +604,9 @@ function patchMjcfSource(sourceContent: string, generatedContent: string): strin
     });
   });
 
-  const missingSections = generatedSections.filter((section) => !sourceSectionsByKey.has(section.key));
+  const missingSections = generatedSections.filter(
+    (section) => !sourceSectionsByKey.has(section.key),
+  );
   if (missingSections.length > 0) {
     const newline = getPreferredNewline(patched);
     const insertionIndent = sourceSections[0]
@@ -827,12 +625,13 @@ function patchMjcfSource(sourceContent: string, generatedContent: string): strin
 }
 
 function findGeneratedSdfModel(generatedContent: string): KeyedElement | null {
-  return (
-    collectKeyedChildren(generatedContent, 'sdf', (tagName) => tagName === 'model')[0] ?? null
-  );
+  return collectKeyedChildren(generatedContent, 'sdf', (tagName) => tagName === 'model')[0] ?? null;
 }
 
-function findSourceSdfModel(sourceContent: string, generatedModelName: string | null): KeyedElement | null {
+function findSourceSdfModel(
+  sourceContent: string,
+  generatedModelName: string | null,
+): KeyedElement | null {
   const allBounds = collectXmlElementBounds(sourceContent);
   const modelBounds = allBounds
     .filter((element) => element.tagName === 'model')
@@ -881,13 +680,20 @@ function patchSdfSource(sourceContent: string, generatedContent: string): string
     );
   }
 
-  const patched = applyRootAttributePatch(sourceContent, sourceRoot, generatedRoot, generatedContent, [
-    'version',
-  ]);
+  const patched = applyRootAttributePatch({
+    xml: sourceContent,
+    sourceRoot,
+    generatedRoot,
+    generatedXml: generatedContent,
+    attrNames: ['version'],
+  });
   const adjustedSourceModel =
     patched === sourceContent
       ? sourceModel
-      : findSourceSdfModel(patched, getElementAttribute(generatedContent, generatedModel.bounds, 'name'));
+      : findSourceSdfModel(
+          patched,
+          getElementAttribute(generatedContent, generatedModel.bounds, 'name'),
+        );
   if (!adjustedSourceModel) {
     throw new SourcePreservingExportError('Cannot re-locate source <model> for SDF export.');
   }
@@ -913,7 +719,13 @@ function patchSourceContent(
 ): string {
   switch (format) {
     case 'urdf':
-      return patchUrdfLikeSource(sourceContent, generatedContent, 'urdf', sourceRobot, generatedRobot);
+      return patchUrdfLikeSource(
+        sourceContent,
+        generatedContent,
+        'urdf',
+        sourceRobot,
+        generatedRobot,
+      );
     case 'xacro':
       return patchUrdfLikeSource(
         sourceContent,
@@ -928,7 +740,9 @@ function patchSourceContent(
       return patchSdfSource(sourceContent, generatedContent);
     default: {
       const unsupportedFormat: never = format;
-      throw new SourcePreservingExportError(`Unsupported source-preserving export format: ${unsupportedFormat}`);
+      throw new SourcePreservingExportError(
+        `Unsupported source-preserving export format: ${unsupportedFormat}`,
+      );
     }
   }
 }

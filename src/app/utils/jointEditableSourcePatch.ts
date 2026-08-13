@@ -1,5 +1,16 @@
 import { MAX_PROPERTY_DECIMALS, formatNumberWithMaxDecimals } from '@/core/utils/numberPrecision';
 import { JointType, type UrdfJoint, type UrdfLink } from '@/types';
+import {
+  getPreferredNewline,
+  getLineStart,
+  getIndentAt,
+  replaceOrRemoveXmlAttribute,
+} from '@/core/utils/xmlSourceTextUtils';
+import {
+  findNamedXmlElement,
+  findNamedXmlElementByTagNames,
+  type XmlElementOccurrence,
+} from './jointEditableSourceXml';
 
 interface JointLimitSourcePatchOptions {
   sourceContent: string;
@@ -14,118 +25,9 @@ interface LinkInertialSourcePatchOptions {
   inertial: NonNullable<UrdfLink['inertial']>;
 }
 
-interface XmlElementOccurrence {
-  start: number;
-  openEnd: number;
-  closeStart: number;
-  end: number;
-  selfClosing: boolean;
-  rawOpenTag: string;
-}
-
 const DEFAULT_INDENT_UNIT = '  ';
-const XML_NAME_ATTR_RE = /\bname\s*=\s*(["'])(.*?)\1/i;
 const XML_TAG_OR_COMMENT_RE = /<!--[\s\S]*?-->|<\s*(\/?)([A-Za-z_][\w:.-]*)\b[^>]*>/g;
 const SDF_MANAGED_LIMIT_TAG_NAMES = ['lower', 'upper', 'effort', 'velocity'] as const;
-
-function escapeXmlAttribute(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function buildXmlTagNamesRegExp(tagNames: string[]): RegExp {
-  return new RegExp(
-    `<\\s*(\\/?)(${tagNames.map(escapeRegExp).join('|')})\\b[^>]*>`,
-    'gi',
-  );
-}
-
-function findNamedXmlElementByTagNames(
-  sourceContent: string,
-  tagNames: string[],
-  name: string,
-): XmlElementOccurrence | null {
-  const tagRe = buildXmlTagNamesRegExp(tagNames);
-  const stack: Array<{
-    start: number;
-    openEnd: number;
-    rawOpenTag: string;
-    tagName: string;
-    matchesName: boolean;
-  }> = [];
-
-  let match: RegExpExecArray | null;
-  while ((match = tagRe.exec(sourceContent)) !== null) {
-    const rawTag = match[0];
-    const isClosingTag = match[1] === '/';
-    const matchedTagName = match[2] ?? '';
-
-    if (isClosingTag) {
-      let openTagIndex = -1;
-      for (let index = stack.length - 1; index >= 0; index -= 1) {
-        if (stack[index]?.tagName === matchedTagName) {
-          openTagIndex = index;
-          break;
-        }
-      }
-      const openTag = openTagIndex >= 0 ? stack.splice(openTagIndex, 1)[0] : null;
-      if (!openTag) {
-        continue;
-      }
-      if (openTag.matchesName) {
-        return {
-          start: openTag.start,
-          openEnd: openTag.openEnd,
-          closeStart: match.index,
-          end: match.index + rawTag.length,
-          selfClosing: false,
-          rawOpenTag: openTag.rawOpenTag,
-        };
-      }
-      continue;
-    }
-
-    const isSelfClosing = /\/\s*>$/.test(rawTag);
-    const matchedName = XML_NAME_ATTR_RE.exec(rawTag)?.[2]?.trim() ?? '';
-    if (isSelfClosing && matchedName === name) {
-      return {
-        start: match.index,
-        openEnd: match.index + rawTag.length,
-        closeStart: match.index + rawTag.length,
-        end: match.index + rawTag.length,
-        selfClosing: true,
-        rawOpenTag: rawTag,
-      };
-    }
-
-    if (!isSelfClosing) {
-      stack.push({
-        start: match.index,
-        openEnd: match.index + rawTag.length,
-        rawOpenTag: rawTag,
-        tagName: matchedTagName,
-        matchesName: matchedName === name,
-      });
-    }
-  }
-
-  return null;
-}
-
-function findNamedXmlElement(
-  sourceContent: string,
-  tagName: string,
-  name: string,
-): XmlElementOccurrence | null {
-  return findNamedXmlElementByTagNames(sourceContent, [tagName], name);
-}
 
 function findFirstXmlElementByTagNames(
   sourceContent: string,
@@ -187,22 +89,6 @@ function findFirstXmlElement(sourceContent: string, tagName: string): XmlElement
   return findFirstXmlElementByTagNames(sourceContent, [tagName]);
 }
 
-function getPreferredNewline(sourceContent: string): string {
-  return sourceContent.includes('\r\n') ? '\r\n' : '\n';
-}
-
-function getLineStart(sourceContent: string, index: number): number {
-  let cursor = index;
-  while (cursor > 0) {
-    const previousChar = sourceContent[cursor - 1];
-    if (previousChar === '\n' || previousChar === '\r') {
-      break;
-    }
-    cursor -= 1;
-  }
-  return cursor;
-}
-
 function getLineEndIncludingNewline(sourceContent: string, index: number): number {
   let cursor = index;
   while (cursor < sourceContent.length) {
@@ -216,12 +102,6 @@ function getLineEndIncludingNewline(sourceContent: string, index: number): numbe
     cursor += 1;
   }
   return cursor;
-}
-
-function getIndentAt(sourceContent: string, index: number): string {
-  const lineStart = getLineStart(sourceContent, index);
-  const match = sourceContent.slice(lineStart, index).match(/^[ \t]*/);
-  return match?.[0] ?? '';
 }
 
 function formatScalar(value: number): string {
@@ -244,27 +124,6 @@ function formatInertialXyz(inertial: NonNullable<UrdfLink['inertial']>): string 
 function formatInertialRpy(inertial: NonNullable<UrdfLink['inertial']>): string {
   const rpy = inertial.origin?.rpy;
   return formatVectorValues([rpy?.r ?? 0, rpy?.p ?? 0, rpy?.y ?? 0]);
-}
-
-function replaceOrRemoveXmlAttribute(
-  rawTag: string,
-  attributeName: string,
-  nextValue: string | null,
-): string {
-  const attrRe = new RegExp(`\\s+${escapeRegExp(attributeName)}\\s*=\\s*(["']).*?\\1`, 'i');
-  if (nextValue == null) {
-    return rawTag.replace(attrRe, '');
-  }
-
-  const escapedNextValue = escapeXmlAttribute(nextValue);
-  if (attrRe.test(rawTag)) {
-    return rawTag.replace(
-      new RegExp(`(\\s+${escapeRegExp(attributeName)}\\s*=\\s*)(["']).*?\\2`, 'i'),
-      (_match, prefix: string, quote: string) => `${prefix}${quote}${escapedNextValue}${quote}`,
-    );
-  }
-
-  return rawTag.replace(/(\s*\/?>)$/, ` ${attributeName}="${escapedNextValue}"$1`);
 }
 
 function shouldEmitUrdfPositionLimits(jointType: UrdfJoint['type']): boolean {

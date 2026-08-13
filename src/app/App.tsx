@@ -24,8 +24,12 @@ import { resolveExportErrorMessage } from './utils/exportErrorMessage';
 import { useUIStore, useAssetsStore } from '@/store';
 import type { InspectionReport, RobotFile, RobotState } from '@/types';
 import { translations } from '@/shared/i18n';
-import type { ExportDialogConfig, ExportFormat, ExportProgressState } from '@/features/file-io';
-import { EXPORT_FORMATS } from '@/features/file-io/components/ExportDialog/config';
+import {
+  EXPORT_FORMATS,
+  type ExportDialogConfig,
+  type ExportFormat,
+  type ExportProgressState,
+} from '@/features/file-io';
 import type { ImportPreparationOverlayState } from './hooks/useFileImport';
 import { useAssetImportFromUrl } from './hooks/useAssetImportFromUrl';
 import { useMeshPreviewFromUrl } from './hooks/useMeshPreviewFromUrl';
@@ -38,6 +42,7 @@ import {
   preloadExportProgressDialog,
   preloadSettingsModal,
 } from './components/lazyAppOverlays';
+import { resolveCurrentAIRobotSnapshot } from '@/features/ai-assistant';
 import type {
   AIConversationFocusedIssue,
   AIConversationLaunchContext,
@@ -45,10 +50,8 @@ import type {
   AIConversationSelection,
 } from '@/features/ai-assistant';
 import type { ExportTarget } from './hooks/file-export/types';
-import {
-  createConversationLaunchContext,
-  resolveCurrentAIRobotSnapshot,
-} from './utils/aiConversationLaunch';
+import { createConversationLaunchContext } from './utils/aiConversationLaunch';
+import { applyAIUrdfModification } from './utils/applyAIUrdfModification';
 import { waitForNextPaint } from './utils/waitForNextPaint';
 import { waitForAnimationFrame } from './utils/waitForAnimationFrame';
 import { logRegressionError } from '@/shared/debug/consoleDiagnostics';
@@ -150,11 +153,6 @@ export function AppContent({ extensions, onExposeActions }: AppContentProps = {}
   });
   const { importAssetFromBotWorld, ...botWorldImportState } = useAssetImportFromUrl({
     handleImport,
-    onImportComplete: (success) => {
-      if (success) {
-        showToast(t.addedFilesToAssetLibrary.replace('{count}', '1'), 'success');
-      }
-    },
     onConvertToRequest: ({ convertTo, success }) => {
       // Asset was downloaded+imported; on success open the export dialog
       // preselected to the requested format so the user can export/convert.
@@ -221,6 +219,7 @@ export function AppContent({ extensions, onExposeActions }: AppContentProps = {}
     setProjectExportProgress,
     showToast,
     t.exportFailedParse,
+    t.exportUrdfJointUnsupported,
     t.exportProgressPreparing,
     t.exportProgressPreparingDetail,
   ]);
@@ -355,7 +354,7 @@ export function AppContent({ extensions, onExposeActions }: AppContentProps = {}
     (currentLaunchContext: AIConversationLaunchContext) => {
       const nextLaunchContext = createConversationLaunchContextFromSnapshot(
         currentLaunchContext.mode,
-        currentLaunchContext.robotSnapshot,
+        resolveCurrentAIRobotSnapshot(),
         currentLaunchContext.inspectionReportSnapshot ?? null,
         {
           selectedEntity: currentLaunchContext.selectedEntity,
@@ -426,7 +425,7 @@ export function AppContent({ extensions, onExposeActions }: AppContentProps = {}
         showToast(
           resolveExportErrorMessage(error, {
             exportFailedParse: t.exportFailedParse,
-            exportUrdfBallJointUnsupported: t.exportUrdfBallJointUnsupported,
+            exportUrdfJointUnsupported: t.exportUrdfJointUnsupported,
           }),
           'error',
         );
@@ -442,7 +441,7 @@ export function AppContent({ extensions, onExposeActions }: AppContentProps = {}
       setIsExporting,
       showToast,
       t.exportFailedParse,
-      t.exportUrdfBallJointUnsupported,
+      t.exportUrdfJointUnsupported,
     ],
   );
 
@@ -536,6 +535,7 @@ export function AppContent({ extensions, onExposeActions }: AppContentProps = {}
     handleExportDisconnectedWorkspaceUrdfBundle,
     showToast,
     t.exportFailedParse,
+    t.exportUrdfJointUnsupported,
   ]);
 
   const loadingLabel = t.loadingPanel;
@@ -578,6 +578,9 @@ export function AppContent({ extensions, onExposeActions }: AppContentProps = {}
         importPreparationOverlay={importPreparationOverlay}
         headerQuickAction={extensions?.config?.headerQuickAction}
         headerSecondaryAction={extensions?.config?.headerSecondaryAction}
+        surfaceModeSelector={extensions?.config?.surfaceModeSelector}
+        contextFileMenu={extensions?.config?.contextFileMenu}
+        extensionToolboxItems={extensions?.config?.toolboxItems}
         onExposeLayoutActions={handleExposeLayoutActions}
       />
 
@@ -594,6 +597,7 @@ export function AppContent({ extensions, onExposeActions }: AppContentProps = {}
         handleOpenConversationWithReport={handleOpenConversationWithReport}
         handleStartNewAIConversation={handleStartNewAIConversation}
         isAIConversationOpen={isAIConversationOpen}
+        onApplyAIUrdfModification={applyAIUrdfModification}
         isAIInspectionOpen={isAIInspectionOpen}
         isDisconnectedWorkspaceUrdfExporting={isDisconnectedWorkspaceUrdfExporting}
         isExportDialogOpen={isExportDialogOpen}

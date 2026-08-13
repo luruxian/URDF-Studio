@@ -4,9 +4,11 @@ import {
   GeometryType,
   IMPORTED_EXTERNAL_FRAME_LINK_TYPE,
   type RobotState,
+  type RobotImportRecoveryDiagnostic,
   type UrdfJoint,
   type UrdfLink,
 } from '@/types';
+import { attachParserRecoveryDiagnostics } from '@/core/parsers/recoveryDiagnostics';
 import { preprocessXML } from './utils';
 import { parseMaterials } from './materialParser';
 import { parseLinks } from './linkParser';
@@ -103,7 +105,11 @@ function resolveRootLinkId(
   const rootCandidates = Object.keys(links).filter((linkId) => !childLinkIds.has(linkId));
 
   if (rootCandidates.length === 0) {
-    return null;
+    // Every link is some joint's child, so the joint graph is entirely cyclic
+    // and no link can anchor it. Anchor on the first declared link anyway so the
+    // document still imports; import recovery breaks the cycle and re-resolves
+    // the root from what survives.
+    return Object.keys(links)[0] ?? null;
   }
 
   if (rootCandidates.length === 1) {
@@ -129,41 +135,110 @@ export const parseURDF = (xmlString: string): RobotState | null => {
   xmlString = preprocessXML(xmlString);
 
   const parser = new DOMParser();
-  const xmlDoc = parser.parseFromString(xmlString, "text/xml");
+  const xmlDoc = parser.parseFromString(xmlString, 'text/xml');
 
   // Check for XML parsing errors
-  const parseError = xmlDoc.querySelector("parsererror");
+  const parseError = xmlDoc.querySelector('parsererror');
   if (parseError) {
-      console.error("XML parsing error:", parseError.textContent);
-      return null;
+    console.error('XML parsing error:', parseError.textContent);
+    return null;
   }
 
-  const robotEl = xmlDoc.querySelector("robot");
-  if (!robotEl) {
-      console.error("Invalid URDF: No <robot> tag found.");
-      return null;
+  const robotEl = xmlDoc.documentElement;
+  if (robotEl?.tagName !== 'robot') {
+    console.error('Invalid URDF: The document root must be <robot>.');
+    return null;
   }
 
-  const name = robotEl.getAttribute("name") || "imported_robot";
-  const version = robotEl.getAttribute("version")?.trim() || undefined;
+  const name = robotEl.getAttribute('name') || 'imported_robot';
+  const version = robotEl.getAttribute('version')?.trim() || undefined;
+  const declaredLinkNames = new Set(
+    Array.from(robotEl.children)
+      .filter((child) => child.tagName === 'link')
+      .map((linkEl) => linkEl.getAttribute('name')?.trim())
+      .filter((linkName): linkName is string => Boolean(linkName)),
+  );
 
-  // Parse Materials
-  const { globalMaterials, linkGazeboMaterials } = parseMaterials(robotEl);
+  let globalMaterials: Record<
+    string,
+    { color?: string; colorRgba?: [number, number, number, number]; texture?: string }
+  >;
+  let linkGazeboMaterials: Record<string, string>;
+  let parsedLinks: Record<string, UrdfLink>;
+  let extraJoints: ReturnType<typeof parseLinks>['extraJoints'];
+  let linkMaterials: Record<
+    string,
+    { color?: string; colorRgba?: [number, number, number, number]; texture?: string }
+  >;
+  let joints: Record<string, UrdfJoint>;
+  const recoveryDiagnostics: RobotImportRecoveryDiagnostic[] = [];
 
-  // Parse Links
-  const { links: parsedLinks, extraJoints, linkMaterials } = parseLinks(robotEl, globalMaterials, linkGazeboMaterials);
+  try {
+    const materialResult = parseMaterials(robotEl, recoveryDiagnostics);
+    globalMaterials = materialResult.globalMaterials;
+    linkGazeboMaterials = materialResult.linkGazeboMaterials;
+
+    const linkResult = parseLinks(
+      robotEl,
+      globalMaterials,
+      linkGazeboMaterials,
+      recoveryDiagnostics,
+    );
+    parsedLinks = linkResult.links;
+    extraJoints = linkResult.extraJoints;
+    linkMaterials = linkResult.linkMaterials;
+
+    joints = parseJoints(robotEl, recoveryDiagnostics);
+  } catch (error) {
+    console.error('[URDFParser] Failed to parse URDF document:', error);
+    return null;
+  }
 
   if (Object.keys(parsedLinks).length === 0) {
-      console.error("Invalid URDF: No <link> tags found.");
-      return null;
+    console.error('Invalid URDF: No <link> tags found.');
+    return null;
   }
 
-  // Parse Joints
-  const joints = parseJoints(robotEl);
-
   // Add virtual joints from multi-collision parsing
-  extraJoints.forEach(j => {
-      joints[j.id] = j;
+  extraJoints.forEach((j) => {
+    joints[j.id] = j;
+  });
+
+  Object.entries(joints).forEach(([jointId, joint]) => {
+    const declaredParentWasOmitted =
+      declaredLinkNames.has(joint.parentLinkId) && !parsedLinks[joint.parentLinkId];
+    if (
+      !joint.parentLinkId ||
+      !joint.childLinkId ||
+      !parsedLinks[joint.childLinkId] ||
+      declaredParentWasOmitted
+    ) {
+      delete joints[jointId];
+      recoveryDiagnostics.push({
+        code: 'urdf_joint_endpoint_missing_omitted',
+        severity: 'warning',
+        category: 'topology',
+        message: `Joint "${joint.name}" referenced an unusable endpoint and was omitted.`,
+        relatedIds: [joint.id, joint.parentLinkId, joint.childLinkId].filter(Boolean),
+        source: { tag: 'joint', name: joint.name },
+        action: 'omitted',
+      });
+    }
+  });
+
+  Object.values(joints).forEach((joint) => {
+    if (!joint.mimic?.joint || joints[joint.mimic.joint]) return;
+    const missingTarget = joint.mimic.joint;
+    delete joint.mimic;
+    recoveryDiagnostics.push({
+      code: 'urdf_joint_mimic_omitted',
+      severity: 'warning',
+      category: 'joint',
+      message: `Joint "${joint.name}" referenced missing mimic target "${missingTarget}", so only its mimic metadata was omitted.`,
+      relatedIds: [joint.id, missingTarget],
+      source: { tag: 'mimic', name: joint.name, attribute: 'joint' },
+      action: 'omitted',
+    });
   });
 
   const links = synthesizeMissingExternalParentLinks(parsedLinks, joints);
@@ -176,34 +251,36 @@ export const parseURDF = (xmlString: string): RobotState | null => {
   const rootId = resolveRootLinkId(links, joints);
 
   if (!rootId) {
-      console.error("Invalid URDF: Could not determine a unique root link.");
-      return null;
+    console.error('Invalid URDF: Could not determine a unique root link.');
+    return null;
   }
 
   const urdfInspectionContext = buildUrdfInspectionContext({
-      robotEl,
-      parsedLinks,
-      joints,
-      rootLinkId: rootId,
+    robotEl,
+    parsedLinks,
+    joints,
+    rootLinkId: rootId,
   });
 
   const materials = Object.fromEntries(
-      Object.entries(linkMaterials)
-          .filter(([, material]) => Boolean(material.color || material.colorRgba || material.texture))
-          .map(([linkId, material]) => [linkId, material]),
+    Object.entries(linkMaterials)
+      .filter(([, material]) => Boolean(material.color || material.colorRgba || material.texture))
+      .map(([linkId, material]) => [linkId, material]),
   );
 
-  return {
-      name,
-      version,
-      links,
-      joints,
-      rootLinkId: rootId,
-      ...(Object.keys(materials).length > 0 ? { materials } : {}),
-      inspectionContext: {
-          sourceFormat: 'urdf',
-          urdf: urdfInspectionContext,
-      },
-      selection: { type: 'link', id: rootId }
+  const robot: RobotState = {
+    name,
+    version,
+    links,
+    joints,
+    rootLinkId: rootId,
+    ...(Object.keys(materials).length > 0 ? { materials } : {}),
+    inspectionContext: {
+      sourceFormat: 'urdf',
+      urdf: urdfInspectionContext,
+    },
+    selection: { type: 'link', id: rootId },
   };
+
+  return attachParserRecoveryDiagnostics(robot, recoveryDiagnostics);
 };

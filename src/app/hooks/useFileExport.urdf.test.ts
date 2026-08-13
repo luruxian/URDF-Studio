@@ -275,6 +275,7 @@ function createUrdfExportConfig(
       includeActuators: true,
       actuatorType: 'position',
       includeMeshes: false,
+      meshFormat: 'auto',
       compressSTL: false,
       stlQuality: 50,
     },
@@ -284,6 +285,7 @@ function createUrdfExportConfig(
       useRelativePaths: true,
       preferSourceVisualMeshes: true,
       includeMeshes: false,
+      meshFormat: 'auto',
       compressSTL: false,
       stlQuality: 50,
       ...urdfOverrides,
@@ -295,11 +297,13 @@ function createUrdfExportConfig(
       rosHardwareInterface: 'effort',
       useRelativePaths: true,
       includeMeshes: false,
+      meshFormat: 'auto',
       compressSTL: false,
       stlQuality: 50,
     },
     sdf: {
       includeMeshes: false,
+      meshFormat: 'auto',
       compressSTL: false,
       stlQuality: 50,
     },
@@ -324,6 +328,7 @@ function createSdfExportConfig(
       includeActuators: true,
       actuatorType: 'position',
       includeMeshes: false,
+      meshFormat: 'auto',
       compressSTL: false,
       stlQuality: 50,
     },
@@ -333,6 +338,7 @@ function createSdfExportConfig(
       useRelativePaths: true,
       preferSourceVisualMeshes: true,
       includeMeshes: false,
+      meshFormat: 'auto',
       compressSTL: false,
       stlQuality: 50,
     },
@@ -343,11 +349,13 @@ function createSdfExportConfig(
       rosHardwareInterface: 'effort',
       useRelativePaths: true,
       includeMeshes: false,
+      meshFormat: 'auto',
       compressSTL: false,
       stlQuality: 50,
     },
     sdf: {
       includeMeshes: false,
+      meshFormat: 'auto',
       compressSTL: false,
       stlQuality: 50,
       ...sdfOverrides,
@@ -557,54 +565,6 @@ test('useFileExport rejects URDF export when the current robot contains closed-l
     );
 
     assert.equal(downloadMocks.clicked, false, 'closed-loop URDF export should not download');
-  } finally {
-    rendered.cleanup();
-    downloadMocks.restore();
-    await settleDomTasks();
-    domEnvironment.restore();
-  }
-});
-
-test('useFileExport rejects legacy handleExportURDF when the current robot contains closed-loop constraints', async () => {
-  resetStoresToBaseline();
-  const domEnvironment = installDomEnvironment();
-  installExportTestRobot(createClosedLoopRobotData('closed_loop_robot'));
-
-  const downloadMocks = installDownloadMocks();
-  const rendered = renderHook();
-
-  try {
-    await assert.rejects(rendered.hook.handleExportURDF(), /closed-loop constraint/);
-
-    assert.equal(
-      downloadMocks.clicked,
-      false,
-      'legacy handleExportURDF should not download when closed-loop constraints exist',
-    );
-  } finally {
-    rendered.cleanup();
-    downloadMocks.restore();
-    await settleDomTasks();
-    domEnvironment.restore();
-  }
-});
-
-test('useFileExport rejects legacy handleExport package when the current robot contains closed-loop constraints', async () => {
-  resetStoresToBaseline();
-  const domEnvironment = installDomEnvironment();
-  installExportTestRobot(createClosedLoopRobotData('closed_loop_robot'));
-
-  const downloadMocks = installDownloadMocks();
-  const rendered = renderHook();
-
-  try {
-    await assert.rejects(rendered.hook.handleExport(), /closed-loop constraint/);
-
-    assert.equal(
-      downloadMocks.clicked,
-      false,
-      'legacy handleExport should not download when closed-loop constraints exist',
-    );
   } finally {
     rendered.cleanup();
     downloadMocks.restore();

@@ -11,10 +11,25 @@ export const zh: TranslationKeys = {
   // Header
   appName: 'URDF Studio',
   editor: '编辑器',
-  aiAssistant: 'AI审阅',
+  aiAssistant: 'AI 审阅',
   aiMenu: 'AI',
-  aiInspection: 'AI审阅',
+  aiInspection: 'AI 审阅',
   aiConversation: 'AI 对话',
+  aiModificationButton: '修改机器人',
+  aiModificationTitle: 'AI 修改方案',
+  aiModificationApply: '应用',
+  aiModificationDismiss: '放弃',
+  aiModificationApplied: '已应用',
+  aiModificationUndoHint: '可按 Undo 撤销',
+  aiModificationNoComponent: '请选择单个机器人组件再进行修改。',
+  aiModificationNoChange: 'AI 未提出任何修改。',
+  aiModificationUnsupportedJoint: '机器人包含无法导出为 URDF 的关节类型(如球关节)。',
+  aiModificationFailed: 'AI 修改请求失败。',
+  aiAutoApply: '自动应用 AI 修改',
+  aiAutoApplyDesc: 'AI 提出的修改直接应用,不弹确认卡片。可用 Ctrl+Z 撤销。',
+  aiAutoAppliedSummary: '已应用 AI 修改:{explanation}',
+  aiDiffCollapsedLines: '{count} 行未变更（已折叠）',
+  aiDiffCollapsedHint: '长段未变更行已折叠，点击展开查看完整上下文。',
   feedback: '反馈',
   file: '文件',
   import: '导入',
@@ -349,7 +364,7 @@ export const zh: TranslationKeys = {
   apply: '应用',
 
   // AI Modal
-  aiTitle: 'AI审阅',
+  aiTitle: 'AI 审阅',
   aiIntro: '我可以帮你生成新机器人，修改当前设计，或提供硬件建议。',
   aiExamples: '示例：\n- "创建一个四足机器人"\n- "在 base_link 添加激光雷达"\n- "为髋关节推荐电机"',
   aiPlaceholder: '今天我能帮你做什么？',
@@ -538,7 +553,6 @@ export const zh: TranslationKeys = {
   trajectoryEditing: '轨迹编辑',
   featureInDevelopment: '功能开发中',
   transformMode: '变换模式',
-  visualTransformDisabledWithCollisions: '已显示碰撞体：当前只能移动碰撞体，不能移动可视化几何体。',
   translateMode: '移动',
   rotateMode: '旋转',
   universalMode: '万能',
@@ -579,6 +593,9 @@ export const zh: TranslationKeys = {
   resetJoints: '重置关节',
   reset: '重置',
   advanced: '高级',
+  ignoreJointLimits: '忽略关节限位',
+  ignoreJointLimitsOn: '已忽略关节限位',
+  ignoreJointLimitsHint: '可将关节转到限位之外，便于先摆位再修正限位。切换模型时自动关闭。',
   expand: '展开',
   collapse: '收起',
   close: '关闭',
@@ -808,6 +825,7 @@ export const zh: TranslationKeys = {
   motorType: '电机型号',
   addedComponent: '已添加组件: {name}',
   addedComponentRecovered: '已添加组件: {name}（已忽略 {count} 项源数据问题）',
+  appliedSourceRecovered: '已应用 {name}，跳过 {count} 项源数据问题，其余内容已显示。',
   noCollisionOptimizationApplied: '未应用任何碰撞体优化。',
   collisionOptimizationApplied:
     '已应用 {count} 项碰撞体优化（Mesh {meshCount}，基础体 {primitiveCount}）',
@@ -821,8 +839,8 @@ export const zh: TranslationKeys = {
   exportFailedParse: '导出失败：文件解析失败',
   exportClosedLoopUrdfUnsupported:
     '无法将 {name} 导出为 URDF：检测到 {count} 个闭链约束。核心 URDF 只支持树形拓扑，请改用 MJCF、Xacro、SDF 或 .usp。',
-  exportUrdfBallJointUnsupported:
-    '无法将 {name} 导出为 URDF：检测到 ball 球关节。核心 URDF 不支持球关节，请改用 MJCF、SDF 或 Xacro，或将其改写为可表达的关节组合。',
+  exportUrdfJointUnsupported:
+    '无法将 {name} 导出为 URDF：检测到不受支持的 {type} 关节。请改用 MJCF、SDF 或 Xacro，或将其改写为可表达的关节组合。',
   exportLibraryParseFailed: '解析素材库文件失败：{file}',
   exportLibraryUnsupportedFormat: '素材库导出不支持该格式：{format}',
   usdExportRequiresLoadedStage: '当前 USD 导出仅支持在当前 3D 场景中导出已加载完成的 USD 模型。',
@@ -917,7 +935,7 @@ export const zh: TranslationKeys = {
 
   // About Modal
   aboutDescription:
-    '专业的机器人 URDF 设计与可视化工作站，支持快速编辑，碰撞优化，参数配置，AI审阅和实用工具。',
+    '专业的机器人 URDF 设计与可视化工作站，支持快速编辑，碰撞优化，参数配置，AI 审阅和实用工具。',
   aboutCopyright: '© 2025-2026 enkeebot.',
   aboutOpenSource: '基于 Apache License 2.0 协议开源。',
   aboutMotphysTagline: '超越物理，进化不止',

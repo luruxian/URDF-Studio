@@ -65,6 +65,8 @@ export interface AppLayoutHeaderSectionProps {
   onPrefetchSettings: AppLayoutProps['onPrefetchSettings'];
   headerQuickAction: AppLayoutProps['headerQuickAction'];
   headerSecondaryAction: AppLayoutProps['headerSecondaryAction'];
+  surfaceModeSelector: AppLayoutProps['surfaceModeSelector'];
+  contextFileMenu: AppLayoutProps['contextFileMenu'];
   viewConfig: AppLayoutProps['viewConfig'];
   setViewConfig: AppLayoutProps['setViewConfig'];
   toolboxItems: HeaderProps['toolboxItems'];
@@ -180,6 +182,7 @@ export interface AppLayoutSidebarsProps {
   setViewConfig: AppLayoutProps['setViewConfig'];
   handleJointPreview: TreeEditorProps['onJointAnglePreview'];
   handleJointChange: TreeEditorProps['onJointAngleChange'];
+  handleResetJointAngles: TreeEditorProps['onResetJointAngles'];
   previewFile: FilePreviewWindowProps['file'];
   previewRobot: FilePreviewWindowProps['previewRobot'];
   filePreview: FilePreviewWindowProps['previewState'];

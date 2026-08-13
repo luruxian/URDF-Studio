@@ -232,6 +232,19 @@ test('processXacro evaluates boolean expressions and quoted string comparisons i
   assert.doesNotMatch(processed, /<link name="disabled_link"/);
 });
 
+test('processXacro evaluates unary operators around signed numeric properties', () => {
+  const processed = processXacro(`
+    <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="signed_expression_fixture">
+      <xacro:property name="lower" value="-1.25" />
+      <link name="base" data-mirrored="\${-lower}" data-half-turn="\${-pi/2}" />
+    </robot>
+  `);
+
+  assert.match(processed, /data-mirrored="1\.25"/);
+  assert.match(processed, /data-half-turn="-1\.5707963267948966"/);
+  assert.doesNotMatch(processed, /\$\{/);
+});
+
 test('processXacro does not eagerly evaluate conditionals inside macro definitions before expansion', () => {
   const processed = processXacro(`
     <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="macro_conditional_fixture">
@@ -263,8 +276,8 @@ test('processXacro expands xacro macros whose params attribute is omitted', () =
   assert.doesNotMatch(processed, /<xacro:chassis/);
 });
 
-test('processXacro treats unresolved debug arg conditionals as disabled instead of aborting parse', () => {
-  const processed = processXacro(`
+test('parseXacro omits an unresolved conditional block and preserves healthy siblings', () => {
+  const robot = parseXacro(`
     <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="missing_debug_arg_fixture">
       <xacro:if value="$(arg DEBUG)">
         <link name="debug_world" />
@@ -273,22 +286,137 @@ test('processXacro treats unresolved debug arg conditionals as disabled instead 
     </robot>
   `);
 
-  assert.match(processed, /<link name="base"/);
-  assert.doesNotMatch(processed, /debug_world/);
+  assert.ok(robot);
+  assert.ok(robot.links.base);
+  assert.equal(robot.links.debug_world, undefined);
+  assert.equal(robot.inspectionContext?.sourceFormat, 'xacro');
+  assert.equal(
+    robot.inspectionContext?.recovery?.diagnostics.some(
+      (diagnostic) => diagnostic.code === 'xacro_unresolved_condition_omitted',
+    ),
+    true,
+  );
 });
 
-test('processXacro fails fast when unresolved substitution arguments remain in emitted output', () => {
+test('processXacro omits unresolved substitution text and preserves emitted XML', () => {
+  const processed = processXacro(`
+    <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="missing_arg_fixture">
+      <link name="base" />
+      <gazebo>
+        <robotNamespace>$(arg robot_namespace)</robotNamespace>
+      </gazebo>
+    </robot>
+  `);
+
+  assert.match(processed, /<link name="base"/);
+  assert.doesNotMatch(processed, /\$\(arg robot_namespace\)/);
+});
+
+test('parseXacro omits a construct with an unresolved identity and keeps a healthy link', () => {
+  const robot = parseXacro(`
+    <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="missing_expression_fixture">
+      <link name="\${missing_prefix}_broken" />
+      <link name="base" />
+    </robot>
+  `);
+
+  assert.ok(robot);
+  assert.deepEqual(Object.keys(robot.links), ['base']);
+  const recoveryCodes = new Set(
+    robot.inspectionContext?.recovery?.diagnostics.map((diagnostic) => diagnostic.code),
+  );
+  assert.equal(recoveryCodes.has('xacro_unresolved_substitution_omitted'), true);
+  assert.equal(recoveryCodes.has('urdf_unnamed_link_omitted'), true);
+});
+
+test('parseXacro omits an unknown macro call and preserves healthy siblings', () => {
+  const robot = parseXacro(`
+    <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="unknown_element_fixture">
+      <link name="base" />
+      <xacro:not_supported />
+    </robot>
+  `);
+
+  assert.ok(robot);
+  assert.ok(robot.links.base);
+  assert.equal(
+    robot.inspectionContext?.recovery?.diagnostics.some(
+      (diagnostic) => diagnostic.code === 'xacro_unresolved_macro_omitted',
+    ),
+    true,
+  );
+});
+
+test('parseXacro omits a missing include and reports recovery', () => {
+  const robot = parseXacro(`
+    <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="missing_include_fixture">
+      <xacro:include filename="missing.xacro" />
+      <link name="base" />
+    </robot>
+  `);
+
+  assert.ok(robot);
+  assert.ok(robot.links.base);
+  assert.equal(
+    robot.inspectionContext?.recovery?.diagnostics.some(
+      (diagnostic) => diagnostic.code === 'xacro_missing_include_omitted',
+    ),
+    true,
+  );
+});
+
+test('parseXacro cuts a circular include edge and keeps non-circular included content', () => {
+  const fileMap: XacroFileMap = {
+    'fixtures/loop.xacro': `
+      <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="loop">
+        <link name="included_link" />
+        <xacro:include filename="loop.xacro" />
+      </robot>
+    `,
+  };
+  const robot = parseXacro(
+    `
+      <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="circular_include_fixture">
+        <link name="base" />
+        <xacro:include filename="loop.xacro" />
+      </robot>
+    `,
+    {},
+    fileMap,
+    'fixtures',
+  );
+
+  assert.ok(robot);
+  assert.ok(robot.links.base);
+  assert.ok(robot.links.included_link);
+  assert.equal(
+    robot.inspectionContext?.recovery?.diagnostics.some(
+      (diagnostic) => diagnostic.code === 'xacro_circular_include_omitted',
+    ),
+    true,
+  );
+});
+
+test('parseXacro keeps malformed top-level XML and missing roots fatal', () => {
+  assert.throws(
+    () => parseXacro('<robot name="broken"><link name="base"></robot>'),
+    /\[Xacro\] Malformed top-level XML:/,
+  );
+  assert.throws(
+    () => parseXacro('<link name="base" />'),
+    /\[Xacro\] No <robot> root element found\./,
+  );
+});
+
+test('parseXacro remains fatal when recovery leaves no usable links', () => {
   assert.throws(
     () =>
-      processXacro(`
-        <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="missing_arg_fixture">
-          <link name="base" />
-          <gazebo>
-            <robotNamespace>$(arg robot_namespace)</robotNamespace>
-          </gazebo>
+      parseXacro(`
+        <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="empty_after_recovery">
+          <xacro:include filename="missing.xacro" />
         </robot>
       `),
-    /\[Xacro\] Unresolved substitution arguments remain after expansion/,
+    /\[Xacro\] Processed output is not valid URDF\./,
   );
 });
 
@@ -397,7 +525,12 @@ test('parseXacro can load the main Unitree robot.xacro fixtures without modifyin
 
   for (const packageName of fixturePackages) {
     const fixture = loadRobotFixture(packageName);
-    const robot = parseXacro(fixture.xacroContent, {}, unitreeRobotsFileMap, fixture.basePath);
+    const robot = parseXacro(
+      fixture.xacroContent,
+      { DEBUG: 'false' },
+      unitreeRobotsFileMap,
+      fixture.basePath,
+    );
 
     assert.ok(robot, `${packageName} should parse`);
     assert.ok(robot.rootLinkId, `${packageName} should resolve a root link`);

@@ -85,6 +85,17 @@ export function mjcfQuatTupleFromQuaternion(
   );
 }
 
+// MJCF stores quaternions as [w, x, y, z]; Three.js stores them as (x, y, z, w).
+// This is the canonical MJCF→Three.js conversion used by both the model parser
+// and the hierarchy builder.
+export function mjcfQuatToThreeQuat(quat?: [number, number, number, number]): THREE.Quaternion {
+  if (!quat) {
+    return new THREE.Quaternion();
+  }
+
+  return new THREE.Quaternion(quat[1], quat[2], quat[3], quat[0]);
+}
+
 export function createMuJoCoFromToQuaternion(direction: THREE.Vector3): THREE.Quaternion {
   if (direction.lengthSq() <= 1e-12) {
     return new THREE.Quaternion();
@@ -99,6 +110,67 @@ export function createMuJoCoFromToQuaternion(direction: THREE.Vector3): THREE.Qu
   }
 
   return new THREE.Quaternion().setFromUnitVectors(localNegativeZ, normalizedDirection).normalize();
+}
+
+/**
+ * Converts MuJoCo's endpoint form into the equivalent canonical primitive pose.
+ *
+ * MuJoCo ignores an authored `pos`/orientation when `fromto` is present. The
+ * returned size keeps MuJoCo's half-length convention so format adapters can
+ * map it to their own geometry representation without reimplementing the pose
+ * math.
+ */
+export function canonicalizeMjcfFromToGeom(
+  geom: {
+    type: string;
+    size?: readonly number[];
+    fromto?: readonly number[];
+  },
+  options: MJCFPrecisionOptions = {},
+): {
+  pos: [number, number, number];
+  quat: MJCFQuatTuple;
+  size: [number, number];
+} | null {
+  if (!geom.fromto || geom.fromto.length < 6) {
+    return null;
+  }
+
+  const normalizedType = geom.type.trim().toLowerCase();
+  if (normalizedType !== 'capsule' && normalizedType !== 'cylinder') {
+    return null;
+  }
+
+  const radius = geom.size?.[0];
+  if (radius == null || !Number.isFinite(radius)) {
+    return null;
+  }
+
+  const from = new THREE.Vector3(
+    geom.fromto[0] ?? 0,
+    geom.fromto[1] ?? 0,
+    geom.fromto[2] ?? 0,
+  );
+  const to = new THREE.Vector3(
+    geom.fromto[3] ?? 0,
+    geom.fromto[4] ?? 0,
+    geom.fromto[5] ?? 0,
+  );
+  const direction = new THREE.Vector3().subVectors(to, from);
+  const center = new THREE.Vector3().addVectors(from, to).multiplyScalar(0.5);
+
+  return {
+    pos: [
+      roundNumber(center.x, options.precision),
+      roundNumber(center.y, options.precision),
+      roundNumber(center.z, options.precision),
+    ],
+    quat: mjcfQuatTupleFromQuaternion(createMuJoCoFromToQuaternion(direction), options),
+    size: [
+      roundNumber(radius, options.precision),
+      roundNumber(direction.length() / 2, options.precision),
+    ],
+  };
 }
 
 function sortEigenvectorsByDescendingValues(

@@ -19,6 +19,7 @@ import { useLibraryRobotLoadRequest } from './hooks/useLibraryRobotLoadRequest';
 import { usePreparedUsdViewerAssets } from './hooks/usePreparedUsdViewerAssets';
 import { usePreviewFileWithFeedback } from './hooks/usePreviewFileWithFeedback';
 import { useResponsiveSidebarCollapse } from './hooks/useResponsiveSidebarCollapse';
+import { useIgnoreJointLimitsScopeReset } from './hooks/useIgnoreJointLimitsScopeReset';
 import { useSelectionActiveComponentSync } from './hooks/useSelectionActiveComponentSync';
 import { useSourceCodeEditorDocuments } from './hooks/useSourceCodeEditorDocuments';
 import { useSourceCodeEditorWarmup } from './hooks/useSourceCodeEditorWarmup';
@@ -68,6 +69,9 @@ export function AppLayout({
   onPrefetchSettings,
   headerQuickAction,
   headerSecondaryAction,
+  surfaceModeSelector,
+  contextFileMenu,
+  extensionToolboxItems,
   viewConfig,
   setViewConfig,
   onLoadRobot,
@@ -107,10 +111,6 @@ export function AppLayout({
       allFileContents,
       componentSourceDrafts,
       uploadAsset,
-      removeRobotFile,
-      removeRobotFolder,
-      renameRobotFolder,
-      clearRobotLibrary,
       getUsdPreparedExportCache,
       usdPreparedExportCaches,
       setDocumentLoadState,
@@ -120,6 +120,7 @@ export function AppLayout({
   } = useAppLayoutStoreSlices();
 
   useSelectionActiveComponentSync();
+  useIgnoreJointLimitsScopeReset();
   useResponsiveSidebarCollapse({ sidebar, setSidebar });
   const mergedAppMode = normalizeMergedAppMode(appMode);
   const t = translations[lang];
@@ -211,7 +212,6 @@ export function AppLayout({
     clearAssemblyComponentPreparationOverlay,
     isSelectedUsdHydrating: isUsdHydrationPending,
     labels: {
-      addedComponent: t.addedComponent,
       failedToParseFormat: t.failedToParseFormat,
     },
     previewFile: activePreviewFile,
@@ -278,6 +278,7 @@ export function AppLayout({
     handleDelete,
     handleSetShowVisual,
     handleJointChange: handleCommittedJointChange,
+    handleResetJointAngles,
     flushJointMotion,
   } = useWorkspaceMutations({
     focusOn,
@@ -318,10 +319,6 @@ export function AppLayout({
     availableFiles,
     selectedFile,
     assemblyState: workspace,
-    removeRobotFile,
-    removeRobotFolder,
-    renameRobotFolder,
-    clearRobotLibrary,
     clearSelection,
     uploadAsset,
     openLibraryExportDialog: onOpenLibraryExport,
@@ -343,7 +340,6 @@ export function AppLayout({
     showAssemblyComponentPreparationOverlay,
     clearAssemblyComponentPreparationOverlay,
     showToast,
-    t,
     setBridgePreview,
     setShouldRenderBridgeModal,
     setIsBridgeModalOpen,
@@ -359,10 +355,7 @@ export function AppLayout({
     focusOn,
     pulseSelection,
     setSelection,
-    showToast,
-    t,
   });
-
   const { handleCodeChange: handleComponentCodeChange } = useEditableSourceCodeApply({
     allFileContents,
     availableFiles,
@@ -449,6 +442,7 @@ export function AppLayout({
     prefetchAIConversation: onPrefetchAIConversation,
     openIkTool: handleOpenIkTool,
     openCollisionOptimizer: handleOpenCollisionOptimizer,
+    extensionItems: extensionToolboxItems,
     prefetchCollisionOptimizer: handlePrefetchCollisionOptimizer,
   });
   useEffect(() => {
@@ -507,7 +501,6 @@ export function AppLayout({
     labels: {
       failedToParseFormat: t.failedToParseFormat,
       importPackageAssetBundleHint: t.importPackageAssetBundleHint,
-      importPrimitiveGeometryHint: t.importPrimitiveGeometryHint,
       usdPreviewRequiresOpen: t.usdPreviewRequiresOpen,
       xacroSourceOnlyPreviewHint: t.xacroSourceOnlyPreviewHint,
     },
@@ -561,6 +554,8 @@ export function AppLayout({
         onPrefetchSettings,
         headerQuickAction,
         headerSecondaryAction,
+        surfaceModeSelector,
+        contextFileMenu,
         viewConfig,
         setViewConfig,
         toolboxItems,
@@ -668,6 +663,7 @@ export function AppLayout({
         setViewConfig,
         handleJointPreview,
         handleJointChange,
+        handleResetJointAngles,
         previewFile: activePreviewFile,
         previewRobot,
         filePreview,

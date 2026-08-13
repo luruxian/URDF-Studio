@@ -14,6 +14,21 @@ export interface TranslationKeys extends TranslationWorkflowKeys {
   aiMenu: string;
   aiInspection: string;
   aiConversation: string;
+  aiModificationButton: string;
+  aiModificationTitle: string;
+  aiModificationApply: string;
+  aiModificationDismiss: string;
+  aiModificationApplied: string;
+  aiModificationUndoHint: string;
+  aiModificationNoComponent: string;
+  aiModificationNoChange: string;
+  aiModificationUnsupportedJoint: string;
+  aiModificationFailed: string;
+  aiAutoApply: string;
+  aiAutoApplyDesc: string;
+  aiAutoAppliedSummary: string;
+  aiDiffCollapsedLines: string;
+  aiDiffCollapsedHint: string;
   feedback: string;
   file: string;
   import: string;
@@ -512,7 +527,6 @@ export interface TranslationKeys extends TranslationWorkflowKeys {
   trajectoryEditing: string;
   featureInDevelopment: string;
   transformMode: string;
-  visualTransformDisabledWithCollisions: string;
   translateMode: string;
   rotateMode: string;
   universalMode: string;
@@ -552,6 +566,9 @@ export interface TranslationKeys extends TranslationWorkflowKeys {
   resetJoints: string;
   reset: string;
   advanced: string;
+  ignoreJointLimits: string;
+  ignoreJointLimitsOn: string;
+  ignoreJointLimitsHint: string;
   expand: string;
   collapse: string;
   close: string;
@@ -767,6 +784,7 @@ export interface TranslationKeys extends TranslationWorkflowKeys {
   motorType: string;
   addedComponent: string;
   addedComponentRecovered: string;
+  appliedSourceRecovered: string;
   noCollisionOptimizationApplied: string;
   collisionOptimizationApplied: string;
   renamedFolder: string;
@@ -778,7 +796,7 @@ export interface TranslationKeys extends TranslationWorkflowKeys {
   onlyUrdfMjcfExport: string;
   exportFailedParse: string;
   exportClosedLoopUrdfUnsupported: string;
-  exportUrdfBallJointUnsupported: string;
+  exportUrdfJointUnsupported: string;
   exportLibraryParseFailed: string;
   exportLibraryUnsupportedFormat: string;
   usdExportRequiresLoadedStage: string;
