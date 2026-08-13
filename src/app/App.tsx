@@ -2,7 +2,7 @@
  * Main App Component
  * Root component that assembles app workflows and overlay layers.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Providers } from './Providers';
 import { AppLayout } from './AppLayout';
@@ -24,6 +24,7 @@ import { resolveExportErrorMessage } from './utils/exportErrorMessage';
 import { useUIStore, useAssetsStore } from '@/store';
 import type { InspectionReport, RobotFile, RobotState } from '@/types';
 import { translations } from '@/shared/i18n';
+import { useAgileRobotBootstrap, type MeshReloadImportPort } from '@/integrations/agile-robot';
 import {
   EXPORT_FORMATS,
   type ExportDialogConfig,
@@ -64,6 +65,9 @@ function preloadOverlay(label: string, preload: () => Promise<unknown>): void {
 
 export function AppContent({ extensions, onExposeActions }: AppContentProps = {}) {
   useUnsavedChangesPrompt();
+
+  // NEW — listen for robots:studio-bootstrap postMessage
+  useAgileRobotBootstrap();
 
   // Refs for file inputs
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -172,6 +176,14 @@ export function AppContent({ extensions, onExposeActions }: AppContentProps = {}
       }
     },
   });
+  // Agile Robot mesh hot-reload: reuse the ?mesh= import pipeline so a
+  // regenerated GLB replaces the model shown in the 3D viewport.
+  const agileRobotMeshReloadPort = useMemo<MeshReloadImportPort>(
+    () => ({
+      importMeshFile: (file) => handleImport([file], { forceLoadRobot: true }),
+    }),
+    [handleImport],
+  );
   const {
     handleExportProject: runProjectExport,
     handleExportWithConfig,
@@ -606,6 +618,7 @@ export function AppContent({ extensions, onExposeActions }: AppContentProps = {}
         lang={lang}
         loadingLabel={loadingLabel}
         projectExportProgress={projectExportProgress}
+        reloadMesh={agileRobotMeshReloadPort}
         setDisconnectedWorkspaceUrdfDialog={setDisconnectedWorkspaceUrdfDialog}
         setIsAIConversationOpen={setIsAIConversationOpen}
         setIsAIInspectionOpen={setIsAIInspectionOpen}

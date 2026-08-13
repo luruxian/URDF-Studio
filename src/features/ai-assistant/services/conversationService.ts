@@ -12,6 +12,22 @@ import {
   stripModelThinkingContent,
 } from './openAiRequestOptions';
 
+// Provider-agnostic tool-calling types. ConversationToolDefinition mirrors the
+// OpenAI ChatCompletionTool shape so it can be passed through without a cast,
+// while staying SDK-agnostic at this module boundary.
+export interface ConversationToolDefinition {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+}
+
+export interface ConversationToolCall {
+  function: { name: string; arguments: string };
+}
+
 export interface ConversationHistoryTurn {
   role: 'user' | 'assistant';
   content: string;
@@ -28,6 +44,9 @@ export interface SendConversationTurnInput {
 export interface SendConversationTurnStreamInput extends SendConversationTurnInput {
   signal?: AbortSignal;
   onReplyDelta?: (delta: string) => void;
+  // Optional tool calling. When tools is omitted, behavior is unchanged.
+  tools?: ConversationToolDefinition[];
+  onToolCalls?: (toolCalls: ConversationToolCall[]) => void;
 }
 
 export type ConversationTurnErrorCode =
@@ -55,7 +74,16 @@ interface ConversationStreamChunkLike {
   choices?: Array<{
     delta?: {
       content?: string | null;
+      tool_calls?: Array<{
+        index: number;
+        id?: string | null;
+        function?: {
+          name?: string | null;
+          arguments?: string | null;
+        } | null;
+      }>;
     };
+    finish_reason?: string | null;
   }>;
 }
 
@@ -166,6 +194,112 @@ export const extractConversationDelta = (
   return chunk.choices.map((choice) => choice.delta?.content ?? '').join('');
 };
 
+/**
+ * Accumulate streaming tool_calls from a chunk into a map keyed by index.
+ * OpenAI streams tool_calls across multiple chunks:
+ *  - first chunk: { index, id, type, function: { name } }
+ *  - subsequent chunks: { index, function: { arguments: "..." } }
+ */
+export const accumulateToolCallDeltas = (
+  acc: Map<number, { id?: string; name?: string; arguments: string }>,
+  chunk: ConversationStreamChunkLike | null | undefined,
+): void => {
+  if (!chunk?.choices?.length) {
+    return;
+  }
+  for (const choice of chunk.choices) {
+    const toolCalls = choice.delta?.tool_calls;
+    if (!toolCalls) {
+      continue;
+    }
+    for (const tc of toolCalls) {
+      const existing = acc.get(tc.index) ?? { arguments: '' };
+      if (tc.id) existing.id = tc.id;
+      if (tc.function?.name) existing.name = tc.function.name;
+      if (tc.function?.arguments) existing.arguments += tc.function.arguments;
+      acc.set(tc.index, existing);
+    }
+  }
+};
+
+// Mutable accumulation state for one direct-to-provider streaming turn.
+interface DirectStreamState {
+  reply: string;
+  strippedReplyLength: number;
+  finishReason: string | null;
+  toolCallAcc: Map<number, { id?: string; name?: string; arguments: string }>;
+}
+
+/**
+ * Process one streamed chunk: capture finish_reason, accumulate tool_calls and the
+ * visible reply delta. Keeping this per-chunk makes the streaming loop trivial and
+ * keeps sendConversationTurnStream within its complexity budget.
+ */
+const processDirectStreamChunk = (
+  state: DirectStreamState,
+  chunk: ConversationStreamChunkLike,
+  onReplyDelta?: (delta: string) => void,
+): void => {
+  const firstChoice = chunk.choices?.[0];
+  if (firstChoice?.finish_reason) {
+    state.finishReason = firstChoice.finish_reason;
+  }
+  accumulateToolCallDeltas(state.toolCallAcc, chunk);
+
+  const delta = extractConversationDelta(chunk);
+  if (!delta) {
+    return;
+  }
+  state.reply += delta;
+  const strippedReply = stripModelThinkingContent(state.reply, { trim: false });
+  const visibleDelta = strippedReply.slice(state.strippedReplyLength);
+  state.strippedReplyLength = strippedReply.length;
+  if (visibleDelta) {
+    onReplyDelta?.(visibleDelta);
+  }
+};
+
+/**
+ * Turn accumulated streaming tool_calls into ConversationToolCall[] and emit them
+ * through onToolCalls when the model finished with a tool_calls reason. Returns the
+ * early-complete result (empty reply — the caller drives the tool UI) or null when
+ * there is nothing to surface.
+ */
+const resolveStreamToolCalls = (
+  finishReason: string | null,
+  toolCallAcc: Map<number, { id?: string; name?: string; arguments: string }>,
+  onToolCalls?: (toolCalls: ConversationToolCall[]) => void,
+): ConversationTurnStreamResult | null => {
+  if (finishReason !== 'tool_calls' || toolCallAcc.size === 0) {
+    return null;
+  }
+
+  const toolCalls = Array.from(toolCallAcc.values()).flatMap((tc) => {
+    if (!tc.name) {
+      return [];
+    }
+    return [
+      {
+        function: {
+          name: tc.name,
+          arguments: tc.arguments,
+        },
+      },
+    ];
+  });
+
+  if (toolCalls.length > 0 && onToolCalls) {
+    onToolCalls(toolCalls);
+    return {
+      reply: '',
+      error: null,
+      status: 'completed',
+    };
+  }
+
+  return null;
+};
+
 export const sendConversationTurnStream = async ({
   mode,
   lang = 'en',
@@ -174,6 +308,8 @@ export const sendConversationTurnStream = async ({
   userMessage,
   signal,
   onReplyDelta,
+  tools,
+  onToolCalls,
 }: SendConversationTurnStreamInput): Promise<ConversationTurnStreamResult> => {
   const text = getConversationTexts(lang);
   const trimmedMessage = userMessage.trim();
@@ -257,8 +393,12 @@ export const sendConversationTurnStream = async ({
   const extraBody = resolveOpenAiChatExtraBody(modelName);
   const messages = buildConversationMessages(history, trimmedMessage);
   const requestMessages = [{ role: 'system' as const, content: systemPrompt }, ...messages];
-  let reply = '';
-  let strippedReplyLength = 0;
+  const streamState: DirectStreamState = {
+    reply: '',
+    strippedReplyLength: 0,
+    finishReason: null,
+    toolCallAcc: new Map<number, { id?: string; name?: string; arguments: string }>(),
+  };
 
   try {
     const stream = await openai.chat.completions.create(
@@ -268,6 +408,9 @@ export const sendConversationTurnStream = async ({
         temperature: 0.3,
         stream: true,
         ...(extraBody ? { extra_body: extraBody } : {}),
+        // Pass tools through unchanged; ConversationToolDefinition is structurally
+        // compatible with ChatCompletionTool. When tools is undefined the SDK omits it.
+        tools,
       },
       {
         signal,
@@ -275,21 +418,21 @@ export const sendConversationTurnStream = async ({
     );
 
     for await (const chunk of stream) {
-      const delta = extractConversationDelta(chunk);
-      if (!delta) {
-        continue;
-      }
-
-      reply += delta;
-      const strippedReply = stripModelThinkingContent(reply, { trim: false });
-      const visibleDelta = strippedReply.slice(strippedReplyLength);
-      strippedReplyLength = strippedReply.length;
-      if (visibleDelta) {
-        onReplyDelta?.(visibleDelta);
-      }
+      processDirectStreamChunk(streamState, chunk, onReplyDelta);
     }
 
-    const normalizedReply = stripModelThinkingContent(reply.trim());
+    // If the model asked to call tools, surface the accumulated calls to the
+    // caller and return an empty reply — the caller drives the tool UI.
+    const toolCallResult = resolveStreamToolCalls(
+      streamState.finishReason,
+      streamState.toolCallAcc,
+      onToolCalls,
+    );
+    if (toolCallResult) {
+      return toolCallResult;
+    }
+
+    const normalizedReply = stripModelThinkingContent(streamState.reply.trim());
     if (!normalizedReply) {
       return {
         reply: '',
@@ -306,7 +449,7 @@ export const sendConversationTurnStream = async ({
   } catch (error) {
     if (isConversationAbortError(error) || signal?.aborted) {
       return {
-        reply: reply.trim(),
+        reply: streamState.reply.trim(),
         error: null,
         status: 'aborted',
       };

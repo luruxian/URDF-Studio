@@ -7,8 +7,14 @@ import {
   getInitialLanguageFromUrl,
   hideSeoLanguagePathFromUserUrl,
 } from '@/app/utils/initialLanguage';
+import { initRobotsStudioBootstrap } from '@/integrations/agile-robot';
 import { getRuntimeLanguageTranslations } from '@/shared/i18n';
 import '@/styles/index.css';
+
+// Agile Robot preview opens Studio with `?mesh=` + `#robots-bootstrap=`.
+// Persist BFF credentials from the hash before React mounts so AI tools can
+// read sessionStorage even if the mesh import effect races ahead.
+initRobotsStudioBootstrap();
 
 // ponytail: 全局安全网 —— React 渲染期之外的错误（未 await 的 Promise reject、
 // 同步抛出）在生产默认会被静默吞掉。这里落完整日志，让崩溃可诊断。
