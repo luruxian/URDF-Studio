@@ -8,6 +8,7 @@ import {
   type ImportPreparationWorkerRequest,
   type ImportPreparationWorkerResponse,
 } from '@/app/utils/importPreparation';
+import { prepareImportPayload } from '@/app/utils/importPreparation';
 
 interface PendingWorkerRequest {
   resolve: (value: unknown) => void;
@@ -74,6 +75,16 @@ function handleSharedWorkerMessage(event: MessageEvent<ImportPreparationWorkerRe
     return;
   }
 
+  // Log every message arriving from the worker (diagnostic). This includes
+  // both the `__diag:true` self-reports and protocol messages.
+  console.error('[import prep worker] msg from worker', message);
+
+  // Diagnostic traffic from inside the worker — not part of the request protocol.
+  const diag = message as unknown as { __diag?: boolean; kind?: string };
+  if (diag?.__diag) {
+    return;
+  }
+
   const pendingRequest = pendingWorkerRequests.get(message.requestId) ?? null;
   if (!pendingRequest) {
     return;
@@ -117,42 +128,93 @@ function handleSharedWorkerMessage(event: MessageEvent<ImportPreparationWorkerRe
   pendingRequest.reject(new Error('Import preparation worker returned an unexpected response'));
 }
 
-function handleSharedWorkerError(event: ErrorEvent): void {
+function handleSharedWorkerError(event: Event): void {
   workerUnavailable = true;
-  const error = event.error ?? new Error(event.message || 'Import preparation worker failed');
+  const anyEvent = event as unknown as Record<string, unknown> & { type?: string };
+  console.error('[import prep worker] error event', {
+    eventType: anyEvent?.type,
+    constructor: (event as object)?.constructor?.name,
+    keys: event ? Object.keys(event) : null,
+    ownProps: event ? Object.getOwnPropertyNames(event) : null,
+    eventSelf: event,
+    eventMessage: anyEvent?.message,
+    eventFilename: anyEvent?.filename,
+    eventLineno: anyEvent?.lineno,
+    eventColno: anyEvent?.colno,
+    eventError: anyEvent?.error,
+    pageCrossOriginIsolated: typeof crossOriginIsolated !== 'undefined' ? crossOriginIsolated : null,
+    pageSecureContext: typeof isSecureContext !== 'undefined' ? isSecureContext : null,
+    hasSharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
+  });
+  const message =
+    (typeof anyEvent?.message === 'string' && anyEvent.message) ||
+    (anyEvent?.error instanceof Error && (anyEvent.error as Error).message) ||
+    '';
+  const error =
+    anyEvent?.error instanceof Error
+      ? (anyEvent.error as Error)
+      : new Error(message || 'Import preparation worker failed');
   disposeSharedWorker(error);
 }
 
-function handleSharedWorkerMessageError(): void {
+function handleSharedWorkerMessageError(event: Event): void {
   workerUnavailable = true;
+  const anyEvent = event as unknown as Record<string, unknown>;
+  console.error('[import prep worker] messageerror event', {
+    eventType: anyEvent?.type,
+    constructor: (event as object)?.constructor?.name,
+    keys: event ? Object.keys(event) : null,
+    eventSelf: event,
+  });
   disposeSharedWorker(new Error('Import preparation worker message transfer failed'));
 }
 
 function ensureSharedWorker(): Worker {
   if (!sharedWorker) {
     workerUnavailable = false;
-    sharedWorker = new Worker(new URL('../workers/importPreparation.worker.ts', import.meta.url), {
-      type: 'module',
-    });
-    sharedWorker.addEventListener('message', handleSharedWorkerMessage);
-    sharedWorker.addEventListener('error', handleSharedWorkerError);
-    sharedWorker.addEventListener('messageerror', handleSharedWorkerMessageError);
+    try {
+      sharedWorker = new Worker(new URL('../workers/importPreparation.worker.ts', import.meta.url), {
+        type: 'module',
+      });
+      sharedWorker.addEventListener('message', handleSharedWorkerMessage);
+      sharedWorker.addEventListener('error', handleSharedWorkerError as EventListener);
+      sharedWorker.addEventListener('messageerror', handleSharedWorkerMessageError as EventListener);
+      console.error('[import prep worker] worker created', {
+        ctor: sharedWorker?.constructor?.name,
+        pageCrossOriginIsolated:
+          typeof crossOriginIsolated !== 'undefined' ? crossOriginIsolated : null,
+        pageSecureContext: typeof isSecureContext !== 'undefined' ? isSecureContext : null,
+        hasSharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
+      });
+    } catch (creationError) {
+      workerUnavailable = true;
+      console.error('[import prep worker] worker creation threw', {
+        name: (creationError as Error)?.name,
+        message: (creationError as Error)?.message,
+        stack: (creationError as Error)?.stack,
+      });
+      throw creationError;
+    }
   }
 
   return sharedWorker;
 }
 
-export async function prepareImportPayloadWithWorker(
+function warnMainThreadImportFallback(reason: string): void {
+  console.warn(`[import prep worker] falling back to main-thread payload preparation (${reason})`);
+}
+
+async function prepareImportPayloadOnMainThread(
+  args: PrepareImportPayloadArgs,
+  reason: string,
+): Promise<PreparedImportPayload> {
+  warnMainThreadImportFallback(reason);
+  return prepareImportPayload(args);
+}
+
+function invokePrepareImportPayloadWorker(
   args: PrepareImportPayloadArgs,
 ): Promise<PreparedImportPayload> {
-  if (workerUnavailable && sharedWorker) {
-    throw new Error('Import preparation worker is unavailable');
-  }
-
-  if (typeof Worker === 'undefined') {
-    throw new Error('Web Worker is not available in this environment');
-  }
-
   return new Promise<PreparedImportPayload>((resolve, reject) => {
     const requestId = ++requestIdCounter;
     let worker: Worker;
@@ -203,6 +265,31 @@ export async function prepareImportPayloadWithWorker(
       reject(error);
     }
   });
+}
+
+export async function prepareImportPayloadWithWorker(
+  args: PrepareImportPayloadArgs,
+): Promise<PreparedImportPayload> {
+  // Auto-fallback to the main-thread implementation whenever the worker is
+  // known to be unavailable (creation failed or sanitized error event fired).
+  // Running prepareImportPayload on the main thread is slower but functionally
+  // equivalent for non-archive imports; the worker provides the perf win.
+  if (workerUnavailable) {
+    return prepareImportPayloadOnMainThread(args, 'worker previously unavailable');
+  }
+
+  if (typeof Worker === 'undefined') {
+    return prepareImportPayloadOnMainThread(args, 'Worker is undefined');
+  }
+
+  try {
+    return await invokePrepareImportPayloadWorker(args);
+  } catch (error) {
+    if (workerUnavailable) {
+      return prepareImportPayloadOnMainThread(args, 'worker request failed');
+    }
+    throw error;
+  }
 }
 
 interface HydrateDeferredImportAssetsWithWorkerArgs {
