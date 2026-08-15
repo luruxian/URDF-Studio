@@ -19,8 +19,8 @@ test('bootstrap protocol constants carry the fixed contract values', () => {
 });
 
 test('hunyuan polling constants are stable intervals', () => {
-  assert.equal(HUNYUAN_POLL_INTERVAL_MS, 4000);
-  assert.equal(HUNYUAN_POLL_TIMEOUT_MS, 5 * 60 * 1000);
+  assert.equal(HUNYUAN_POLL_INTERVAL_MS, 5000);
+  assert.equal(HUNYUAN_POLL_TIMEOUT_MS, 15 * 60 * 1000);
 });
 
 test('origin allowlist falls back to production domains when env is unset', () => {

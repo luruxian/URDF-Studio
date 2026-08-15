@@ -75,7 +75,7 @@ export function isOriginAllowed(origin: string): boolean {
 // ============================================================
 
 /** 混元任务轮询间隔 (ms) */
-export const HUNYUAN_POLL_INTERVAL_MS = 4000;
+export const HUNYUAN_POLL_INTERVAL_MS = 5000;
 
 /** 混元任务轮询超时 (ms) */
-export const HUNYUAN_POLL_TIMEOUT_MS = 5 * 60 * 1000;
+export const HUNYUAN_POLL_TIMEOUT_MS = 15 * 60 * 1000;
