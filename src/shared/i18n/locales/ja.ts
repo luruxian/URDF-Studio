@@ -1065,6 +1065,24 @@ export const ja: TranslationKeys = {
   paintErrorSelectionUnavailable:
     'クリックした visual から有効な面の選択を特定できませんでした。',
 
+  // Agile Robot bootstrap tool confirmation
+  agileRobotToolConfirm: '確認',
+  agileRobotToolCancel: 'キャンセル',
+  agileRobotToolRetry: '再試行',
+  agileRobotToolExecuting: '新しい 3D モデルを生成しています…',
+  agileRobotToolRegenerateSummary: '3D モデルを再生成',
+  agileRobotToolSessionExpired:
+    'セッションの有効期限が切れました。Agile Robot のメインサイトに戻り、プレビューを再度開いてください。',
+  agileRobotToolModelUpdated: '3D モデルを更新しました',
+  agileRobotToolPreviewNotConnected:
+    '3D モデルは生成されましたが、プレビューの更新が接続されていません',
+  agileRobotToolGenerationFailed: '3D 生成に失敗しました',
+  agileRobotToolCancelled: 'キャンセルしました',
+  agileRobotToolJobInProgress:
+    '3D 生成タスクが実行中です。完了までお待ちください。',
+  agileRobotToolUnknownTool: '不明なツール: {toolName}',
+  agileRobotToolUnknownError: '不明なエラー',
+
   // Performance
   performance: 'パフォーマンス',
   showFPS: 'FPS を表示',

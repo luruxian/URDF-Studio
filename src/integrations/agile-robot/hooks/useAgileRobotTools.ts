@@ -3,15 +3,17 @@
 //
 // 当处于 robots 主站会话时，返回 AIConversationToolsConfig 供 AI 对话 UI 使用：
 // - tools: OpenAI function-calling 形状的两个工具定义
-// - parseToolCalls: 把 LLM 返回的 tool_calls 解析为结构化 ParsedToolCall（含中文摘要）
+// - parseToolCalls: 把 LLM 返回的 tool_calls 解析为结构化 ParsedToolCall（含摘要）
 // - onExecute: 执行确认后的工具调用（即梦改图 → 混元生成 → 轮询 → mesh 热重载）
 // 未处于 robots 会话（无 bootstrap）时返回 null。
 // ============================================================
 
 import { useCallback, useRef } from 'react';
+import type { Language } from '@/shared/i18n';
 import { hasBootstrap, getBootstrap } from '../bootstrap';
 import { jimengEdit, hunyuanSubmit, hunyuanPollJob, AgileRobotApiError } from '../api';
 import { reloadMeshFromUrl, type MeshReloadImportPort } from '../meshReload';
+import { getAgileRobotToolTexts, type AgileRobotToolTexts } from '../agileRobotToolTexts';
 import type {
   AIConversationToolsConfig,
   AIConversationToolDef,
@@ -76,8 +78,12 @@ interface RawToolCall {
   function: { name: string; arguments: string };
 }
 
-/** 把工具调用的 prompt 参数压缩为确认 UI 可展示的中文概括（优先取 JSON 的 subject）。 */
-function buildSummary(toolName: string, args: Record<string, unknown>): string {
+/** 把工具调用的 prompt 参数压缩为确认 UI 可展示的概括（优先取 JSON 的 subject）。 */
+function buildSummary(
+  toolName: string,
+  args: Record<string, unknown>,
+  texts: AgileRobotToolTexts,
+): string {
   if (toolName === 'edit_robot_appearance') {
     const prompt = typeof args.prompt === 'string' ? args.prompt : '';
     // Try to extract subject from JSON prompt for a shorter summary
@@ -94,36 +100,38 @@ function buildSummary(toolName: string, args: Record<string, unknown>): string {
     return prompt.length > 50 ? prompt.slice(0, 50) + '…' : prompt;
   }
   if (toolName === 'regenerate_robot_3d') {
-    return '重新生成 3D 模型';
+    return texts.agileRobotToolRegenerateSummary;
   }
   return toolName;
 }
 
-/**
- * 解析 LLM 返回的 tool_calls。取第一个调用，解析其 JSON arguments。
- * 空数组 / 非法 JSON / 缺 name 时返回 null（表示不是一次可执行的工具调用）。
- */
-function parseToolCalls(rawToolCalls: RawToolCall[]): ParsedToolCall | null {
-  if (!rawToolCalls.length) return null;
+function createParseToolCalls(texts: AgileRobotToolTexts) {
+  /**
+   * 解析 LLM 返回的 tool_calls。取第一个调用，解析其 JSON arguments。
+   * 空数组 / 非法 JSON / 缺 name 时返回 null（表示不是一次可执行的工具调用）。
+   */
+  return function parseToolCalls(rawToolCalls: RawToolCall[]): ParsedToolCall | null {
+    if (!rawToolCalls.length) return null;
 
-  const tc = rawToolCalls[0];
-  let args: Record<string, unknown> = {};
-  try {
-    args = JSON.parse(tc.function.arguments) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
+    const tc = rawToolCalls[0];
+    let args: Record<string, unknown> = {};
+    try {
+      args = JSON.parse(tc.function.arguments) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
 
-  // JSON.parse may legitimately return null or a scalar; buildSummary needs an
-  // object to read args.prompt, so treat anything non-object as non-executable.
-  if (args === null || typeof args !== 'object') return null;
+    // JSON.parse may legitimately return null or a scalar; buildSummary needs an
+    // object to read args.prompt, so treat anything non-object as non-executable.
+    if (args === null || typeof args !== 'object') return null;
 
-  if (!tc.function.name) return null;
+    if (!tc.function.name) return null;
 
-  return {
-    toolName: tc.function.name,
-    args,
-    summary: buildSummary(tc.function.name, args),
+    return {
+      toolName: tc.function.name,
+      args,
+      summary: buildSummary(tc.function.name, args, texts),
+    };
   };
 }
 
@@ -132,14 +140,19 @@ function parseToolCalls(rawToolCalls: RawToolCall[]): ParsedToolCall | null {
 // ============================================================
 
 export interface UseAgileRobotToolsOptions {
+  /** UI language for tool summaries and execution feedback. */
+  lang: Language;
   /** Port that routes a regenerated GLB through the app file-import pipeline so
    *  the 3D viewport updates. Required for hot-reload; without it a successful
    *  regeneration cannot swap the visible model. */
   reloadMesh?: MeshReloadImportPort | null;
 }
 
-export function useAgileRobotTools(options: UseAgileRobotToolsOptions = {}): AIConversationToolsConfig | null {
-  const { reloadMesh = null } = options;
+export function useAgileRobotTools(
+  options: UseAgileRobotToolsOptions,
+): AIConversationToolsConfig | null {
+  const { lang, reloadMesh = null } = options;
+  const texts = getAgileRobotToolTexts(lang);
   const abortRef = useRef<AbortController | null>(null);
   const reloadMeshRef = useRef<MeshReloadImportPort | null>(reloadMesh);
   reloadMeshRef.current = reloadMesh;
@@ -150,7 +163,7 @@ export function useAgileRobotTools(options: UseAgileRobotToolsOptions = {}): AIC
       if (!b) {
         return {
           success: false,
-          message: '会话已过期，请回到 Agile Robot 主站重新点击预览',
+          message: texts.agileRobotToolSessionExpired,
         };
       }
 
@@ -179,16 +192,16 @@ export function useAgileRobotTools(options: UseAgileRobotToolsOptions = {}): AIC
             if (!reloadMesh) {
               return {
                 success: false,
-                message: '3D 模型已生成，但预览刷新未接入',
+                message: texts.agileRobotToolPreviewNotConnected,
               };
             }
             await reloadMeshFromUrl(job.preview_url, reloadMesh);
-            return { success: true, message: '3D 模型已更新' };
+            return { success: true, message: texts.agileRobotToolModelUpdated };
           }
 
           return {
             success: false,
-            message: job.error_message || '3D 生成失败',
+            message: job.error_message || texts.agileRobotToolGenerationFailed,
           };
         }
 
@@ -201,35 +214,38 @@ export function useAgileRobotTools(options: UseAgileRobotToolsOptions = {}): AIC
             if (!reloadMesh) {
               return {
                 success: false,
-                message: '3D 模型已生成，但预览刷新未接入',
+                message: texts.agileRobotToolPreviewNotConnected,
               };
             }
             await reloadMeshFromUrl(job.preview_url, reloadMesh);
-            return { success: true, message: '3D 模型已更新' };
+            return { success: true, message: texts.agileRobotToolModelUpdated };
           }
 
           return {
             success: false,
-            message: job.error_message || '3D 生成失败',
+            message: job.error_message || texts.agileRobotToolGenerationFailed,
           };
         }
 
-        return { success: false, message: '未知工具: ' + toolCall.toolName };
+        return {
+          success: false,
+          message: texts.agileRobotToolUnknownTool.replace('{toolName}', toolCall.toolName),
+        };
       } catch (error) {
         if (signal.aborted) {
-          return { success: false, message: '已取消' };
+          return { success: false, message: texts.agileRobotToolCancelled };
         }
         if (error instanceof AgileRobotApiError) {
           if (error.status === 401) {
             return {
               success: false,
-              message: '会话已过期，请回到 Agile Robot 主站重新点击预览',
+              message: texts.agileRobotToolSessionExpired,
             };
           }
           if (error.status === 409) {
             return {
               success: false,
-              message: '3D 生成任务正在进行中，请等待完成',
+              message: texts.agileRobotToolJobInProgress,
             };
           }
           return {
@@ -239,11 +255,11 @@ export function useAgileRobotTools(options: UseAgileRobotToolsOptions = {}): AIC
         }
         return {
           success: false,
-          message: error instanceof Error ? error.message : '未知错误',
+          message: error instanceof Error ? error.message : texts.agileRobotToolUnknownError,
         };
       }
     },
-    [],
+    [texts],
   );
 
   // Only return config when in a robots session
@@ -251,7 +267,7 @@ export function useAgileRobotTools(options: UseAgileRobotToolsOptions = {}): AIC
 
   return {
     tools: TOOL_DEFS,
-    parseToolCalls,
+    parseToolCalls: createParseToolCalls(texts),
     onExecute,
   };
 }

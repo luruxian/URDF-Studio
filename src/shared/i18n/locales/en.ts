@@ -1054,6 +1054,24 @@ export const en: TranslationKeys = {
   paintErrorSelectionUnavailable:
     'Could not resolve a valid face selection from the clicked visual.',
 
+  // Agile Robot bootstrap tool confirmation
+  agileRobotToolConfirm: 'Confirm',
+  agileRobotToolCancel: 'Cancel',
+  agileRobotToolRetry: 'Retry',
+  agileRobotToolExecuting: 'Generating new 3D model…',
+  agileRobotToolRegenerateSummary: 'Regenerate 3D model',
+  agileRobotToolSessionExpired:
+    'Session expired. Return to Agile Robot and open preview again.',
+  agileRobotToolModelUpdated: '3D model updated',
+  agileRobotToolPreviewNotConnected:
+    '3D model generated, but preview refresh is not connected',
+  agileRobotToolGenerationFailed: '3D generation failed',
+  agileRobotToolCancelled: 'Cancelled',
+  agileRobotToolJobInProgress:
+    'A 3D generation job is already running. Please wait for it to finish.',
+  agileRobotToolUnknownTool: 'Unknown tool: {toolName}',
+  agileRobotToolUnknownError: 'Unknown error',
+
   // Performance
   performance: 'Performance',
   showFPS: 'Show FPS',

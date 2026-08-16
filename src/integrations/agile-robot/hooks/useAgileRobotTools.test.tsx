@@ -93,7 +93,7 @@ function createReloadMeshSpy(): { port: MeshReloadImportPort; imported: File[] }
 }
 
 /** Render the hook inside a React root so useCallback/useRef have a dispatcher. */
-async function renderHook(options?: Parameters<typeof useAgileRobotTools>[0]) {
+async function renderHook(options: Parameters<typeof useAgileRobotTools>[0]) {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -139,15 +139,17 @@ const regenerateToolCall: ParsedToolCall = {
 // Config availability (bootstrap gating)
 // ============================================================
 
+const defaultHookOptions = { lang: 'zh' as const };
+
 test('returns null when no bootstrap is stored', async () => {
-  const rendered = await renderHook();
+  const rendered = await renderHook(defaultHookOptions);
   assert.equal(rendered.current, null);
   await rendered.cleanup();
 });
 
 test('returns tools config when a valid bootstrap is stored', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
-  const rendered = await renderHook();
+  const rendered = await renderHook(defaultHookOptions);
   const config = rendered.current;
   assert.notEqual(config, null);
   assert.equal(config!.tools.length, 2);
@@ -166,7 +168,7 @@ test('returns tools config when a valid bootstrap is stored', async () => {
 
 test('parseToolCalls extracts structured tool call and subject summary', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
-  const rendered = await renderHook();
+  const rendered = await renderHook(defaultHookOptions);
   const config = rendered.current;
   assert.notEqual(config, null);
 
@@ -188,7 +190,7 @@ test('parseToolCalls extracts structured tool call and subject summary', async (
 
 test('parseToolCalls returns null for an empty tool_calls array', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
-  const rendered = await renderHook();
+  const rendered = await renderHook(defaultHookOptions);
   const config = rendered.current;
   assert.notEqual(config, null);
 
@@ -198,7 +200,7 @@ test('parseToolCalls returns null for an empty tool_calls array', async () => {
 
 test('parseToolCalls returns null for invalid JSON arguments', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
-  const rendered = await renderHook();
+  const rendered = await renderHook(defaultHookOptions);
   const config = rendered.current;
   assert.notEqual(config, null);
 
@@ -212,7 +214,7 @@ test('parseToolCalls returns null for invalid JSON arguments', async () => {
 
 test('parseToolCalls returns null when arguments parse to a non-object value', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
-  const rendered = await renderHook();
+  const rendered = await renderHook(defaultHookOptions);
   const config = rendered.current;
   assert.notEqual(config, null);
 
@@ -231,7 +233,7 @@ test('parseToolCalls returns null when arguments parse to a non-object value', a
 
 test('parseToolCalls returns null when the tool name is missing', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
-  const rendered = await renderHook();
+  const rendered = await renderHook(defaultHookOptions);
   const config = rendered.current;
   assert.notEqual(config, null);
 
@@ -245,7 +247,7 @@ test('parseToolCalls returns null when the tool name is missing', async () => {
 
 test('parseToolCalls truncates a long subject summary at 50 chars', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
-  const rendered = await renderHook();
+  const rendered = await renderHook(defaultHookOptions);
   const config = rendered.current;
   assert.notEqual(config, null);
 
@@ -266,7 +268,7 @@ test('parseToolCalls truncates a long subject summary at 50 chars', async () => 
 
 test('parseToolCalls falls back to the raw prompt when prompt is not JSON', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
-  const rendered = await renderHook();
+  const rendered = await renderHook(defaultHookOptions);
   const config = rendered.current;
   assert.notEqual(config, null);
 
@@ -285,24 +287,36 @@ test('parseToolCalls falls back to the raw prompt when prompt is not JSON', asyn
   await rendered.cleanup();
 });
 
-test('parseToolCalls summarizes regenerate_robot_3d as a fixed label', async () => {
+test('parseToolCalls summarizes regenerate_robot_3d with localized label', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
-  const rendered = await renderHook();
-  const config = rendered.current;
-  assert.notEqual(config, null);
+  const renderedZh = await renderHook(defaultHookOptions);
+  const configZh = renderedZh.current;
+  assert.notEqual(configZh, null);
 
-  const result = config!.parseToolCalls([
+  const zhResult = configZh!.parseToolCalls([
     { function: { name: 'regenerate_robot_3d', arguments: '{}' } },
   ]);
 
-  assert.notEqual(result, null);
-  assert.equal(result!.summary, '重新生成 3D 模型');
-  await rendered.cleanup();
+  assert.notEqual(zhResult, null);
+  assert.equal(zhResult!.summary, '重新生成 3D 模型');
+  await renderedZh.cleanup();
+
+  const renderedEn = await renderHook({ lang: 'en' });
+  const configEn = renderedEn.current;
+  assert.notEqual(configEn, null);
+
+  const enResult = configEn!.parseToolCalls([
+    { function: { name: 'regenerate_robot_3d', arguments: '{}' } },
+  ]);
+
+  assert.notEqual(enResult, null);
+  assert.equal(enResult!.summary, 'Regenerate 3D model');
+  await renderedEn.cleanup();
 });
 
 test('parseToolCalls summarizes unknown tools as the tool name', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
-  const rendered = await renderHook();
+  const rendered = await renderHook(defaultHookOptions);
   const config = rendered.current;
   assert.notEqual(config, null);
 
@@ -321,7 +335,7 @@ test('parseToolCalls summarizes unknown tools as the tool name', async () => {
 
 test('onExecute reports session expired when bootstrap disappears before execution', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
-  const rendered = await renderHook();
+  const rendered = await renderHook(defaultHookOptions);
   const config = rendered.current;
   assert.notEqual(config, null);
 
@@ -336,7 +350,7 @@ test('onExecute reports session expired when bootstrap disappears before executi
 
 test('onExecute maps a 401 API error to session-expired', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
-  const rendered = await renderHook();
+  const rendered = await renderHook(defaultHookOptions);
   const config = rendered.current;
   assert.notEqual(config, null);
 
@@ -351,7 +365,7 @@ test('onExecute maps a 401 API error to session-expired', async () => {
 
 test('onExecute maps a 409 API error to job-in-progress', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
-  const rendered = await renderHook();
+  const rendered = await renderHook(defaultHookOptions);
   const config = rendered.current;
   assert.notEqual(config, null);
 
@@ -366,7 +380,7 @@ test('onExecute maps a 409 API error to job-in-progress', async () => {
 
 test('onExecute propagates the API error message for other statuses', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
-  const rendered = await renderHook();
+  const rendered = await renderHook(defaultHookOptions);
   const config = rendered.current;
   assert.notEqual(config, null);
 
@@ -381,7 +395,7 @@ test('onExecute propagates the API error message for other statuses', async () =
 
 test('onExecute returns unknown-tool message for an unhandled tool', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
-  const rendered = await renderHook();
+  const rendered = await renderHook(defaultHookOptions);
   const config = rendered.current;
   assert.notEqual(config, null);
 
@@ -403,7 +417,7 @@ test('onExecute returns unknown-tool message for an unhandled tool', async () =>
 test('onExecute edit_robot_appearance runs jimeng → hunyuan → mesh reload', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
   const { port, imported } = createReloadMeshSpy();
-  const rendered = await renderHook({ reloadMesh: port });
+  const rendered = await renderHook({ ...defaultHookOptions, reloadMesh: port });
   const config = rendered.current;
   assert.notEqual(config, null);
 
@@ -431,7 +445,7 @@ test('onExecute edit_robot_appearance runs jimeng → hunyuan → mesh reload', 
 test('onExecute regenerate_robot_3d runs hunyuan → mesh reload', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
   const { port, imported } = createReloadMeshSpy();
-  const rendered = await renderHook({ reloadMesh: port });
+  const rendered = await renderHook({ ...defaultHookOptions, reloadMesh: port });
   const config = rendered.current;
   assert.notEqual(config, null);
 
@@ -456,7 +470,7 @@ test('onExecute regenerate_robot_3d runs hunyuan → mesh reload', async () => {
 
 test('onExecute reports the job error message when the job fails', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
-  const rendered = await renderHook();
+  const rendered = await renderHook(defaultHookOptions);
   const config = rendered.current;
   assert.notEqual(config, null);
 
@@ -480,7 +494,7 @@ test('onExecute reports the job error message when the job fails', async () => {
 test('onExecute propagates a generic error message when the mesh reload fails', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
   const { port } = createReloadMeshSpy();
-  const rendered = await renderHook({ reloadMesh: port });
+  const rendered = await renderHook({ ...defaultHookOptions, reloadMesh: port });
   const config = rendered.current;
   assert.notEqual(config, null);
 

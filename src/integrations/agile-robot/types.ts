@@ -69,7 +69,7 @@ export type ToolConfirmState =
 export interface ParsedToolCall {
   toolName: string;
   args: Record<string, unknown>;
-  summary: string; // 确认 UI 展示用中文概括
+  summary: string; // 确认 UI 展示用概括（edit 取模型 subject，regenerate 取本地化标签）
 }
 
 export interface ToolResult {

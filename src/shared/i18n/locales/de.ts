@@ -1080,6 +1080,24 @@ export const de: TranslationKeys = {
   paintErrorSelectionUnavailable:
     'Aus dem angeklickten Visual konnte keine gültige Flächenauswahl abgeleitet werden.',
 
+  // Agile Robot bootstrap tool confirmation
+  agileRobotToolConfirm: 'Bestätigen',
+  agileRobotToolCancel: 'Abbrechen',
+  agileRobotToolRetry: 'Erneut versuchen',
+  agileRobotToolExecuting: 'Neues 3D-Modell wird erstellt…',
+  agileRobotToolRegenerateSummary: '3D-Modell neu generieren',
+  agileRobotToolSessionExpired:
+    'Sitzung abgelaufen. Kehren Sie zu Agile Robot zurück und öffnen Sie die Vorschau erneut.',
+  agileRobotToolModelUpdated: '3D-Modell aktualisiert',
+  agileRobotToolPreviewNotConnected:
+    '3D-Modell erstellt, aber die Vorschau-Aktualisierung ist nicht angebunden',
+  agileRobotToolGenerationFailed: '3D-Generierung fehlgeschlagen',
+  agileRobotToolCancelled: 'Abgebrochen',
+  agileRobotToolJobInProgress:
+    'Eine 3D-Generierung läuft bereits. Bitte warten Sie, bis sie abgeschlossen ist.',
+  agileRobotToolUnknownTool: 'Unbekanntes Tool: {toolName}',
+  agileRobotToolUnknownError: 'Unbekannter Fehler',
+
   // Performance
   performance: 'Leistung',
   showFPS: 'FPS anzeigen',

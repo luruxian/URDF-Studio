@@ -964,6 +964,21 @@ export interface TranslationKeys extends TranslationWorkflowKeys {
   paintErrorFaceUnavailable: string;
   paintErrorSelectionUnavailable: string;
 
+  // Agile Robot bootstrap tool confirmation
+  agileRobotToolConfirm: string;
+  agileRobotToolCancel: string;
+  agileRobotToolRetry: string;
+  agileRobotToolExecuting: string;
+  agileRobotToolRegenerateSummary: string;
+  agileRobotToolSessionExpired: string;
+  agileRobotToolModelUpdated: string;
+  agileRobotToolPreviewNotConnected: string;
+  agileRobotToolGenerationFailed: string;
+  agileRobotToolCancelled: string;
+  agileRobotToolJobInProgress: string;
+  agileRobotToolUnknownTool: string;
+  agileRobotToolUnknownError: string;
+
   // Performance
   performance: string;
   showFPS: string;

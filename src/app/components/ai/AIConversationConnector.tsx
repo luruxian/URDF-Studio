@@ -23,7 +23,7 @@ export function AIConversationConnector({
   onApply,
   reloadMesh,
 }: AIConversationConnectorProps) {
-  const toolsConfig = useAgileRobotTools({ reloadMesh });
+  const toolsConfig = useAgileRobotTools({ reloadMesh, lang });
 
   return (
     <AIConversationModal

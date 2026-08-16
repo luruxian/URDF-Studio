@@ -1034,6 +1034,7 @@ export function AIConversationModal({
             {toolsConfig && pendingToolCall && (
               <div className="shrink-0 border-t border-border-black bg-element-bg px-4 py-3">
                 <ToolConfirmBanner
+                  lang={lang}
                   state={toolConfirmState}
                   toolCall={pendingToolCall}
                   result={toolResult ?? undefined}

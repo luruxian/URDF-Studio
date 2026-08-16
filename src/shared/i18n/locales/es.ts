@@ -1078,6 +1078,24 @@ export const es: TranslationKeys = {
   paintErrorSelectionUnavailable:
     'No se pudo resolver una selección de caras válida a partir del visual en el que hiciste clic.',
 
+  // Agile Robot bootstrap tool confirmation
+  agileRobotToolConfirm: 'Confirmar',
+  agileRobotToolCancel: 'Cancelar',
+  agileRobotToolRetry: 'Reintentar',
+  agileRobotToolExecuting: 'Generando nuevo modelo 3D…',
+  agileRobotToolRegenerateSummary: 'Regenerar modelo 3D',
+  agileRobotToolSessionExpired:
+    'Sesión expirada. Vuelve a Agile Robot y abre la vista previa de nuevo.',
+  agileRobotToolModelUpdated: 'Modelo 3D actualizado',
+  agileRobotToolPreviewNotConnected:
+    'Modelo 3D generado, pero la actualización de la vista previa no está conectada',
+  agileRobotToolGenerationFailed: 'Error en la generación 3D',
+  agileRobotToolCancelled: 'Cancelado',
+  agileRobotToolJobInProgress:
+    'Ya hay una generación 3D en curso. Espera a que termine.',
+  agileRobotToolUnknownTool: 'Herramienta desconocida: {toolName}',
+  agileRobotToolUnknownError: 'Error desconocido',
+
   // Performance
   performance: 'Rendimiento',
   showFPS: 'Mostrar FPS',

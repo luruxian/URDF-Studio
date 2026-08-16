@@ -1014,6 +1014,21 @@ export const zh: TranslationKeys = {
   paintErrorFaceUnavailable: '无法解析当前点击的可视化面。',
   paintErrorSelectionUnavailable: '无法从当前点击结果解析出有效的可视化面选择。',
 
+  // Agile Robot bootstrap tool confirmation
+  agileRobotToolConfirm: '确认',
+  agileRobotToolCancel: '取消',
+  agileRobotToolRetry: '重试',
+  agileRobotToolExecuting: '正在生成新的 3D 模型…',
+  agileRobotToolRegenerateSummary: '重新生成 3D 模型',
+  agileRobotToolSessionExpired: '会话已过期，请回到 Agile Robot 主站重新点击预览',
+  agileRobotToolModelUpdated: '3D 模型已更新',
+  agileRobotToolPreviewNotConnected: '3D 模型已生成，但预览刷新未接入',
+  agileRobotToolGenerationFailed: '3D 生成失败',
+  agileRobotToolCancelled: '已取消',
+  agileRobotToolJobInProgress: '3D 生成任务正在进行中，请等待完成',
+  agileRobotToolUnknownTool: '未知工具: {toolName}',
+  agileRobotToolUnknownError: '未知错误',
+
   // Performance
   performance: '性能',
   showFPS: '显示帧率',
