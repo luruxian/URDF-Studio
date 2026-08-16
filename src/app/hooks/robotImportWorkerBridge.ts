@@ -2,6 +2,7 @@ import {
   type ResolveRobotFileDataOptions,
   type RobotImportProgress,
   type RobotImportResult,
+  resolveRobotFileDataAsync,
 } from '@/core/parsers/importRobotFile';
 import type { RobotFile } from '@/types';
 import type {
@@ -142,6 +143,20 @@ function createWorkerTimeoutError(requestId: number, timeoutMs: number): Error {
     'Robot import worker did not respond within the timeout '
       + `(likely a worker crash). Request id: ${requestId}. Timeout: ${timeoutMs} ms.`,
   );
+}
+
+function warnRobotImportMainThreadFallback(reason: string): void {
+  console.warn(`[robot import worker] falling back to main-thread robot import (${reason})`);
+}
+
+async function resolveRobotFileDataOnMainThread(
+  file: RobotFile,
+  options: ResolveRobotFileDataOptions,
+  callbacks: { onProgress?: (progress: RobotImportProgress) => void } | undefined,
+  reason: string,
+): Promise<RobotImportResult> {
+  warnRobotImportMainThreadFallback(reason);
+  return resolveRobotFileDataAsync(file, options, callbacks?.onProgress);
 }
 
 function decrementWorkerPendingCount(workerEntry: WorkerPoolEntry): void {
@@ -408,6 +423,10 @@ export function createRobotImportWorkerClient({
   };
 
   const disposeWorkerPool = (rejectPendingWith?: unknown): void => {
+    if (rejectPendingWith !== undefined) {
+      workerUnavailable = true;
+    }
+
     const rejectionReason = rejectPendingWith ?? new Error('Robot import worker disposed');
 
     workerPool.forEach((entry) => {
@@ -548,20 +567,12 @@ export function createRobotImportWorkerClient({
     return contextId;
   };
 
-  const resolve = async (
+  const invokeResolveRobotFileWorker = (
     file: RobotFile,
-    options: ResolveRobotFileDataOptions = {},
+    options: ResolveRobotFileDataOptions,
     callbacks?: { onProgress?: (progress: RobotImportProgress) => void },
-  ): Promise<RobotImportResult> => {
-    if (workerUnavailable && workerPool.length > 0) {
-      throw new Error('Robot import worker is unavailable');
-    }
-
-    if (!canUseWorker()) {
-      throw new Error('Web Worker is not available in this environment');
-    }
-
-    return new Promise<RobotImportResult>((resolveRequest, rejectRequest) => {
+  ): Promise<RobotImportResult> =>
+    new Promise<RobotImportResult>((resolveRequest, rejectRequest) => {
       const requestId = ++requestIdCounter;
       let workerEntry: WorkerPoolEntry;
 
@@ -612,6 +623,33 @@ export function createRobotImportWorkerClient({
         rejectRequest(error);
       }
     });
+
+  const resolve = async (
+    file: RobotFile,
+    options: ResolveRobotFileDataOptions = {},
+    callbacks?: { onProgress?: (progress: RobotImportProgress) => void },
+  ): Promise<RobotImportResult> => {
+    if (!canUseWorker()) {
+      return resolveRobotFileDataOnMainThread(file, options, callbacks, 'Worker is undefined');
+    }
+
+    if (workerUnavailable) {
+      return resolveRobotFileDataOnMainThread(
+        file,
+        options,
+        callbacks,
+        'worker previously unavailable',
+      );
+    }
+
+    try {
+      return await invokeResolveRobotFileWorker(file, options, callbacks);
+    } catch (error) {
+      if (workerUnavailable) {
+        return resolveRobotFileDataOnMainThread(file, options, callbacks, 'worker request failed');
+      }
+      throw error;
+    }
   };
 
   const parseEditableSource = async (

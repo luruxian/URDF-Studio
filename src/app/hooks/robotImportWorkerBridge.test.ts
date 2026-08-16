@@ -195,7 +195,7 @@ test('resolveRobotFileDataWithWorker reports pre-resolved imports as finalizing 
   }
 });
 
-test('robot import worker client rejects after worker errors and recovers with a fresh worker', async () => {
+test('robot import worker client falls back to main thread after worker errors and recovers with a fresh worker', async () => {
   const createdWorkers: FakeWorker[] = [];
   const client = createRobotImportWorkerClient({
     canUseWorker: () => true,
@@ -213,24 +213,16 @@ test('robot import worker client rejects after worker errors and recovers with a
 
   createdWorkers[0].emitError(new Error('worker exploded'));
 
-  await assert.rejects(firstResultPromise, /worker exploded/i);
+  const firstResult = await firstResultPromise;
+  assert.equal(firstResult.status, 'ready');
   assert.equal(createdWorkers[0].terminated, true);
 
-  const secondResultPromise = client.resolve(demoUrdfFile);
-  assert.equal(createdWorkers.length, 2);
-  assert.notEqual(createdWorkers[1], createdWorkers[0]);
-
-  createdWorkers[1].emitMessage({
-    type: 'resolve-robot-file-result',
-    requestId: (createdWorkers[1].postedMessages[0] as { requestId: number }).requestId,
-    result: resolveRobotFileData(demoUrdfFile),
-  });
-
-  const secondResult = await secondResultPromise;
+  const secondResult = await client.resolve(demoUrdfFile);
   assert.equal(secondResult.status, 'ready');
+  assert.equal(createdWorkers.length, 1);
 });
 
-test('robot import worker client rejects timed-out requests and recovers with a fresh worker', async () => {
+test('robot import worker client falls back to main thread after worker timeouts and recovers with a fresh worker', async () => {
   const createdWorkers: FakeWorker[] = [];
   const client = createRobotImportWorkerClient({
     canUseWorker: () => true,
@@ -247,25 +239,16 @@ test('robot import worker client rejects timed-out requests and recovers with a 
   assert.equal(createdWorkers.length, 1);
   assert.equal(createdWorkers[0].postedMessages.length, 1);
 
-  await assert.rejects(firstResultPromise, /did not respond within the timeout/i);
+  const firstResult = await firstResultPromise;
+  assert.equal(firstResult.status, 'ready');
   assert.equal(createdWorkers[0].terminated, true);
 
-  const secondResultPromise = client.resolve(demoUrdfFile);
-  assert.equal(createdWorkers.length, 2);
-  assert.notEqual(createdWorkers[1], createdWorkers[0]);
-  assert.equal(createdWorkers[1].postedMessages.length, 1);
-
-  createdWorkers[1].emitMessage({
-    type: 'resolve-robot-file-result',
-    requestId: (createdWorkers[1].postedMessages[0] as { requestId: number }).requestId,
-    result: resolveRobotFileData(demoUrdfFile),
-  });
-
-  const secondResult = await secondResultPromise;
+  const secondResult = await client.resolve(demoUrdfFile);
   assert.equal(secondResult.status, 'ready');
+  assert.equal(createdWorkers.length, 1);
 });
 
-test('robot import worker client rejects after worker message transfer failures', async () => {
+test('robot import worker client falls back to main thread after worker message transfer failures', async () => {
   const fakeWorker = new FakeWorker();
   const client = createRobotImportWorkerClient({
     canUseWorker: () => true,
@@ -279,7 +262,8 @@ test('robot import worker client rejects after worker message transfer failures'
 
   fakeWorker.emitMessageError(new Error('structured clone failed'));
 
-  await assert.rejects(resultPromise, /message transfer failed/i);
+  const result = await resultPromise;
+  assert.equal(result.status, 'ready');
   assert.equal(fakeWorker.terminated, true);
 });
 
@@ -670,7 +654,7 @@ test('robot import worker client rejects editable source parse errors', async ()
   await assert.rejects(resultPromise, /broken editable source/i);
 });
 
-test('robot import worker client rejects resolve requests immediately when Worker is unavailable', async () => {
+test('robot import worker client uses main thread when Worker is unavailable', async () => {
   const originalWorker = globalThis.Worker;
 
   Object.defineProperty(globalThis, 'Worker', {
@@ -681,10 +665,8 @@ test('robot import worker client rejects resolve requests immediately when Worke
 
   try {
     const client = createRobotImportWorkerClient();
-    await assert.rejects(
-      client.resolve(demoUrdfFile),
-      /Web Worker is not available in this environment/i,
-    );
+    const result = await client.resolve(demoUrdfFile);
+    assert.equal(result.status, 'ready');
   } finally {
     Object.defineProperty(globalThis, 'Worker', {
       configurable: true,
@@ -694,7 +676,7 @@ test('robot import worker client rejects resolve requests immediately when Worke
   }
 });
 
-test('resolveRobotFileDataWithWorker rejects immediately when Worker is unavailable', async () => {
+test('resolveRobotFileDataWithWorker uses main thread when Worker is unavailable', async () => {
   const originalWorker = globalThis.Worker;
 
   Object.defineProperty(globalThis, 'Worker', {
@@ -704,10 +686,8 @@ test('resolveRobotFileDataWithWorker rejects immediately when Worker is unavaila
   });
 
   try {
-    await assert.rejects(
-      resolveRobotFileDataWithWorker(demoUrdfFile),
-      /Web Worker is not available in this environment/i,
-    );
+    const result = await resolveRobotFileDataWithWorker(demoUrdfFile);
+    assert.equal(result.status, 'ready');
   } finally {
     Object.defineProperty(globalThis, 'Worker', {
       configurable: true,

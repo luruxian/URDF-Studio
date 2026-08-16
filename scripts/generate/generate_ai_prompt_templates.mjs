@@ -36,7 +36,8 @@ const REQUIRED_SECTION_PLACEHOLDERS = {
   ],
 };
 
-const sectionPattern = /<!-- PROMPT: ([^\n]+?) -->\n([\s\S]*?)\n<!-- \/PROMPT -->/g;
+// Accept LF or CRLF so Windows editors do not break section parsing.
+const sectionPattern = /<!-- PROMPT: ([^\r\n]+?) -->\r?\n([\s\S]*?)\r?\n<!-- \/PROMPT -->/g;
 const promptSections = new Map();
 
 for (const match of source.matchAll(sectionPattern)) {

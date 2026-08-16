@@ -38,9 +38,60 @@ class FakeWorker {
       handler({ error, message: error.message });
     });
   }
+
+  emitError(): void {
+    this.listeners.get('error')?.forEach((handler) => {
+      handler({ type: 'error' });
+    });
+  }
 }
 
-test('import preparation worker bridge rejects immediately when Worker is unavailable', async () => {
+test('import preparation worker bridge falls back to main thread when worker errors during the first request', async () => {
+  const originalWorker = globalThis.Worker;
+  const fakeWorkers: FakeWorker[] = [];
+  const createFakeWorker = function ImportPreparationWorkerMock() {
+    const worker = new FakeWorker();
+    fakeWorkers.push(worker);
+    queueMicrotask(() => {
+      worker.emitError();
+    });
+    return worker;
+  };
+
+  Object.defineProperty(globalThis, 'Worker', {
+    configurable: true,
+    writable: true,
+    value: createFakeWorker as unknown as typeof Worker,
+  });
+
+  try {
+    const result = await prepareImportPayloadWithWorker({
+      files: [],
+      existingPaths: [],
+    });
+
+    assert.deepEqual(result, {
+      robotFiles: [],
+      assetFiles: [],
+      deferredAssetFiles: [],
+      usdSourceFiles: [],
+      libraryFiles: [],
+      textFiles: [],
+      preferredFileName: null,
+      preResolvedImports: [],
+    });
+    assert.equal(fakeWorkers[0]?.terminated, true);
+  } finally {
+    disposeImportPreparationWorker();
+    Object.defineProperty(globalThis, 'Worker', {
+      configurable: true,
+      writable: true,
+      value: originalWorker,
+    });
+  }
+});
+
+test('import preparation worker bridge uses main thread when Worker is undefined', async () => {
   const originalWorker = globalThis.Worker;
 
   Object.defineProperty(globalThis, 'Worker', {
@@ -50,13 +101,21 @@ test('import preparation worker bridge rejects immediately when Worker is unavai
   });
 
   try {
-    await assert.rejects(
-      prepareImportPayloadWithWorker({
-        files: [],
-        existingPaths: [],
-      }),
-      /Web Worker is not available in this environment/i,
-    );
+    const result = await prepareImportPayloadWithWorker({
+      files: [],
+      existingPaths: [],
+    });
+
+    assert.deepEqual(result, {
+      robotFiles: [],
+      assetFiles: [],
+      deferredAssetFiles: [],
+      usdSourceFiles: [],
+      libraryFiles: [],
+      textFiles: [],
+      preferredFileName: null,
+      preResolvedImports: [],
+    });
   } finally {
     Object.defineProperty(globalThis, 'Worker', {
       configurable: true,
@@ -66,7 +125,7 @@ test('import preparation worker bridge rejects immediately when Worker is unavai
   }
 });
 
-test('import preparation worker bridge rejects pending work when message transfer fails', async () => {
+test('import preparation worker bridge falls back when message transfer fails', async () => {
   const originalWorker = globalThis.Worker;
   const fakeWorkers: FakeWorker[] = [];
   const createFakeWorker = function ImportPreparationWorkerMock() {
@@ -92,7 +151,17 @@ test('import preparation worker bridge rejects pending work when message transfe
     assert.equal(fakeWorker.postedMessages.length, 1);
     fakeWorker.emitMessageError(new Error('structured clone failed'));
 
-    await assert.rejects(resultPromise, /message transfer failed/i);
+    const result = await resultPromise;
+    assert.deepEqual(result, {
+      robotFiles: [],
+      assetFiles: [],
+      deferredAssetFiles: [],
+      usdSourceFiles: [],
+      libraryFiles: [],
+      textFiles: [],
+      preferredFileName: null,
+      preResolvedImports: [],
+    });
     assert.equal(fakeWorker.terminated, true);
   } finally {
     disposeImportPreparationWorker();
