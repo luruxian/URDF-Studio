@@ -5,7 +5,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { AppMode, DetailLinkTab, Theme } from '@/types';
-import { translations } from '@/shared/i18n';
+import { translations, normalizeLanguage, type Language } from '@/shared/i18n';
 import { normalizeMergedAppMode } from '@/shared/utils/appMode';
 import { applyDocumentTheme } from '@/shared/utils/theme';
 import {
@@ -15,7 +15,7 @@ import {
 } from '@/shared/utils/viewerRenderQuality';
 
 // Language type
-export type Language = 'en' | 'zh';
+export type { Language } from '@/shared/i18n';
 export type RotationDisplayMode = 'euler_deg' | 'euler_rad' | 'quaternion';
 export type GlobalFontSize = 'small' | 'medium' | 'large';
 export type CodeEditorFontFamily = 'jetbrains-mono' | 'fira-code' | 'system-mono';
@@ -351,14 +351,15 @@ const normalizeDetailLinkTab = (value: unknown): DetailLinkTab =>
 // Detect system language
 const getSystemLang = (): Language => {
   if (typeof window !== 'undefined') {
-    const saved = localStorage.getItem('language');
-    if (saved === 'en' || saved === 'zh') {
+    const saved = normalizeLanguage(localStorage.getItem('language'));
+    if (saved) {
       return saved;
     }
     const systemLang =
       navigator.language || (navigator as unknown as { userLanguage?: string }).userLanguage;
-    if (systemLang && systemLang.toLowerCase().startsWith('zh')) {
-      return 'zh';
+    const browserLanguage = normalizeLanguage(systemLang);
+    if (browserLanguage) {
+      return browserLanguage;
     }
   }
   return 'en';

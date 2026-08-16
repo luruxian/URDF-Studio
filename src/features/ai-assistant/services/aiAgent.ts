@@ -68,7 +68,18 @@ function summarizeRobot(robot: RobotData): string {
 }
 
 function getAgentSystemPrompt(robot: RobotData, lang: Language): string {
-  const langInstruction = lang === 'zh' ? '请用中文回复。' : 'Respond in English.';
+  const langInstruction =
+    lang === 'zh'
+      ? '请用中文回复。'
+      : lang === 'ja'
+        ? '日本語で返答してください。'
+        : lang === 'fr'
+          ? 'Répondez en français.'
+          : lang === 'de'
+            ? 'Antworten Sie auf Deutsch.'
+            : lang === 'es'
+              ? 'Responde en español.'
+              : 'Respond in English.';
   return [
     'You are a URDF editing agent inside URDF Studio. You MUST call tools to make ANY change to the robot. If you do not call a tool, NO change will be applied — the robot stays exactly as-is.',
     '',

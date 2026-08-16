@@ -3,7 +3,7 @@
  * Provides convenient access to app-wide UI state
  */
 import { useUIStore } from '@/store';
-import { translations } from '@/shared/i18n';
+import { translations, getNextLanguage } from '@/shared/i18n';
 
 /**
  * Hook for accessing app-wide UI state
@@ -32,7 +32,7 @@ export function useAppState() {
     lang,
     setLang,
     t,
-    toggleLang: () => setLang(lang === 'en' ? 'zh' : 'en'),
+    toggleLang: () => setLang(getNextLanguage(lang)),
 
     // OS
     os,

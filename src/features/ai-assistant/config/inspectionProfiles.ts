@@ -1,3 +1,5 @@
+import type { Language } from '@/shared/i18n'
+
 export type InspectionProfileLayer = 'base' | 'format' | 'morph' | 'workflow' | 'target'
 
 export type InspectionIssueSeverity = 'error' | 'warning' | 'suggestion'
@@ -461,7 +463,7 @@ export function getInspectionProfileItem(profileId: string, itemId: string) {
   return getInspectionProfileDefinition(profileId)?.items.find((item) => item.id === itemId)
 }
 
-export function getInspectionProfileName(profileId: string, lang: 'en' | 'zh') {
+export function getInspectionProfileName(profileId: string, lang: Language) {
   const profile = getInspectionProfileDefinition(profileId)
   if (!profile) {
     return profileId
@@ -470,7 +472,7 @@ export function getInspectionProfileName(profileId: string, lang: 'en' | 'zh') {
   return lang === 'zh' ? profile.nameZh : profile.name
 }
 
-export function getInspectionProfileLayerName(layer: InspectionProfileLayer, lang: 'en' | 'zh') {
+export function getInspectionProfileLayerName(layer: InspectionProfileLayer, lang: Language) {
   const labels: Record<InspectionProfileLayer, { en: string; zh: string }> = {
     base: { en: 'Base', zh: '基础通用层' },
     format: { en: 'Source Format', zh: '源格式层' },
@@ -479,7 +481,7 @@ export function getInspectionProfileLayerName(layer: InspectionProfileLayer, lan
     workflow: { en: 'Workflow', zh: '工作流层' },
   }
 
-  return labels[layer][lang]
+  return lang === 'zh' ? labels[layer].zh : labels[layer].en
 }
 
 export function getAllInspectionProfileItemCount() {

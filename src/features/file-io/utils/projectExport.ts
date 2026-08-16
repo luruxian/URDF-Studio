@@ -1,5 +1,6 @@
 import { GeometryType, JointType } from '@/types';
 import type { AssemblyState, BridgeJoint, RobotData, RobotFile, UrdfLink } from '@/types';
+import { normalizeLanguage } from '@/shared/i18n';
 import { generateMujocoXML, generateURDF } from '@/core/parsers';
 import { normalizeMeshPathForExport, resolveMeshAssetUrl } from '@/core/parsers/meshPathUtils';
 import { generateBOM } from './bomGenerator';
@@ -851,7 +852,7 @@ async function buildProjectArchiveEntries(params: ExportProjectParams): Promise<
     setProjectArchiveEntry(
       archiveEntries,
       joinArchivePath('output', 'bom.csv'),
-      generateBOM(robotForExport, params.lang as 'en' | 'zh'),
+      generateBOM(robotForExport, normalizeLanguage(params.lang) ?? 'en'),
     );
     completedOutputTasks += 1;
     emitPhaseProgress('output', completedOutputTasks, totalOutputTasks, 'bom.csv');

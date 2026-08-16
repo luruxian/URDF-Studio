@@ -1,5 +1,5 @@
 import React from 'react';
-import { getRuntimeLanguageTranslations } from '@/shared/i18n';
+import { getRuntimeLanguageTranslations, resolveDocumentLocale } from '@/shared/i18n';
 
 interface AppErrorBoundaryProps {
   children: React.ReactNode;
@@ -58,7 +58,7 @@ export class AppErrorBoundary extends React.Component<
 
     return (
       <div
-        lang={lang === 'zh' ? 'zh-CN' : 'en'}
+        lang={resolveDocumentLocale(lang)}
         role="alert"
         style={{
           position: 'fixed',

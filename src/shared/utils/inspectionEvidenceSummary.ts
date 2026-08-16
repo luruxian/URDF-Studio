@@ -1,5 +1,5 @@
 import type { RobotInspectionContext } from '@/types'
-import { translations } from '@/shared/i18n'
+import { translations, type Language } from '@/shared/i18n'
 
 export interface InspectionEvidenceMetric {
   label: string
@@ -13,7 +13,7 @@ export interface InspectionEvidenceSummary {
 
 export function buildInspectionEvidenceSummary(
   inspectionContext: RobotInspectionContext | undefined,
-  lang: 'en' | 'zh'
+  lang: Language
 ): InspectionEvidenceSummary | null {
   if (!inspectionContext) {
     return null

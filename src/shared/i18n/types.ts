@@ -4,7 +4,7 @@
 
 import type { TranslationWorkflowKeys } from './translationWorkflowKeys';
 
-export type Language = 'en' | 'zh';
+export type Language = 'en' | 'zh' | 'ja' | 'fr' | 'de' | 'es';
 
 export interface TranslationKeys extends TranslationWorkflowKeys {
   // Header

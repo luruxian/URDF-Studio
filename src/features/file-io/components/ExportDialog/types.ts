@@ -1,4 +1,5 @@
 import type { ExportProgressState } from '../../types';
+import type { Language } from '@/shared/i18n';
 import type { MjcfActuatorType } from '@/core/parsers/mjcf/mjcfGenerator';
 
 export type ExportFormat = 'project' | 'mjcf' | 'urdf' | 'xacro' | 'sdf' | 'usd';
@@ -78,7 +79,7 @@ export interface ExportDialogProps {
       onProgress?: (progress: ExportProgressState) => void;
     },
   ) => void | Promise<void>;
-  lang: 'en' | 'zh';
+  lang: Language;
   isExporting?: boolean;
   canExportUsd?: boolean;
   defaultFormat?: ExportFormat;

@@ -7,7 +7,7 @@ import {
   PanelSelect,
   Slider,
 } from '@/shared/components/ui';
-import { translations } from '@/shared/i18n';
+import { translations, LANGUAGE_OPTIONS, type Language } from '@/shared/i18n';
 import {
   NAVIGATION_SENSITIVITY_MAX,
   NAVIGATION_SENSITIVITY_MIN,
@@ -39,9 +39,9 @@ import {
 
 export interface SettingsPaneProps {
   activePage: SettingsPage;
-  lang: 'en' | 'zh';
+  lang: Language;
   theme: 'light' | 'dark' | 'system';
-  setLang: (lang: 'en' | 'zh') => void;
+  setLang: (lang: Language) => void;
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
   fontSize: 'small' | 'medium' | 'large';
   setFontSize: (size: 'small' | 'medium' | 'large') => void;
@@ -311,12 +311,12 @@ export function SettingsPanes(props: SettingsPaneProps) {
           >
             <SettingsRow label={t.language}>
               <PanelSegmentedControl
-                options={[
-                  { value: 'en', label: 'English' },
-                  { value: 'zh', label: '中文' },
-                ]}
+                options={LANGUAGE_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: option.label,
+                }))}
                 value={props.lang}
-                onChange={(value) => props.setLang(value as 'en' | 'zh')}
+                onChange={(value) => props.setLang(value as Language)}
                 size="xs"
                 stretch={false}
                 ariaLabel={t.language}

@@ -11,6 +11,7 @@ import {
   Undo,
 } from 'lucide-react';
 import { IconButton } from '@/shared/components/ui';
+import { getNextLanguage } from '@/shared/i18n';
 import { HeaderMenuOverlay } from './HeaderMenuOverlay';
 import { HeaderMenuItem, HeaderMenuSeparator } from './HeaderMenuItem';
 import type { HeaderOverflowMenuProps } from './types';
@@ -164,7 +165,7 @@ export function HeaderOverflowMenu({
                   <HeaderMenuItem
                     icon={Languages}
                     onClick={() => {
-                      setLang(lang === 'en' ? 'zh' : 'en');
+                      setLang(getNextLanguage(lang));
                       setActiveMenu(null);
                     }}
                   >

@@ -22,7 +22,7 @@ import {
   PanelSegmentedControl,
 } from '@/shared/components/ui';
 import { useDraggableWindow } from '@/shared/hooks/useDraggableWindow';
-import { translations } from '@/shared/i18n';
+import { translations, type Language } from '@/shared/i18n';
 import { afterNextPaint } from '@/shared/utils/afterNextPaint';
 import { useManagedWindowLayer } from '@/store/useManagedWindowLayer';
 import { GeometryType, type InteractionSelection } from '@/types';
@@ -83,7 +83,7 @@ interface CollisionOptimizationDialogProps {
   source: CollisionOptimizationSource;
   assets: Record<string, string>;
   sourceFilePath?: string;
-  lang: 'en' | 'zh';
+  lang: Language;
   selection?: InteractionSelection;
   onClose: () => void;
   onApply: (operations: CollisionOptimizationOperation[]) => void;

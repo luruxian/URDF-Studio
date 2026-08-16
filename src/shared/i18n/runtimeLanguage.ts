@@ -1,7 +1,6 @@
 import { translations } from './translations';
 import type { Language, TranslationKeys } from './types';
-
-const SUPPORTED_LANGUAGES: readonly Language[] = ['en', 'zh'];
+import { SUPPORTED_LANGUAGES } from './languageUtils';
 
 export function normalizeLanguage(value: unknown): Language | null {
   if (typeof value !== 'string') {
@@ -14,6 +13,18 @@ export function normalizeLanguage(value: unknown): Language | null {
   }
   if (normalized === 'en' || normalized === 'en-us' || normalized.startsWith('en-')) {
     return 'en';
+  }
+  if (normalized === 'ja' || normalized === 'ja-jp' || normalized.startsWith('ja-')) {
+    return 'ja';
+  }
+  if (normalized === 'fr' || normalized === 'fr-fr' || normalized.startsWith('fr-')) {
+    return 'fr';
+  }
+  if (normalized === 'de' || normalized === 'de-de' || normalized.startsWith('de-')) {
+    return 'de';
+  }
+  if (normalized === 'es' || normalized === 'es-es' || normalized.startsWith('es-')) {
+    return 'es';
   }
 
   return SUPPORTED_LANGUAGES.includes(normalized as Language) ? (normalized as Language) : null;

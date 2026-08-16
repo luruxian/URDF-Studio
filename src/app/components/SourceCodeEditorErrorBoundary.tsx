@@ -2,7 +2,7 @@ import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 
 import { Button } from '@/shared/components/ui/Button';
-import { translations, type Language } from '@/shared/i18n';
+import { translations, resolveDocumentLocale, type Language } from '@/shared/i18n';
 
 interface SourceCodeEditorErrorBoundaryProps {
   children: React.ReactNode;
@@ -63,7 +63,7 @@ export class SourceCodeEditorErrorBoundary extends React.Component<
       <div
         className="fixed inset-0 z-[160] flex items-center justify-center bg-black/45 p-4"
         data-testid="source-code-editor-load-error"
-        lang={this.props.lang === 'zh' ? 'zh-CN' : 'en'}
+        lang={resolveDocumentLocale(this.props.lang)}
       >
         <div
           className="w-[min(32rem,calc(100vw-2rem))] rounded-xl border border-border-black bg-panel-bg p-5 text-text-primary shadow-2xl"
