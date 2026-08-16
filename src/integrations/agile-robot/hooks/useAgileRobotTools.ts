@@ -36,7 +36,7 @@ const TOOL_DEFS: AIConversationToolDef[] = [
 JSON包含五个字段：
 - subject：将用户需求翻译为精确的视觉描述（材质、颜色、形状、结构），使用具体颜色名和色值（如"亮橙色 #FF8C00"、"哑光黑"、"拉丝金属"）
 - preserve：明确列出必须保留的元素（视角、结构、关节、背景）
-- size：固定为 "512x512"
+- size：固定为 "1024x1024"
 - style：工业设计渲染，影棚灯光，高清晰度，photorealistic
 - negative：不要改变机器人结构、不要变形、不要添加文字或logo
 
