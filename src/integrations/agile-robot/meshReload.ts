@@ -22,6 +22,8 @@ export interface MeshReloadImportPort {
 export async function reloadMeshFromUrl(
   previewUrl: string,
   port: MeshReloadImportPort,
+  /** From hunyuan job.filename; CORS does not expose Content-Disposition on preview_url. */
+  filename?: string | null,
 ): Promise<void> {
   const response = await fetch(previewUrl);
   if (!response.ok) {
@@ -33,7 +35,8 @@ export async function reloadMeshFromUrl(
     throw new Error('Empty mesh response');
   }
 
-  const file = new File([blob], 'updated_model.glb', {
+  const meshFilename = filename?.trim() || 'updated_model.glb';
+  const file = new File([blob], meshFilename, {
     type: 'model/gltf-binary',
   });
 

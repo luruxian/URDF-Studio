@@ -51,6 +51,8 @@ export interface HunyuanJobResponse {
   attachment_id?: string;
   error_code?: string | null;
   error_message?: string | null;
+  /** GLB original_name; only present when status === "done". */
+  filename?: string | null;
   preview_url?: string | null;
 }
 

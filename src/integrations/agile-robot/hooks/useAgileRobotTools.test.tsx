@@ -414,6 +414,7 @@ test('onExecute edit_robot_appearance runs jimeng → hunyuan → mesh reload', 
       job_id: 'j1',
       status: 'done',
       preview_url: 'https://cdn.example/preview.png',
+      filename: 'abc123.glb',
     }),
     new Response(new Blob(['glb']), { status: 200 }),
   ]);
@@ -424,7 +425,7 @@ test('onExecute edit_robot_appearance runs jimeng → hunyuan → mesh reload', 
   assert.equal(result.message, '3D 模型已更新');
   assert.equal(spy.calls.length, 4);
   assert.equal(imported.length, 1, 'expected the regenerated GLB to be routed through the reload port');
-  assert.equal(imported[0]?.name, 'updated_model.glb');
+  assert.equal(imported[0]?.name, 'abc123.glb');
   await rendered.cleanup();
 });
 
@@ -441,6 +442,7 @@ test('onExecute regenerate_robot_3d runs hunyuan → mesh reload', async () => {
       job_id: 'j1',
       status: 'done',
       preview_url: 'https://cdn.example/preview.png',
+      filename: 'abc123.glb',
     }),
     new Response(new Blob(['glb']), { status: 200 }),
   ]);
@@ -454,7 +456,7 @@ test('onExecute regenerate_robot_3d runs hunyuan → mesh reload', async () => {
   await rendered.cleanup();
 });
 
-test('onExecute reports the job error message when the job fails', async () => {
+test('onExecute reports error_code when the hunyuan job fails', async () => {
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
   const rendered = await renderHook();
   const config = rendered.current;
@@ -466,6 +468,7 @@ test('onExecute reports the job error message when the job fails', async () => {
     jsonResponse({
       job_id: 'j1',
       status: 'failed',
+      error_code: 'HUNYUAN_TIMEOUT',
       error_message: '生成失败：模型解析错误',
     }),
   ]);
@@ -473,7 +476,7 @@ test('onExecute reports the job error message when the job fails', async () => {
   const result = await config!.onExecute(editToolCall());
 
   assert.equal(result.success, false);
-  assert.equal(result.message, '生成失败：模型解析错误');
+  assert.equal(result.message, 'HUNYUAN_TIMEOUT');
   await rendered.cleanup();
 });
 
@@ -491,6 +494,7 @@ test('onExecute propagates a generic error message when the mesh reload fails', 
       job_id: 'j1',
       status: 'done',
       preview_url: 'https://cdn.example/preview.png',
+      filename: 'abc123.glb',
     }),
     new Response('boom', { status: 500 }),
   ]);

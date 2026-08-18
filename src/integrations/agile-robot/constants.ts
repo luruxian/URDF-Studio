@@ -74,7 +74,7 @@ export function isOriginAllowed(origin: string): boolean {
 // 混元任务轮询
 // ============================================================
 
-/** 混元任务轮询间隔 (ms) */
+/** 混元任务轮询间隔 (ms)，建议 3–5 秒 */
 export const HUNYUAN_POLL_INTERVAL_MS = 5000;
 
 /** 混元任务轮询超时 (ms) */

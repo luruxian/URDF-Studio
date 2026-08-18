@@ -10,7 +10,14 @@
 
 import { useCallback, useRef } from 'react';
 import { hasBootstrap, getBootstrap } from '../bootstrap';
-import { jimengEdit, hunyuanSubmit, hunyuanPollJob, AgileRobotApiError } from '../api';
+import {
+  jimengEdit,
+  hunyuanSubmit,
+  hunyuanPollJob,
+  formatHunyuanJobFailure,
+  AgileRobotApiError,
+} from '../api';
+import type { HunyuanJobResponse } from '../types';
 import { reloadMeshFromUrl, type MeshReloadImportPort } from '../meshReload';
 import type {
   AIConversationToolsConfig,
@@ -127,6 +134,27 @@ function parseToolCalls(rawToolCalls: RawToolCall[]): ParsedToolCall | null {
   };
 }
 
+async function reloadDoneHunyuanJob(
+  job: HunyuanJobResponse,
+  reloadMesh: MeshReloadImportPort | null,
+): Promise<ToolResult> {
+  if (job.status === 'done' && job.preview_url) {
+    if (!reloadMesh) {
+      return {
+        success: false,
+        message: '3D 模型已生成，但预览刷新未接入',
+      };
+    }
+    await reloadMeshFromUrl(job.preview_url, reloadMesh, job.filename);
+    return { success: true, message: '3D 模型已更新' };
+  }
+
+  return {
+    success: false,
+    message: formatHunyuanJobFailure(job),
+  };
+}
+
 // ============================================================
 // Hook
 // ============================================================
@@ -171,47 +199,15 @@ export function useAgileRobotTools(options: UseAgileRobotToolsOptions = {}): AIC
           // Step 2: hunyuan submit
           await hunyuanSubmit('orders/' + b.order_id + '/model_input_customized.png');
 
-          // Step 3: poll until done
+          // Step 3: poll until done (3–5s interval; filename from job, not preview_url)
           const job = await hunyuanPollJob(signal);
-
-          if (job.status === 'done' && job.preview_url) {
-            const reloadMesh = reloadMeshRef.current;
-            if (!reloadMesh) {
-              return {
-                success: false,
-                message: '3D 模型已生成，但预览刷新未接入',
-              };
-            }
-            await reloadMeshFromUrl(job.preview_url, reloadMesh);
-            return { success: true, message: '3D 模型已更新' };
-          }
-
-          return {
-            success: false,
-            message: job.error_message || '3D 生成失败',
-          };
+          return await reloadDoneHunyuanJob(job, reloadMeshRef.current);
         }
 
         if (toolCall.toolName === 'regenerate_robot_3d') {
           await hunyuanSubmit();
           const job = await hunyuanPollJob(signal);
-
-          if (job.status === 'done' && job.preview_url) {
-            const reloadMesh = reloadMeshRef.current;
-            if (!reloadMesh) {
-              return {
-                success: false,
-                message: '3D 模型已生成，但预览刷新未接入',
-              };
-            }
-            await reloadMeshFromUrl(job.preview_url, reloadMesh);
-            return { success: true, message: '3D 模型已更新' };
-          }
-
-          return {
-            success: false,
-            message: job.error_message || '3D 生成失败',
-          };
+          return await reloadDoneHunyuanJob(job, reloadMeshRef.current);
         }
 
         return { success: false, message: '未知工具: ' + toolCall.toolName };

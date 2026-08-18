@@ -46,14 +46,24 @@ test('reloadMeshFromUrl fetches the URL and routes the GLB through the import po
   const { calls } = installFetchMock([new Response(mockBlob, { status: 200 })]);
   const { port, imported } = createImportSpy();
 
-  await reloadMeshFromUrl('https://api.example.com/preview?token=x', port);
+  await reloadMeshFromUrl('https://api.example.com/preview?token=x', port, 'abc123.glb');
 
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, 'https://api.example.com/preview?token=x');
   assert.equal(imported.length, 1, 'expected the GLB to be routed through the import port');
-  assert.equal(imported[0]?.name, 'updated_model.glb');
+  assert.equal(imported[0]?.name, 'abc123.glb');
   assert.equal(imported[0]?.type, 'model/gltf-binary');
   assert.equal(imported[0]?.size, mockBlob.size);
+});
+
+test('reloadMeshFromUrl falls back to updated_model.glb when filename is omitted', async () => {
+  const mockBlob = new Blob(['fake-glb-data'], { type: 'model/gltf-binary' });
+  installFetchMock([new Response(mockBlob, { status: 200 })]);
+  const { port, imported } = createImportSpy();
+
+  await reloadMeshFromUrl('https://api.example.com/preview?token=x', port);
+
+  assert.equal(imported[0]?.name, 'updated_model.glb');
 });
 
 test('reloadMeshFromUrl throws when the response is not ok', async () => {

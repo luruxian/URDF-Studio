@@ -73,6 +73,17 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+/** User-facing message for a failed hunyuan job (prefer API error_code). */
+export function formatHunyuanJobFailure(job: HunyuanJobResponse): string {
+  if (job.error_code) {
+    return job.error_code;
+  }
+  if (job.error_message) {
+    return job.error_message;
+  }
+  return '3D 生成失败';
+}
+
 // ============================================================
 // Public API functions
 // ============================================================

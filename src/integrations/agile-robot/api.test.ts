@@ -5,6 +5,7 @@ import { JSDOM } from 'jsdom';
 
 import {
   AgileRobotApiError,
+  formatHunyuanJobFailure,
   hunyuanGetJob,
   hunyuanPollJob,
   hunyuanSubmit,
@@ -291,6 +292,30 @@ test('hunyuanGetJob GETs the job endpoint', async () => {
     Authorization: 'Bearer test-token',
     'Content-Type': 'application/json',
   });
+});
+
+test('formatHunyuanJobFailure prefers error_code over error_message', () => {
+  assert.equal(
+    formatHunyuanJobFailure({
+      job_id: 'j1',
+      status: 'failed',
+      error_code: 'E1',
+      error_message: 'boom',
+    }),
+    'E1',
+  );
+  assert.equal(
+    formatHunyuanJobFailure({
+      job_id: 'j1',
+      status: 'failed',
+      error_message: 'boom',
+    }),
+    'boom',
+  );
+  assert.equal(
+    formatHunyuanJobFailure({ job_id: 'j1', status: 'failed' }),
+    '3D 生成失败',
+  );
 });
 
 // ============================================================
