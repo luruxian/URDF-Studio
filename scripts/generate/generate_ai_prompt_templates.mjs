@@ -9,7 +9,7 @@ const outputPath = path.join(
   'src/features/ai-assistant/config/aiPromptTemplates.generated.ts',
 );
 
-const source = fs.readFileSync(sourcePath, 'utf8');
+const source = fs.readFileSync(sourcePath, 'utf8').replace(/\r\n/g, '\n');
 
 const REQUIRED_PROMPT_SECTIONS = [
   'generation',

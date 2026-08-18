@@ -3,7 +3,7 @@ import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 
 import { InspectionReportTemplate } from '@/shared/components/reports/InspectionReportTemplate';
-import { translations, type Language } from '@/shared/i18n';
+import { translations, resolveDateLocale, type Language } from '@/shared/i18n';
 import type { InspectionReport, RobotInspectionContext } from '@/types';
 import { printElementAsPdf } from '@/shared/utils/pdf/printElementAsPdf';
 
@@ -20,7 +20,7 @@ interface ExportInspectionReportPdfParams {
 function buildInspectionReportPdfFileName(robotName: string, lang: Language): string {
   const t = translations[lang];
   const now = new Date();
-  const dateStr = now.toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US', {
+  const dateStr = now.toLocaleString(resolveDateLocale(lang), {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

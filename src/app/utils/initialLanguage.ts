@@ -7,6 +7,10 @@ import type { Language } from '@/shared/i18n';
 /** Returns the language encoded in a URL path, or null when the path carries no signal. */
 export function getLanguageFromPath(pathname: string): Language | null {
   if (/^\/zh(\/|$)/.test(pathname)) return 'zh';
+  if (/^\/ja(\/|$)/.test(pathname)) return 'ja';
+  if (/^\/fr(\/|$)/.test(pathname)) return 'fr';
+  if (/^\/de(\/|$)/.test(pathname)) return 'de';
+  if (/^\/es(\/|$)/.test(pathname)) return 'es';
   if (/^\/en(\/|$)/.test(pathname)) return 'en';
   return null;
 }

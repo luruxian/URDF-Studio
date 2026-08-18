@@ -1,5 +1,5 @@
 import type { InspectionReport } from '@/types'
-import { translations } from '@/shared/i18n'
+import { translations, type Language } from '@/shared/i18n'
 import type { IssueType } from '../types'
 import {
   getInspectionProfileDefinition,
@@ -62,7 +62,7 @@ const toRelatedIds = (relatedIds: unknown) => {
 
 const createUnmappedIssue = (
   rawIssue: RawInspectionIssue,
-  lang: 'en' | 'zh',
+  lang: Language,
 ): InspectionReport['issues'][number] => {
   const t = translations[lang]
   const rawTitle = typeof rawIssue.title === 'string' ? rawIssue.title : ''
@@ -85,7 +85,7 @@ const createUnmappedIssue = (
 
 const normalizeIssue = (
   rawIssue: RawInspectionIssue,
-  lang: 'en' | 'zh',
+  lang: Language,
 ): InspectionReport['issues'][number] => {
   const profileId = typeof rawIssue.profileId === 'string' ? rawIssue.profileId : ''
   const itemId = typeof rawIssue.itemId === 'string' ? rawIssue.itemId : ''
@@ -134,7 +134,7 @@ const issueMatchesSelectedScope = (
 export function processInspectionResults(
   rawResults: unknown,
   selectedProfiles?: SelectedInspectionProfileMap,
-  lang: 'en' | 'zh' = 'en',
+  lang: Language = 'en',
 ): InspectionReport {
   const t = translations[lang]
   const parsedResult = (rawResults || {}) as ParsedInspectionResult

@@ -24,6 +24,26 @@ const surfaceModeSelector: import('./header/types').HeaderSurfaceModeSelectorCon
       primary: { label: '默认', description: '使用默认工作区' },
       alternate: { label: '扩展', description: '使用宿主工作区' },
     },
+    ja: {
+      ariaLabel: 'ワークスペースモード',
+      primary: { label: 'プライマリ', description: 'プライマリワークスペースを使用' },
+      alternate: { label: '代替', description: 'ホストワークスペースを使用' },
+    },
+    fr: {
+      ariaLabel: 'Mode d’espace de travail',
+      primary: { label: 'Principal', description: 'Utiliser l’espace de travail principal' },
+      alternate: { label: 'Alternatif', description: 'Utiliser l’espace de travail hôte' },
+    },
+    de: {
+      ariaLabel: 'Arbeitsbereichsmodus',
+      primary: { label: 'Primär', description: 'Den primären Arbeitsbereich verwenden' },
+      alternate: { label: 'Alternativ', description: 'Den Host-Arbeitsbereich verwenden' },
+    },
+    es: {
+      ariaLabel: 'Modo de espacio de trabajo',
+      primary: { label: 'Principal', description: 'Usar el espacio de trabajo principal' },
+      alternate: { label: 'Alternativo', description: 'Usar el espacio de trabajo del host' },
+    },
   },
 };
 

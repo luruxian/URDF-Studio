@@ -6,7 +6,7 @@ import { useEffect, useLayoutEffect, useMemo } from 'react';
 import { useUIStore } from '@/store';
 import { useSelectionStore } from '@/store/selectionStore';
 import { useShallow } from 'zustand/react/shallow';
-import { translations } from '@/shared/i18n';
+import { translations, resolveDocumentLocale } from '@/shared/i18n';
 import { EffectiveThemeProvider, useResolvedTheme } from '@/shared/hooks/useEffectiveTheme';
 import { OverlayHoverBlockProvider } from '@/shared/hooks/useOverlayHoverBlock';
 import { applyDocumentTheme } from '@/shared/utils/theme';
@@ -52,7 +52,7 @@ export function Providers({ children }: ProvidersProps) {
   // Update document title based on language
   useEffect(() => {
     document.title = t.documentTitle;
-    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+    document.documentElement.lang = resolveDocumentLocale(lang);
     document.documentElement.setAttribute('data-lang', lang);
   }, [lang, t]);
 

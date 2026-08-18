@@ -14,6 +14,13 @@ const toolCall = {
   summary: '将机身改为橙色，保留原视角',
 };
 
+const defaultBannerProps = {
+  lang: 'zh' as const,
+  toolCall,
+  onConfirm: () => {},
+  onCancel: () => {},
+};
+
 function restoreGlobalProperty<T extends keyof typeof globalThis>(
   key: T,
   originalValue: (typeof globalThis)[T] | undefined,
@@ -130,10 +137,8 @@ test('renders nothing when idle', async () => {
   const dom = installDom();
   try {
     const rendered = await renderBanner(dom.dom, {
+      ...defaultBannerProps,
       state: 'idle',
-      toolCall,
-      onConfirm: () => {},
-      onCancel: () => {},
     });
     assert.equal(rendered.root, null);
     await rendered.unmount();
@@ -146,10 +151,8 @@ test('renders nothing when cancelled', async () => {
   const dom = installDom();
   try {
     const rendered = await renderBanner(dom.dom, {
+      ...defaultBannerProps,
       state: 'cancelled',
-      toolCall,
-      onConfirm: () => {},
-      onCancel: () => {},
     });
     assert.equal(rendered.root, null);
     await rendered.unmount();
@@ -162,10 +165,8 @@ test('renders the parsed tool summary with confirm and cancel actions', async ()
   const dom = installDom();
   try {
     const rendered = await renderBanner(dom.dom, {
+      ...defaultBannerProps,
       state: 'parsed',
-      toolCall,
-      onConfirm: () => {},
-      onCancel: () => {},
     });
     assert.match(rendered.text, /将机身改为橙色，保留原视角/);
     assert.match(rendered.text, /确认/);
@@ -181,12 +182,11 @@ test('calls onConfirm when the confirm button is clicked', async () => {
   try {
     let confirmed = 0;
     const rendered = await renderBanner(dom.dom, {
+      ...defaultBannerProps,
       state: 'parsed',
-      toolCall,
       onConfirm: () => {
         confirmed += 1;
       },
-      onCancel: () => {},
     });
     await rendered.click('确认');
     assert.equal(confirmed, 1);
@@ -201,9 +201,8 @@ test('calls onCancel when the cancel button is clicked in the parsed state', asy
   try {
     let cancelled = 0;
     const rendered = await renderBanner(dom.dom, {
+      ...defaultBannerProps,
       state: 'parsed',
-      toolCall,
-      onConfirm: () => {},
       onCancel: () => {
         cancelled += 1;
       },
@@ -220,10 +219,8 @@ test('renders the executing spinner text', async () => {
   const dom = installDom();
   try {
     const rendered = await renderBanner(dom.dom, {
+      ...defaultBannerProps,
       state: 'executing',
-      toolCall,
-      onConfirm: () => {},
-      onCancel: () => {},
     });
     assert.match(rendered.text, /正在生成新的 3D 模型…/);
     await rendered.unmount();
@@ -236,11 +233,9 @@ test('renders the done success message', async () => {
   const dom = installDom();
   try {
     const rendered = await renderBanner(dom.dom, {
+      ...defaultBannerProps,
       state: 'done',
-      toolCall,
       result: { success: true, message: '3D 模型已更新' },
-      onConfirm: () => {},
-      onCancel: () => {},
     });
     assert.match(rendered.text, /3D 模型已更新/);
     await rendered.unmount();
@@ -254,11 +249,9 @@ test('renders the error message and calls onRetry when retry is clicked', async 
   try {
     let retried = 0;
     const rendered = await renderBanner(dom.dom, {
+      ...defaultBannerProps,
       state: 'error',
-      toolCall,
       result: { success: false, message: '生成失败：上游错误' },
-      onConfirm: () => {},
-      onCancel: () => {},
       onRetry: () => {
         retried += 1;
       },
@@ -277,15 +270,29 @@ test('renders the error state without a retry button when onRetry is omitted', a
   const dom = installDom();
   try {
     const rendered = await renderBanner(dom.dom, {
+      ...defaultBannerProps,
       state: 'error',
-      toolCall,
       result: { success: false, message: '生成失败：上游错误' },
-      onConfirm: () => {},
-      onCancel: () => {},
     });
     assert.match(rendered.text, /生成失败：上游错误/);
     assert.doesNotMatch(rendered.text, /重试/);
     assert.match(rendered.text, /取消/);
+    await rendered.unmount();
+  } finally {
+    dom.restore();
+  }
+});
+
+test('renders English confirm banner labels when lang is en', async () => {
+  const dom = installDom();
+  try {
+    const rendered = await renderBanner(dom.dom, {
+      ...defaultBannerProps,
+      lang: 'en',
+      state: 'parsed',
+    });
+    assert.match(rendered.text, /Confirm/);
+    assert.match(rendered.text, /Cancel/);
     await rendered.unmount();
   } finally {
     dom.restore();

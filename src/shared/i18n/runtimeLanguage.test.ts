@@ -28,7 +28,18 @@ test('normalizeLanguage maps regional browser language tags', () => {
   assert.equal(normalizeLanguage('zh-Hans'), 'zh');
   assert.equal(normalizeLanguage('en-US'), 'en');
   assert.equal(normalizeLanguage('en-GB'), 'en');
-  assert.equal(normalizeLanguage('fr-FR'), null);
+  assert.equal(normalizeLanguage('ja-JP'), 'ja');
+  assert.equal(normalizeLanguage('ja'), 'ja');
+  assert.equal(normalizeLanguage('fr-FR'), 'fr');
+  assert.equal(normalizeLanguage('fr'), 'fr');
+  assert.equal(normalizeLanguage('fr-CA'), 'fr');
+  assert.equal(normalizeLanguage('de-DE'), 'de');
+  assert.equal(normalizeLanguage('de'), 'de');
+  assert.equal(normalizeLanguage('de-AT'), 'de');
+  assert.equal(normalizeLanguage('es-ES'), 'es');
+  assert.equal(normalizeLanguage('es'), 'es');
+  assert.equal(normalizeLanguage('es-MX'), 'es');
+  assert.equal(normalizeLanguage('it-IT'), null);
 });
 
 test('resolveRuntimeLanguage prefers the active document language marker', () => {

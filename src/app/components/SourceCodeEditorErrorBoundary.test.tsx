@@ -6,7 +6,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 import { SourceCodeEditorErrorBoundary } from './SourceCodeEditorErrorBoundary.tsx';
 
-function renderFailure(lang: 'en' | 'zh', error: unknown): string {
+import type { Language } from '@/shared/i18n';
+
+function renderFailure(lang: Language, error: unknown): string {
   const boundary = new SourceCodeEditorErrorBoundary({
     children: React.createElement('div', null, 'workspace'),
     lang,

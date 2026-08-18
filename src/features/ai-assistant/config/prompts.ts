@@ -1,4 +1,9 @@
 import { AI_PROMPT_TEMPLATES } from './aiPromptTemplates.generated.ts'
+import type { Language } from '@/shared/i18n'
+
+function resolvePromptTemplateLanguage(lang: Language): 'en' | 'zh' {
+  return lang === 'zh' ? 'zh' : 'en'
+}
 
 export const GENERATION_PROMPT_PLACEHOLDERS = {
   robot: '__ROBOT_CONTEXT__',
@@ -55,14 +60,23 @@ export function getGenerationSystemPrompt(context: GenerationContext): string {
 }
 
 export function getInspectionSystemPrompt(
-  lang: 'zh' | 'en',
+  lang: Language,
   context: InspectionContext
 ): string {
+  const templateLanguage = resolvePromptTemplateLanguage(lang)
   const languageInstruction =
     lang === 'zh'
       ? '请使用中文生成所有报告内容，包括总结、问题标题和描述。'
-      : 'Please generate all report content in English, including summary, issue titles and descriptions.'
-  const template = INSPECTION_SYSTEM_PROMPT_TEMPLATES[lang]
+      : lang === 'ja'
+        ? 'レポート内容（要約、問題タイトル、説明）はすべて日本語で生成してください。'
+        : lang === 'fr'
+          ? 'Générez tout le contenu du rapport en français, y compris le résumé, les titres et les descriptions des problèmes.'
+          : lang === 'de'
+            ? 'Erstellen Sie den gesamten Berichtsinhalt auf Deutsch, einschließlich Zusammenfassung, Problemtitel und Beschreibungen.'
+            : lang === 'es'
+              ? 'Genera todo el contenido del informe en español, incluidos el resumen, los títulos y las descripciones de los problemas.'
+              : 'Please generate all report content in English, including summary, issue titles and descriptions.'
+  const template = INSPECTION_SYSTEM_PROMPT_TEMPLATES[templateLanguage]
 
   return template
     .replace(INSPECTION_PROMPT_PLACEHOLDERS.criteriaDescription, context.criteriaDescription)
@@ -71,14 +85,23 @@ export function getInspectionSystemPrompt(
 }
 
 export function getConversationSystemPrompt(
-  lang: 'zh' | 'en',
+  lang: Language,
   context: ConversationPromptContext
 ): string {
+  const templateLanguage = resolvePromptTemplateLanguage(lang)
   const languageInstruction =
     lang === 'zh'
       ? '请使用中文回复，简洁准确。'
-      : 'Please respond in English with concise and accurate technical language.'
-  const template = CONVERSATION_SYSTEM_PROMPT_TEMPLATES[lang]
+      : lang === 'ja'
+        ? '日本語で簡潔かつ正確に返答してください。'
+        : lang === 'fr'
+          ? 'Répondez en français de manière concise et précise.'
+          : lang === 'de'
+            ? 'Antworten Sie präzise und knapp auf Deutsch.'
+            : lang === 'es'
+              ? 'Responde en español de forma concisa y precisa.'
+              : 'Please respond in English with concise and accurate technical language.'
+  const template = CONVERSATION_SYSTEM_PROMPT_TEMPLATES[templateLanguage]
 
   return template
     .replace(CONVERSATION_PROMPT_PLACEHOLDERS.mode, context.mode)

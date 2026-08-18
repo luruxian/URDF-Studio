@@ -1,4 +1,5 @@
 import type { InspectionReport, RobotState } from '@/types'
+import type { Language } from '@/shared/i18n'
 import { hasFiniteJointLimitBounds } from '@/core/robot'
 import {
   createProfileScoreMetrics,
@@ -215,7 +216,7 @@ export function buildInspectionEvidence(robot: RobotState): InspectionEvidence[]
 export function formatInspectionEvidenceForPrompt(
   evidenceEntries: InspectionEvidence[],
   selectedProfiles: SelectedInspectionProfileMap | undefined,
-  lang: 'en' | 'zh',
+  lang: Language,
 ) {
   const failedEntries = evidenceEntries.filter(
     (entry) => entry.status === 'fail' && evidenceMatchesSelection(entry, selectedProfiles),
@@ -247,7 +248,7 @@ export function formatInspectionEvidenceForPrompt(
 export function mergeInspectionEvidenceIntoReport(
   report: InspectionReport,
   evidenceEntries: InspectionEvidence[],
-  lang: 'en' | 'zh',
+  lang: Language,
   selectedProfiles?: SelectedInspectionProfileMap,
 ): InspectionReport {
   const failedEntries = evidenceEntries.filter(

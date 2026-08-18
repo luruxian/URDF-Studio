@@ -1,8 +1,10 @@
 import { AlertCircle, Check, Loader2 } from 'lucide-react';
 
+import { translations, type Language } from '@/shared/i18n';
 import type { ParsedToolCall, ToolConfirmState, ToolResult } from '../types';
 
 export interface ToolConfirmBannerProps {
+  lang: Language;
   state: ToolConfirmState;
   toolCall: ParsedToolCall;
   result?: ToolResult;
@@ -24,6 +26,7 @@ export interface ToolConfirmBannerProps {
  * current state and forwards the user's confirm/cancel/retry decisions back.
  */
 export function ToolConfirmBanner({
+  lang,
   state,
   toolCall,
   result,
@@ -31,6 +34,8 @@ export function ToolConfirmBanner({
   onCancel,
   onRetry,
 }: ToolConfirmBannerProps) {
+  const t = translations[lang];
+
   if (state === 'idle' || state === 'cancelled') {
     return null;
   }
@@ -47,13 +52,13 @@ export function ToolConfirmBanner({
             onClick={onConfirm}
             className="rounded-md bg-blue-600 px-3 py-1 text-sm font-medium text-white hover:bg-blue-700"
           >
-            确认
+            {t.agileRobotToolConfirm}
           </button>
           <button
             onClick={onCancel}
             className="rounded-md bg-gray-200 px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
           >
-            取消
+            {t.agileRobotToolCancel}
           </button>
         </>
       )}
@@ -62,7 +67,7 @@ export function ToolConfirmBanner({
         <>
           <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
           <span className="text-sm text-gray-600 dark:text-gray-400">
-            正在生成新的 3D 模型…
+            {t.agileRobotToolExecuting}
           </span>
         </>
       )}
@@ -87,14 +92,14 @@ export function ToolConfirmBanner({
               onClick={onRetry}
               className="rounded-md bg-red-100 px-3 py-1 text-sm font-medium text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400"
             >
-              重试
+              {t.agileRobotToolRetry}
             </button>
           )}
           <button
             onClick={onCancel}
             className="rounded-md bg-gray-200 px-3 py-1 text-sm font-medium text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
           >
-            取消
+            {t.agileRobotToolCancel}
           </button>
         </>
       )}

@@ -6,8 +6,10 @@ import { JSDOM } from 'jsdom';
 
 import { AppErrorBoundary } from './AppErrorBoundary.tsx';
 
+import type { Language } from '@/shared/i18n';
+
 function renderErrorBoundaryForLanguage(
-  dataLang: 'en' | 'zh',
+  dataLang: Language,
   error: unknown = new Error('render failed'),
 ) {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', {

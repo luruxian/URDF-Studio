@@ -4,7 +4,7 @@
  */
 
 import type { InspectionReport, RobotInspectionContext } from '@/types';
-import { translations } from '@/shared/i18n';
+import { translations, resolveDateLocale, type Language } from '@/shared/i18n';
 import { buildInspectionEvidenceSummary } from '@/shared/utils/inspectionEvidenceSummary';
 
 interface ReportTemplateProps {
@@ -47,7 +47,7 @@ export function InspectionReportTemplate({
 
   // Date string
   const now = new Date();
-  const dateStr = now.toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US', {
+  const dateStr = now.toLocaleString(resolveDateLocale(lang), {
     year: 'numeric',
     month: 'long',
     day: 'numeric',

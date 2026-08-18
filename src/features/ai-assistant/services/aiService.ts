@@ -275,7 +275,7 @@ const extractRobotData = (parsedResult: Record<string, unknown>): Record<string,
 
 export const buildInspectionCriteriaDescription = (
   selectedItems: SelectedInspectionProfileMap | undefined,
-  lang: 'en' | 'zh'
+  lang: Language
 ): string => {
   return INSPECTION_PROFILE_DEFINITIONS.map(profile => {
     const selectedItemIds = selectedItems?.[profile.id] || []

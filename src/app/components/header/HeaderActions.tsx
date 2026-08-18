@@ -8,6 +8,7 @@ import {
   Sun,
 } from 'lucide-react';
 import { Button, IconButton } from '@/shared/components/ui';
+import { getLanguageShortLabel, getNextLanguage, type Language } from '@/shared/i18n';
 import type { Theme } from '@/types';
 import type {
   HeaderAction,
@@ -22,13 +23,13 @@ export const FEEDBACK_FORM_URL =
 
 interface HeaderActionsProps {
   responsive: HeaderResponsiveLayout;
-  lang: 'en' | 'zh';
+  lang: Language;
   theme: Theme;
   canUndo: boolean;
   canRedo: boolean;
   activeMenu: HeaderMenuKey;
   setActiveMenu: (menu: HeaderMenuKey) => void;
-  setLang: (lang: 'en' | 'zh') => void;
+  setLang: (lang: Language) => void;
   setTheme: (theme: Theme) => void;
   undo: () => void;
   redo: () => void;
@@ -111,8 +112,8 @@ function LanguageButton({
   label,
 }: {
   show: boolean;
-  lang: 'en' | 'zh';
-  setLang: (lang: 'en' | 'zh') => void;
+  lang: Language;
+  setLang: (lang: Language) => void;
   label: string;
 }) {
   if (!show) {
@@ -122,7 +123,7 @@ function LanguageButton({
   return (
     <Button
       type="button"
-      onClick={() => setLang(lang === 'en' ? 'zh' : 'en')}
+      onClick={() => setLang(getNextLanguage(lang))}
       variant="ghost"
       size="xs"
       className="hidden h-7 px-2 text-text-tertiary hover:text-text-primary sm:flex"
@@ -130,7 +131,7 @@ function LanguageButton({
       aria-label={label}
     >
       <Languages className="w-3.5 h-3.5" />
-      <span className="text-[10px] font-semibold">{lang === 'en' ? 'EN' : '中'}</span>
+      <span className="text-[10px] font-semibold">{getLanguageShortLabel(lang)}</span>
     </Button>
   );
 }

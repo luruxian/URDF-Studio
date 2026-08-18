@@ -5,7 +5,16 @@
 
 export type { Language, TranslationKeys, Translations } from './types';
 export { translations } from './translations';
-export { en, zh } from './locales';
+export { en, de, es, fr, ja, zh } from './locales';
+export {
+  getNextLanguage,
+  getLanguageShortLabel,
+  isChineseLanguage,
+  LANGUAGE_OPTIONS,
+  resolveDateLocale,
+  resolveDocumentLocale,
+  SUPPORTED_LANGUAGES,
+} from './languageUtils';
 export {
   getRuntimeLanguageTranslations,
   normalizeLanguage,

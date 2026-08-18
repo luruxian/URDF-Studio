@@ -1,6 +1,6 @@
 import type { ComponentType, Dispatch, MouseEventHandler, ReactNode, SetStateAction } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { translations } from '@/shared/i18n';
+import { translations, type Language } from '@/shared/i18n';
 import type { AppMode, Theme } from '@/types';
 
 export type HeaderTranslations = (typeof translations)['en'];
@@ -41,7 +41,7 @@ export interface HeaderSurfaceModeSelectorCopy {
 export interface HeaderSurfaceModeSelectorConfig {
   current: HeaderSurfaceMode;
   onChange: (mode: HeaderSurfaceMode) => void;
-  translations: Record<'en' | 'zh', HeaderSurfaceModeSelectorCopy>;
+  translations: Record<Language, HeaderSurfaceModeSelectorCopy>;
 }
 
 export interface HeaderContextFileMenuItem {
@@ -101,13 +101,13 @@ export interface HeaderResponsiveLayout {
 
 export interface HeaderOverflowMenuProps {
   className?: string;
-  lang: 'en' | 'zh';
+  lang: Language;
   theme: Theme;
   canUndo: boolean;
   canRedo: boolean;
   activeMenu: HeaderMenuKey;
   setActiveMenu: (menu: HeaderMenuKey) => void;
-  setLang: (lang: 'en' | 'zh') => void;
+  setLang: (lang: Language) => void;
   setTheme: (theme: Theme) => void;
   undo: () => void;
   redo: () => void;

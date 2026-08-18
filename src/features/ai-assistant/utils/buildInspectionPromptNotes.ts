@@ -8,6 +8,7 @@ import type {
   RobotState,
   RobotUrdfInspectionContext,
 } from '@/types';
+import type { Language } from '@/shared/i18n';
 import { buildInspectionEvidence, formatInspectionEvidenceForPrompt } from './inspectionEvidence';
 import type { SelectedInspectionProfileMap } from './inspectionProfileSelection';
 
@@ -40,7 +41,7 @@ const isGeneratedSiteNameForBody = (siteName: string, bodyId: string) => {
   return generatedSitePattern.test(normalizedSiteName);
 };
 
-const buildSourceFormatEvidenceNotes = (robot: RobotState, lang: 'en' | 'zh') => {
+const buildSourceFormatEvidenceNotes = (robot: RobotState, lang: Language) => {
   const sourceFormat = robot.inspectionContext?.sourceFormat;
   if (!sourceFormat || !SOURCE_FORMATS_WITH_PARTIAL_EVIDENCE.has(sourceFormat)) {
     return '';
@@ -145,7 +146,7 @@ const formatUrdfDiagnostics = (diagnostics: RobotSourceDiagnostic[]) => {
 
 const formatImportRecoveryPromptNotes = (
   recovery: RobotImportRecoveryReport,
-  lang: 'en' | 'zh',
+  lang: Language,
 ) => {
   const summary = recovery.diagnostics
     .slice(0, MAX_SUMMARY_ITEMS)
@@ -168,7 +169,7 @@ const formatImportRecoveryPromptNotes = (
 const formatUrdfInspectionPromptNotes = (
   urdfContext: RobotUrdfInspectionContext,
   sourceFormat: string | undefined,
-  lang: 'en' | 'zh',
+  lang: Language,
 ) => {
   const diagnosticSummary = formatUrdfDiagnostics(urdfContext.diagnostics);
   const counts = urdfContext.diagnosticCounts;
@@ -209,7 +210,7 @@ const formatUrdfInspectionPromptNotes = (
 const formatMjcfInspectionPromptNotes = (
   robot: RobotState,
   selectedItems: SelectedInspectionProfileMap | undefined,
-  lang: 'en' | 'zh',
+  lang: Language,
 ) => {
   const mjcfContext =
     robot.inspectionContext?.sourceFormat === 'mjcf' ? robot.inspectionContext.mjcf : undefined;
@@ -293,7 +294,7 @@ const formatMjcfInspectionPromptNotes = (
 export const buildInspectionPromptNotes = (
   robot: RobotState,
   selectedItems: SelectedInspectionProfileMap | undefined,
-  lang: 'en' | 'zh',
+  lang: Language,
 ) => {
   const localEvidenceNotes = formatInspectionEvidenceForPrompt(
     buildInspectionEvidence(robot),
