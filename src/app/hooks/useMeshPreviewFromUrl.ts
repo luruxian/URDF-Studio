@@ -12,6 +12,7 @@ import {
   filenameFromContentDisposition,
   filenameFromMeshPreviewUrl,
   mimeTypeForMeshPreviewFilename,
+  resolveAuthenticatedMeshPreviewUrl,
   resolveMeshPreviewUrl,
   stripMeshPreviewParamFromUrl,
 } from '@/shared/utils/meshPreviewFromUrl';
@@ -107,7 +108,7 @@ export function useMeshPreviewFromUrl(options: UseMeshPreviewFromUrlOptions): vo
       let meshUrlForLog = rawMesh;
       try {
         if (deepLink) {
-          const validated = resolveMeshPreviewUrl(deepLink.meshUrl, window.location.href);
+          const validated = resolveAuthenticatedMeshPreviewUrl(deepLink.meshUrl);
           if (!validated) {
             onImportCompleteRef.current?.(false, 'import_failed');
             return;
@@ -118,7 +119,7 @@ export function useMeshPreviewFromUrl(options: UseMeshPreviewFromUrlOptions): vo
             validated,
             deepLink.previewToken,
           );
-          const result = await handleImportRef.current([file]);
+          const result = await handleImportRef.current([file], { forceLoadRobot: true });
           onImportCompleteRef.current?.(result.status === 'completed');
           return;
         }

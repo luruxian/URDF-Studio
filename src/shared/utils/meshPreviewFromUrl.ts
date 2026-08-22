@@ -103,6 +103,30 @@ function isExplicitlyTrustedCrossOriginMeshPreview(
   );
 }
 
+/**
+ * Resolve a robots deep-link mesh URL (`?mesh=` + `?mesh_auth=`).
+ * Only checks for a well-formed http(s) URL; cross-origin allowlist is not applied
+ * because the preview JWT is the security boundary.
+ */
+export function resolveAuthenticatedMeshPreviewUrl(rawValue: string): string | null {
+  const trimmed = rawValue.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  try {
+    const resolved = trimmed.startsWith('/')
+      ? null
+      : new URL(trimmed);
+    if (!resolved || (resolved.protocol !== 'http:' && resolved.protocol !== 'https:')) {
+      return null;
+    }
+    return resolved.href;
+  } catch {
+    return null;
+  }
+}
+
 /** Resolve and validate a mesh preview URL against the current page origin. */
 export function resolveMeshPreviewUrl(rawValue: string, pageHref: string): string | null {
   const trimmed = rawValue.trim();

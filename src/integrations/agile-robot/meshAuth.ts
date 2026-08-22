@@ -69,10 +69,10 @@ export function updateStoredMeshUrl(meshUrl: string): void {
  * Cross-origin GLB GET with Bearer preview token.
  * credentials must be omit — Studio does not send robots session cookies.
  */
-export async function fetchAuthenticatedGlb(
+export async function fetchAuthenticatedGlbResponse(
   meshUrl: string,
   previewToken: string,
-): Promise<ArrayBuffer> {
+): Promise<Response> {
   const res = await fetch(meshUrl, {
     method: 'GET',
     headers: {
@@ -88,6 +88,14 @@ export async function fetchAuthenticatedGlb(
     throw new Error(`glb_fetch_failed:${res.status}`);
   }
 
+  return res;
+}
+
+export async function fetchAuthenticatedGlb(
+  meshUrl: string,
+  previewToken: string,
+): Promise<ArrayBuffer> {
+  const res = await fetchAuthenticatedGlbResponse(meshUrl, previewToken);
   return res.arrayBuffer();
 }
 

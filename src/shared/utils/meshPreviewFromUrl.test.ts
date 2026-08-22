@@ -6,6 +6,7 @@ import {
   isExplicitlyTrustedCrossOriginMeshPreviewOrigin,
   mimeTypeForMeshPreviewFilename,
   readMeshPreviewUrlFromLocation,
+  resolveAuthenticatedMeshPreviewUrl,
   resolveMeshPreviewUrl,
   stripMeshPreviewParamFromUrl,
   filenameFromContentDisposition,
@@ -29,6 +30,27 @@ test('resolveMeshPreviewUrl accepts same-origin absolute URLs', () => {
 
 test('resolveMeshPreviewUrl rejects cross-origin URLs by default', () => {
   assert.equal(resolveMeshPreviewUrl('https://evil.example/preview.glb', PAGE), null);
+});
+
+test('resolveAuthenticatedMeshPreviewUrl accepts robots API URLs without allowlist', () => {
+  assert.equal(
+    resolveAuthenticatedMeshPreviewUrl(
+      'http://127.0.0.1:8000/api/v1/assets/models/a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    ),
+    'http://127.0.0.1:8000/api/v1/assets/models/a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+  );
+});
+
+test('resolveAuthenticatedMeshPreviewUrl accepts CDN model URLs', () => {
+  assert.equal(
+    resolveAuthenticatedMeshPreviewUrl('https://cdn.example.com/models/a1b2c3d4-e5f6-7890-abcd-ef1234567890'),
+    'https://cdn.example.com/models/a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+  );
+});
+
+test('resolveAuthenticatedMeshPreviewUrl rejects relative paths and non-http URLs', () => {
+  assert.equal(resolveAuthenticatedMeshPreviewUrl('/api/models/a1'), null);
+  assert.equal(resolveAuthenticatedMeshPreviewUrl('file:///tmp/a.glb'), null);
 });
 
 test('resolveMeshPreviewUrl rejects non-mesh extensions', () => {
