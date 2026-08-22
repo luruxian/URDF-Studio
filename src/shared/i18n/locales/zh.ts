@@ -1028,6 +1028,10 @@ export const zh: TranslationKeys = {
   agileRobotToolJobInProgress: '3D 生成任务正在进行中，请等待完成',
   agileRobotToolUnknownTool: '未知工具: {toolName}',
   agileRobotToolUnknownError: '未知错误',
+  meshPreviewAuthMissing: '缺少预览凭证，请从 Agile Robot 主站打开',
+  meshPreviewAuthExpired: '预览凭证无效或已过期，请回主站重新点预览',
+  meshPreviewNotFound: '模型文件不存在',
+  meshPreviewUnavailable: '服务暂时不可用，请稍后重试',
 
   // Performance
   performance: '性能',

@@ -5,6 +5,9 @@
 
 export const MESH_PREVIEW_QUERY_PARAM = 'mesh';
 
+/** Preview JWT for authenticated cross-origin GLB fetch (robots mesh_auth protocol). */
+export const MESH_AUTH_QUERY_PARAM = 'mesh_auth';
+
 const ALLOWED_MESH_EXTENSIONS = ['.glb', '.gltf'] as const;
 
 export function getMeshPreviewAllowedOrigins(): ReadonlyArray<string> {
@@ -146,10 +149,11 @@ export function readMeshPreviewUrlFromLocation(url: string): string | null {
   return resolveMeshPreviewUrl(rawValue, url);
 }
 
-/** Remove the mesh preview query parameter from a URL string. */
+/** Remove mesh preview query parameters (`mesh`, `mesh_auth`) from a URL string. */
 export function stripMeshPreviewParamFromUrl(url: string): string {
   const resolvedUrl = new URL(url);
   resolvedUrl.searchParams.delete(MESH_PREVIEW_QUERY_PARAM);
+  resolvedUrl.searchParams.delete(MESH_AUTH_QUERY_PARAM);
   return resolvedUrl.toString();
 }
 

@@ -170,10 +170,25 @@ export function AppContent({ extensions, onExposeActions }: AppContentProps = {}
   });
   useMeshPreviewFromUrl({
     handleImport,
-    onImportComplete: (success) => {
-      if (!success) {
-        showToast(t.importFailedCheckFiles, 'error');
+    onImportComplete: (success, failureReason) => {
+      if (success) return;
+      if (failureReason === 'auth_missing') {
+        showToast(t.meshPreviewAuthMissing, 'error');
+        return;
       }
+      if (failureReason === 'auth_expired') {
+        showToast(t.meshPreviewAuthExpired, 'error');
+        return;
+      }
+      if (failureReason === 'not_found') {
+        showToast(t.meshPreviewNotFound, 'error');
+        return;
+      }
+      if (failureReason === 'unavailable') {
+        showToast(t.meshPreviewUnavailable, 'error');
+        return;
+      }
+      showToast(t.importFailedCheckFiles, 'error');
     },
   });
   // Agile Robot mesh hot-reload: reuse the ?mesh= import pipeline so a

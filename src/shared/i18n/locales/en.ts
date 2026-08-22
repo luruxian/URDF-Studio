@@ -1071,6 +1071,12 @@ export const en: TranslationKeys = {
     'A 3D generation job is already running. Please wait for it to finish.',
   agileRobotToolUnknownTool: 'Unknown tool: {toolName}',
   agileRobotToolUnknownError: 'Unknown error',
+  meshPreviewAuthMissing:
+    'Missing preview credentials. Open this model from Agile Robot again.',
+  meshPreviewAuthExpired:
+    'Preview credentials are invalid or expired. Return to Agile Robot and open preview again.',
+  meshPreviewNotFound: 'Model file not found.',
+  meshPreviewUnavailable: 'Service temporarily unavailable. Please try again later.',
 
   // Performance
   performance: 'Performance',

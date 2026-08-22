@@ -978,6 +978,10 @@ export interface TranslationKeys extends TranslationWorkflowKeys {
   agileRobotToolJobInProgress: string;
   agileRobotToolUnknownTool: string;
   agileRobotToolUnknownError: string;
+  meshPreviewAuthMissing: string;
+  meshPreviewAuthExpired: string;
+  meshPreviewNotFound: string;
+  meshPreviewUnavailable: string;
 
   // Performance
   performance: string;

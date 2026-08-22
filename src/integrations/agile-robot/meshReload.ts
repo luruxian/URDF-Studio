@@ -2,6 +2,12 @@
 // Mesh hot-reload
 // ============================================================
 
+import {
+  fetchAuthenticatedGlb,
+  getStoredMeshAuth,
+  updateStoredMeshUrl,
+} from './meshAuth';
+
 /** Port injected by the app layer so a regenerated GLB can be routed through
  *  the standard file-import pipeline (which swaps the model in the 3D
  *  viewport). The integration layer must not depend on app/features, so the
@@ -13,11 +19,10 @@ export interface MeshReloadImportPort {
 }
 
 /**
- * Fetch a GLB from the given preview_url and route it through the app's
- * file-import pipeline so the 3D viewport shows the regenerated model.
- * Throws when the response is not OK or the body is empty. The provided port
- * owns the actual import (the app layer reuses handleImport with
- * forceLoadRobot, matching how ?mesh= loads a GLB into the workspace).
+ * Fetch a GLB from the given preview_url (stable URL, no token) using the
+ * mesh_auth JWT stored in sessionStorage, then route it through the app's
+ * file-import pipeline. Throws missing_mesh_auth / preview_token_expired /
+ * glb_fetch_failed:* on auth or HTTP failures.
  */
 export async function reloadMeshFromUrl(
   previewUrl: string,
@@ -25,20 +30,21 @@ export async function reloadMeshFromUrl(
   /** From hunyuan job.filename; CORS does not expose Content-Disposition on preview_url. */
   filename?: string | null,
 ): Promise<void> {
-  const response = await fetch(previewUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch mesh: ${response.status}`);
+  const auth = getStoredMeshAuth();
+  if (!auth) {
+    throw new Error('missing_mesh_auth');
   }
 
-  const blob = await response.blob();
-  if (blob.size === 0) {
+  const buffer = await fetchAuthenticatedGlb(previewUrl, auth.previewToken);
+  if (buffer.byteLength === 0) {
     throw new Error('Empty mesh response');
   }
 
   const meshFilename = filename?.trim() || 'updated_model.glb';
-  const file = new File([blob], meshFilename, {
+  const file = new File([buffer], meshFilename, {
     type: 'model/gltf-binary',
   });
 
   await port.importMeshFile(file);
+  updateStoredMeshUrl(previewUrl);
 }

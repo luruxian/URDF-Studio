@@ -71,6 +71,15 @@ test('stripMeshPreviewParamFromUrl removes the mesh query param', () => {
   );
 });
 
+test('stripMeshPreviewParamFromUrl also removes mesh_auth', () => {
+  assert.equal(
+    stripMeshPreviewParamFromUrl(
+      'https://studio.example/?mesh=https%3A%2F%2Fapi.example%2Fmodels%2Fa1&mesh_auth=eyJ&foo=1',
+    ),
+    'https://studio.example/?foo=1',
+  );
+});
+
 test('filenameFromMeshPreviewUrl keeps the basename from the URL path', () => {
   assert.equal(
     filenameFromMeshPreviewUrl('https://studio.example/api/generated/my%20robot.glb'),

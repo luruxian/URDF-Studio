@@ -1097,6 +1097,13 @@ export const de: TranslationKeys = {
     'Eine 3D-Generierung läuft bereits. Bitte warten Sie, bis sie abgeschlossen ist.',
   agileRobotToolUnknownTool: 'Unbekanntes Tool: {toolName}',
   agileRobotToolUnknownError: 'Unbekannter Fehler',
+  meshPreviewAuthMissing:
+    'Vorschau-Anmeldedaten fehlen. Öffnen Sie dieses Modell erneut über Agile Robot.',
+  meshPreviewAuthExpired:
+    'Vorschau abgelaufen. Kehren Sie zu Agile Robot zurück und öffnen Sie die Vorschau erneut.',
+  meshPreviewNotFound: 'Modelldatei nicht gefunden.',
+  meshPreviewUnavailable:
+    'Dienst vorübergehend nicht verfügbar. Bitte versuchen Sie es später erneut.',
 
   // Performance
   performance: 'Leistung',

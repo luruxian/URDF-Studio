@@ -1082,6 +1082,10 @@ export const ja: TranslationKeys = {
     '3D 生成タスクが実行中です。完了までお待ちください。',
   agileRobotToolUnknownTool: '不明なツール: {toolName}',
   agileRobotToolUnknownError: '不明なエラー',
+  meshPreviewAuthMissing: 'プレビュー認証情報がありません。Agile Robot から再度開いてください。',
+  meshPreviewAuthExpired: 'プレビューの有効期限が切れました。Agile Robot に戻って再度プレビューを開いてください。',
+  meshPreviewNotFound: 'モデルファイルが見つかりません。',
+  meshPreviewUnavailable: 'サービスが一時的に利用できません。しばらくしてから再試行してください。',
 
   // Performance
   performance: 'パフォーマンス',

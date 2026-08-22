@@ -7,13 +7,17 @@ import {
   getInitialLanguageFromUrl,
   hideSeoLanguagePathFromUserUrl,
 } from '@/app/utils/initialLanguage';
-import { initRobotsStudioBootstrap } from '@/integrations/agile-robot';
+import { initRobotsStudioBootstrap, parseMeshDeepLink, persistMeshAuth } from '@/integrations/agile-robot';
 import { getRuntimeLanguageTranslations } from '@/shared/i18n';
 import '@/styles/index.css';
 
-// Agile Robot preview opens Studio with `?mesh=` + `#robots-bootstrap=`.
-// Persist BFF credentials from the hash before React mounts so AI tools can
-// read sessionStorage even if the mesh import effect races ahead.
+// Agile Robot preview opens Studio with `?mesh=` + `?mesh_auth=` + `#robots-bootstrap=`.
+// Persist mesh preview JWT and BFF credentials before React mounts so hunyuan
+// mesh hot-reload and AI tools can read sessionStorage even if effects race.
+const meshDeepLink = parseMeshDeepLink(window.location.search);
+if (meshDeepLink) {
+  persistMeshAuth(meshDeepLink);
+}
 initRobotsStudioBootstrap();
 
 // ponytail: 全局安全网 —— React 渲染期之外的错误（未 await 的 Promise reject、

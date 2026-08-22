@@ -1095,6 +1095,12 @@ export const es: TranslationKeys = {
     'Ya hay una generación 3D en curso. Espera a que termine.',
   agileRobotToolUnknownTool: 'Herramienta desconocida: {toolName}',
   agileRobotToolUnknownError: 'Error desconocido',
+  meshPreviewAuthMissing:
+    'Faltan credenciales de vista previa. Abra este modelo de nuevo desde Agile Robot.',
+  meshPreviewAuthExpired:
+    'La vista previa ha caducado. Vuelva a Agile Robot y abra la vista previa otra vez.',
+  meshPreviewNotFound: 'No se encuentra el archivo del modelo.',
+  meshPreviewUnavailable: 'Servicio temporalmente no disponible. Inténtelo de nuevo más tarde.',
 
   // Performance
   performance: 'Rendimiento',

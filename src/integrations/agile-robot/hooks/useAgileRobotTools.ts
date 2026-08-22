@@ -19,6 +19,7 @@ import {
   AgileRobotApiError,
 } from '../api';
 import type { HunyuanJobResponse } from '../types';
+import { resolveMeshAuthErrorCode } from '../meshAuth';
 import { reloadMeshFromUrl, type MeshReloadImportPort } from '../meshReload';
 import { getAgileRobotToolTexts, type AgileRobotToolTexts } from '../agileRobotToolTexts';
 import type {
@@ -27,6 +28,23 @@ import type {
   ParsedToolCall,
   ToolResult,
 } from '../types';
+
+function messageForMeshAuthFailure(
+  error: unknown,
+  texts: AgileRobotToolTexts,
+): string | null {
+  const code = resolveMeshAuthErrorCode(error);
+  if (!code) return null;
+  switch (code) {
+    case 'auth_missing':
+    case 'auth_expired':
+      return texts.agileRobotToolSessionExpired;
+    case 'not_found':
+      return texts.meshPreviewNotFound;
+    case 'unavailable':
+      return texts.meshPreviewUnavailable;
+  }
+}
 
 // ============================================================
 // Tool definitions (OpenAI function-calling shapes)
@@ -249,6 +267,10 @@ export function useAgileRobotTools(
             success: false,
             message: error.message,
           };
+        }
+        const meshAuthMessage = messageForMeshAuthFailure(error, texts);
+        if (meshAuthMessage) {
+          return { success: false, message: meshAuthMessage };
         }
         return {
           success: false,

@@ -15,6 +15,8 @@ export type AgileRobotToolTexts = Pick<
   | 'agileRobotToolJobInProgress'
   | 'agileRobotToolUnknownTool'
   | 'agileRobotToolUnknownError'
+  | 'meshPreviewNotFound'
+  | 'meshPreviewUnavailable'
 >;
 
 export function getAgileRobotToolTexts(lang: Language): AgileRobotToolTexts {
@@ -33,5 +35,7 @@ export function getAgileRobotToolTexts(lang: Language): AgileRobotToolTexts {
     agileRobotToolJobInProgress: t.agileRobotToolJobInProgress,
     agileRobotToolUnknownTool: t.agileRobotToolUnknownTool,
     agileRobotToolUnknownError: t.agileRobotToolUnknownError,
+    meshPreviewNotFound: t.meshPreviewNotFound,
+    meshPreviewUnavailable: t.meshPreviewUnavailable,
   };
 }

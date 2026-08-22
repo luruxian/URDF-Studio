@@ -1,12 +1,37 @@
-import test, { afterEach } from 'node:test';
+import test, { afterEach, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { JSDOM } from 'jsdom';
+
+import {
+  ROBOTS_MESH_AUTH_STORAGE_KEY,
+  ROBOTS_MESH_URL_STORAGE_KEY,
+  persistMeshAuth,
+} from './meshAuth.ts';
 import { reloadMeshFromUrl, type MeshReloadImportPort } from './meshReload.ts';
+
+const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+  url: 'http://localhost:3000/',
+  pretendToBeVisual: true,
+});
+Object.defineProperty(globalThis, 'sessionStorage', {
+  value: dom.window.sessionStorage,
+  configurable: true,
+});
 
 const originalFetch = globalThis.fetch;
 
+beforeEach(() => {
+  sessionStorage.clear();
+  persistMeshAuth({
+    meshUrl: 'https://api.example.com/api/v1/assets/models/a1',
+    previewToken: 'stored-jwt',
+  });
+});
+
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  sessionStorage.clear();
 });
 
 type FetchCall = { url: string; init?: RequestInit };
@@ -41,19 +66,25 @@ function createImportSpy(): { port: MeshReloadImportPort; imported: File[] } {
   return { port, imported };
 }
 
-test('reloadMeshFromUrl fetches the URL and routes the GLB through the import port', async () => {
+test('reloadMeshFromUrl fetches with stored Bearer auth and routes the GLB', async () => {
   const mockBlob = new Blob(['fake-glb-data'], { type: 'model/gltf-binary' });
   const { calls } = installFetchMock([new Response(mockBlob, { status: 200 })]);
   const { port, imported } = createImportSpy();
+  const previewUrl = 'https://api.example.com/api/v1/assets/models/a1';
 
-  await reloadMeshFromUrl('https://api.example.com/preview?token=x', port, 'abc123.glb');
+  await reloadMeshFromUrl(previewUrl, port, 'abc123.glb');
 
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].url, 'https://api.example.com/preview?token=x');
+  assert.equal(calls[0].url, previewUrl);
+  assert.equal(calls[0].init?.credentials, 'omit');
+  const headers = new Headers(calls[0].init?.headers);
+  assert.equal(headers.get('Authorization'), 'Bearer stored-jwt');
   assert.equal(imported.length, 1, 'expected the GLB to be routed through the import port');
   assert.equal(imported[0]?.name, 'abc123.glb');
   assert.equal(imported[0]?.type, 'model/gltf-binary');
   assert.equal(imported[0]?.size, mockBlob.size);
+  assert.equal(sessionStorage.getItem(ROBOTS_MESH_URL_STORAGE_KEY), previewUrl);
+  assert.equal(sessionStorage.getItem(ROBOTS_MESH_AUTH_STORAGE_KEY), 'stored-jwt');
 });
 
 test('reloadMeshFromUrl falls back to updated_model.glb when filename is omitted', async () => {
@@ -61,9 +92,29 @@ test('reloadMeshFromUrl falls back to updated_model.glb when filename is omitted
   installFetchMock([new Response(mockBlob, { status: 200 })]);
   const { port, imported } = createImportSpy();
 
-  await reloadMeshFromUrl('https://api.example.com/preview?token=x', port);
+  await reloadMeshFromUrl('https://api.example.com/api/v1/assets/models/a1', port);
 
   assert.equal(imported[0]?.name, 'updated_model.glb');
+});
+
+test('reloadMeshFromUrl throws missing_mesh_auth when sessionStorage has no token', async () => {
+  sessionStorage.clear();
+  const { port } = createImportSpy();
+
+  await assert.rejects(
+    () => reloadMeshFromUrl('https://api.example.com/api/v1/assets/models/a1', port),
+    (error: unknown) => error instanceof Error && error.message === 'missing_mesh_auth',
+  );
+});
+
+test('reloadMeshFromUrl throws preview_token_expired on 401', async () => {
+  installFetchMock([new Response(null, { status: 401 })]);
+  const { port } = createImportSpy();
+
+  await assert.rejects(
+    () => reloadMeshFromUrl('https://api.example.com/api/v1/assets/models/a1', port),
+    (error: unknown) => error instanceof Error && error.message === 'preview_token_expired',
+  );
 });
 
 test('reloadMeshFromUrl throws when the response is not ok', async () => {
@@ -72,7 +123,7 @@ test('reloadMeshFromUrl throws when the response is not ok', async () => {
 
   await assert.rejects(
     () => reloadMeshFromUrl('https://api.example.com/bad', port),
-    /Failed to fetch mesh/,
+    /glb_fetch_failed:404/,
   );
 });
 
