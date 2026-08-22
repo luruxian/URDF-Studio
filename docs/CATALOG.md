@@ -19,3 +19,5 @@
 | [update-rules.md](update-rules.md)         | 变更工作流：验收清单、增量命令、测试样本索引、浏览器验证、文档更新映射      | 164 |
 | [robot-canvas-lib.md](robot-canvas-lib.md) | 对外库说明：RobotCanvas API、发布流程、后续拆分建议                         | 85  |
 | [assembly-single-source-refactor.md](assembly-single-source-refactor.md) | Assembly 单一可变模型端到端重构：硬切换边界、阶段与验收                    | 296 |
+| [integrations/urdf-studio.md](integrations/urdf-studio.md) | Studio ↔ robots：GLB 预览、bootstrap、即梦/混元 BFF                         | —   |
+| [integrations/robots-urdf-stl-preview.md](integrations/robots-urdf-stl-preview.md) | 主站预览 URDF+STL：`?import=` + `POST /api/download-asset` 契约           | —   |

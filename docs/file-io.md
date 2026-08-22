@@ -117,8 +117,11 @@ infra（URL 参数解析、BroadcastChannel 已有-tab 认领、并发下载与�
 
 ### 路径 A — assetId 直传（主路径）
 
+robots 主站预览 URDF+STL 时走同一条接收端，调用说明见
+[integrations/robots-urdf-stl-preview.md](integrations/robots-urdf-stl-preview.md)。
+
 ```text
-上游图库构造 URL ?import=<assetId>&from=<gallery_origin> → window.open 新标签页
+上游图库或 robots 主站构造 URL ?import=<assetId>&from=<gallery_origin> → window.open 新标签页
   → useAssetImportFromUrl 检测 URL 参数，立即消费（从 URL 移除）
   → BroadcastChannel 广播 import-request（等待 1s）
     → 已有 Studio tab 回复 import-accepted → 新 tab 关闭 → 已有 tab 执行导入

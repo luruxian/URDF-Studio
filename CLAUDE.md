@@ -274,4 +274,6 @@ node test/usd-viewer/scripts/cleanup-headless.cjs  # 清理自动化残留浏览
 | 测试金字塔 / 命令选择 / 新增测试落点  | [docs/testing.md](docs/testing.md)                   |
 | 验收清单 / 测试样本 / 回归命令        | [docs/update-rules.md](docs/update-rules.md)         |
 | react-robot-canvas 对外库             | [docs/robot-canvas-lib.md](docs/robot-canvas-lib.md) |
+| robots 主站 GLB 预览 / BFF            | [docs/integrations/urdf-studio.md](docs/integrations/urdf-studio.md) |
+| robots 主站 URDF+STL 预览             | [docs/integrations/robots-urdf-stl-preview.md](docs/integrations/robots-urdf-stl-preview.md) |
 | 完整文档索引                          | [docs/CATALOG.md](docs/CATALOG.md)                   |

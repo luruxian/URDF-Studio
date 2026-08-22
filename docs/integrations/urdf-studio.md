@@ -18,6 +18,7 @@
 | 即梦改图 | robots BFF | Studio 只调 BFF；**不要**在 Studio 配火山 AK/SK |
 | 混元 3D | robots BFF | Studio 只调 BFF；**不要**在 Studio 配腾讯密钥 |
 | 读 GLB | robots GET + `preview_token` | 通过 `?mesh=` 传入的绝对 URL |
+| 读 URDF + STL | `?import=` + `POST /api/download-asset` | 多文件包；契约见 [robots-urdf-stl-preview.md](robots-urdf-stl-preview.md) |
 | MinIO / DB | robots 后端 | Studio 永不直连对象存储 |
 
 **一句话**：Studio 管对话与 3D UI；robots 管登录、资产与即梦/混元密钥。
