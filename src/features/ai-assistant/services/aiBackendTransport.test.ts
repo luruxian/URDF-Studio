@@ -8,6 +8,7 @@ import {
   setAiBackendAuthTokenProvider,
   streamAiBackendChat,
 } from './aiBackendTransport.ts';
+import { setAiBackendBaseUrlResolver } from '../../../shared/hostIntegrationState';
 
 const BACKEND_URL = 'https://backend.test/api/ai/urdf-studio';
 
@@ -71,6 +72,23 @@ test('isAiBackendEnabled reflects the backend URL env', async () => {
   await withBackendEnv(() => {
     assert.equal(isAiBackendEnabled(), true);
   });
+});
+
+test('getAiBackendBaseUrl prefers resolver over static env', async () => {
+  setAiBackendBaseUrlResolver(() => 'https://robots.test/api/v1/me/projects/o/studio/ai');
+  process.env.AI_BACKEND_URL = 'https://static.test/ai';
+  try {
+    await withFetch(
+      async () => jsonResponse(200, { success: true, data: { content: 'x' } }),
+      async (requests) => {
+        await requestAiBackendContent('/generate', {});
+        assert.match(requests[0].url, /\/studio\/ai\/generate$/);
+      },
+    );
+  } finally {
+    setAiBackendBaseUrlResolver(null);
+    delete process.env.AI_BACKEND_URL;
+  }
 });
 
 test('requestAiBackendContent posts JSON and returns data.content', async () => {

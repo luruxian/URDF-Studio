@@ -803,6 +803,8 @@ export const zh: TranslationKeys = {
   botWorldImportImporting: '正在导入文件…',
   botWorldImportWaiting: '等待编辑器响应…',
   botWorldImportTitleBlink: '新资产导入 - URDF Studio',
+  robotsHandoffBlockedTitle: '请从 Agile Robot 主站打开',
+  robotsHandoffBlockedBody: '请返回 Agile Robot 主站，点击「预览」进入此工作台。',
   pluginLaunchedTitleBlink: '插件已打开 - URDF Studio',
   appErrorBoundaryTitle: '应用遇到错误',
   appErrorBoundaryMessage: '页面渲染中断。请重新加载；若问题持续，可将下方错误信息反馈给开发团队。',

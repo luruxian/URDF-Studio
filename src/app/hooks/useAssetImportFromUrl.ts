@@ -9,6 +9,7 @@ import {
   stripImportParamsFromUrl,
 } from '@/shared/utils/popupHandoffProtocol';
 import { getRuntimeLanguageTranslations } from '@/shared/i18n';
+import { grantRobotsHandoff } from '@/integrations/agile-robot/handoffGrant';
 import type { AppImportResult } from '../appExtensions';
 import {
   getAssetDownloadAuthToken,
@@ -534,6 +535,10 @@ export function useAssetImportFromUrl(options: UseAssetImportFromUrlOptions) {
 
     const params = readImportParamsFromUrl(window.location.href);
     if (!params) return;
+
+    if (resolveAllowedRemoteImportOrigin(params.fromOrigin)) {
+      grantRobotsHandoff();
+    }
 
     // Clean URL immediately to prevent re-processing
     const nextUrl = stripImportParamsFromUrl(window.location.href);

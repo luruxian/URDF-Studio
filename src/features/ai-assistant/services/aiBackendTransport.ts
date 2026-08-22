@@ -18,6 +18,7 @@
 import {
   getAiBackendAuthToken,
   setAiBackendAuthTokenProvider,
+  resolveAiBackendBaseUrl,
 } from '../../../shared/hostIntegrationState';
 import { resolveAiRuntimeEnv } from './aiRuntimeEnv';
 
@@ -26,6 +27,10 @@ import { resolveAiRuntimeEnv } from './aiRuntimeEnv';
 export { setAiBackendAuthTokenProvider };
 
 export function getAiBackendBaseUrl(): string {
+  const resolved = resolveAiBackendBaseUrl().replace(/\/+$/, '');
+  if (resolved) {
+    return resolved;
+  }
   return resolveAiRuntimeEnv().backendUrl;
 }
 

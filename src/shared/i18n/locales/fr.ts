@@ -853,6 +853,9 @@ export const fr: TranslationKeys = {
   botWorldImportImporting: 'Import des fichiers…',
   botWorldImportWaiting: 'En attente de la réponse de l’éditeur…',
   botWorldImportTitleBlink: 'Nouvel import d’asset - URDF Studio',
+  robotsHandoffBlockedTitle: 'Ouvrir depuis Agile Robot',
+  robotsHandoffBlockedBody:
+    'Retournez sur le site principal Agile Robot et cliquez sur Aperçu pour ouvrir cet espace de travail.',
   pluginLaunchedTitleBlink: 'Plugin lancé - URDF Studio',
   appErrorBoundaryTitle: 'Une erreur est survenue',
   appErrorBoundaryMessage:

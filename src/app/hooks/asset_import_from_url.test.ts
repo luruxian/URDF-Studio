@@ -10,6 +10,7 @@ import {
   resolveAllowedRemoteImportOrigin,
   type FileDownloadInfo,
 } from './useAssetImportFromUrl.ts';
+import { HANDOFF_GRANT_STORAGE_KEY } from '@/integrations/agile-robot/handoffGrant';
 import {
   resolveAssetDownloadEndpoint,
   setAssetDownloadAuthTokenProvider,

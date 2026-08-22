@@ -11,6 +11,7 @@ const defaultAssetDownloadEndpointResolver: AssetDownloadEndpointResolver =
   (remoteImportOrigin) => new URL('/api/download-asset', remoteImportOrigin);
 
 let assetDownloadEndpointResolver = defaultAssetDownloadEndpointResolver;
+let aiBackendBaseUrlResolver: (() => string) | null = null;
 let aiBackendAuthTokenProvider: AiBackendAuthTokenProvider | null = null;
 let assetDownloadAuthTokenProvider: AssetDownloadAuthTokenProvider | null = null;
 
@@ -22,6 +23,14 @@ export function setAssetDownloadEndpointResolver(
 
 export function resolveAssetDownloadEndpoint(remoteImportOrigin: string): URL {
   return assetDownloadEndpointResolver(remoteImportOrigin);
+}
+
+export function setAiBackendBaseUrlResolver(resolver: (() => string) | null): void {
+  aiBackendBaseUrlResolver = resolver;
+}
+
+export function resolveAiBackendBaseUrl(): string {
+  return aiBackendBaseUrlResolver?.() ?? '';
 }
 
 export function setAiBackendAuthTokenProvider(

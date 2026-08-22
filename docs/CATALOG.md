@@ -21,3 +21,5 @@
 | [assembly-single-source-refactor.md](assembly-single-source-refactor.md) | Assembly 单一可变模型端到端重构：硬切换边界、阶段与验收                    | 296 |
 | [integrations/urdf-studio.md](integrations/urdf-studio.md) | Studio ↔ robots：GLB 预览、bootstrap、即梦/混元 BFF                         | —   |
 | [integrations/robots-urdf-stl-preview.md](integrations/robots-urdf-stl-preview.md) | 主站预览 URDF+STL：`?import=` + `POST /api/download-asset` 契约           | —   |
+| [superpowers/specs/2026-08-22-robots-exclusive-studio-mode-b-design.md](superpowers/specs/2026-08-22-robots-exclusive-studio-mode-b-design.md) | robots 专属 Studio + Mode B AI 设计 | —   |
+| [integrations/robots-studio-ai-bff.md](integrations/robots-studio-ai-bff.md) | **主站待实现**：Studio AI 托管 BFF（generate / inspect / chat）           | —   |

@@ -7,6 +7,7 @@
 // ============================================================
 
 import type { RobotsStudioBootstrap } from './types';
+import { grantRobotsHandoff } from './handoffGrant';
 import {
   BOOTSTRAP_HASH_PREFIX,
   BOOTSTRAP_STORAGE_KEY,
@@ -102,6 +103,7 @@ export function storeBootstrap(data: unknown): boolean {
     return false;
   }
   sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(parsed));
+  grantRobotsHandoff();
   return true;
 }
 

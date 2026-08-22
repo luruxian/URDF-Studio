@@ -855,6 +855,9 @@ export const de: TranslationKeys = {
   botWorldImportImporting: 'Dateien werden importiert…',
   botWorldImportWaiting: 'Warten auf Antwort des Editors…',
   botWorldImportTitleBlink: 'Neuer Asset-Import - URDF Studio',
+  robotsHandoffBlockedTitle: 'Über Agile Robot öffnen',
+  robotsHandoffBlockedBody:
+    'Kehren Sie zur Agile-Robot-Hauptseite zurück und klicken Sie auf „Vorschau“, um diesen Arbeitsbereich zu öffnen.',
   pluginLaunchedTitleBlink: 'Plugin gestartet - URDF Studio',
   appErrorBoundaryTitle: 'Etwas ist schiefgelaufen',
   appErrorBoundaryMessage:

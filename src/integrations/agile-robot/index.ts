@@ -26,6 +26,17 @@ export {
   initRobotsStudioBootstrap,
   decodeBootstrapFromHash,
 } from './bootstrap';
+export {
+  grantRobotsHandoff,
+  isHandoffGranted,
+  HANDOFF_GRANT_STORAGE_KEY,
+} from './handoffGrant';
+export {
+  initHandoffGate,
+  isStandaloneAccessAllowed,
+  detectAndGrantHandoffFromUrl,
+} from './handoffGate';
+export { initRobotsAiBackend, resolveRobotsAiBackendBaseUrl } from './robotsAiBackend';
 export type {
   RobotsStudioBootstrap,
   JimengEditRequest,

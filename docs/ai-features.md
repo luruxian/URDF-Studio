@@ -41,6 +41,18 @@ VITE_AI_BACKEND_URL=/api/ai/urdf-studio
 - 服务端提示词模板是本仓 `config/aiPromptTemplates.generated.ts` 的镜像（BotPilot
   `workflows/urdf_studio/prompt_templates.py`）；改模板时两侧一起更新。
 
+**robots 产品线 Mode B（推荐）** —— Studio 仅从 robots 主站 handoff 进入，AI 走 robots BFF，
+浏览器不持有 LLM 密钥；`studio_token` 与即梦/混元共用：
+
+```env
+VITE_ROBOTS_API_BASE_URL=https://api.enkeebot.com/api/v1
+```
+
+- 运行时 URL：`{VITE_ROBOTS_API_BASE_URL}/me/projects/{order_id}/studio/ai/{generate|inspect|chat}`
+- `order_id` 与 `studio_token` 来自 bootstrap（`#robots-bootstrap=` / postMessage）
+- 无 bootstrap 时 AI 不可用（3D 预览仍可加载）
+- 入口门禁见 [integrations/urdf-studio.md](integrations/urdf-studio.md)；本地开发可设 `VITE_ALLOW_STANDALONE=1`
+
 ## 2. 审阅标准输入
 
 - `src/features/ai-assistant/config/urdf_inspect_standard_en.md`

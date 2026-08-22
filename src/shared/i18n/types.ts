@@ -763,6 +763,8 @@ export interface TranslationKeys extends TranslationWorkflowKeys {
   botWorldImportImporting: string;
   botWorldImportWaiting: string;
   botWorldImportTitleBlink: string;
+  robotsHandoffBlockedTitle: string;
+  robotsHandoffBlockedBody: string;
   pluginLaunchedTitleBlink: string;
   appErrorBoundaryTitle: string;
   appErrorBoundaryMessage: string;

@@ -5,6 +5,7 @@
 - **契约来源**：[`docs/superpowers/specs/2026-08-08-studio-jimeng-hunyuan-bff-design.md`](../superpowers/specs/2026-08-08-studio-jimeng-hunyuan-bff-design.md)
 - **robots 实现计划**：[`docs/superpowers/plans/2026-08-08-studio-jimeng-hunyuan-bff.md`](../superpowers/plans/2026-08-08-studio-jimeng-hunyuan-bff.md)
 - **状态**：robots 侧 BFF 按该 plan 落地；本文档定义 Studio 侧应对齐的接口与行为
+- **Studio AI BFF（主站待实现）**：[robots-studio-ai-bff.md](robots-studio-ai-bff.md)
 
 ---
 
@@ -14,14 +15,20 @@
 |------|--------|------|
 | 用户登录 | robots 主站 | Cookie 会话 `ar_session`；Studio **不**做登录 |
 | 打开工作台 | robots「我的项目 → **预览**」 | **没有**单独的「编辑」按钮；预览即入口 |
-| AI 对话 | **URDF-Studio 内部** | 用 Studio 自有 LLM（`OPENAI_*` 等）；**不要**调 robots `/agent/chat` |
+| AI 生成 / 审阅 / 对话 | **robots BFF**（待主站实现） | Studio POST `.../studio/ai/*`，Bearer `studio_token`；契约见 [robots-studio-ai-bff.md](robots-studio-ai-bff.md)；**不要**调 `/agent/chat` |
 | 即梦改图 | robots BFF | Studio 只调 BFF；**不要**在 Studio 配火山 AK/SK |
 | 混元 3D | robots BFF | Studio 只调 BFF；**不要**在 Studio 配腾讯密钥 |
 | 读 GLB | robots GET + `preview_token` | 通过 `?mesh=` 传入的绝对 URL |
 | 读 URDF + STL | `?import=` + `POST /api/download-asset` | 多文件包；契约见 [robots-urdf-stl-preview.md](robots-urdf-stl-preview.md) |
 | MinIO / DB | robots 后端 | Studio 永不直连对象存储 |
 
-**一句话**：Studio 管对话与 3D UI；robots 管登录、资产与即梦/混元密钥。
+**一句话**：Studio 管 3D UI 与 AI 编排；robots 管登录、LLM 密钥、资产与即梦/混元 BFF。
+
+### 1.1 入口门禁（robots 产品线）
+
+生产构建下 Studio **不可**单独打开。合法进入：`?mesh=`、`?import=`+`from=`、`#robots-bootstrap=` 或 `postMessage` bootstrap。刷新后靠 `sessionStorage` 标记 `robots_handoff_granted` 放行。
+
+开发豁免：`VITE_ALLOW_STANDALONE=1`（本地 `.env`）或 `?regressionDebug=1`。Spec：[2026-08-22-robots-exclusive-studio-mode-b-design.md](../superpowers/specs/2026-08-22-robots-exclusive-studio-mode-b-design.md)
 
 ---
 
@@ -253,7 +260,7 @@ src/integrations/agile-robot/
 - [ ] job `done` → 用新 `preview_url` 重载 mesh
 - [ ] token 过期 UI：提示「请回到 Agile Robot 主站重新点击预览」
 - [ ] **不要**在 Studio 配置即梦 / 混元云厂商密钥（订单流水线）
-- [ ] Studio 自有 `OPENAI_*` 仅用于对话 UI（可选）
+- [ ] 配置 `VITE_ROBOTS_API_BASE_URL`；AI 对话走 BFF（见 [robots-studio-ai-bff.md](robots-studio-ai-bff.md)）
 
 ### AI 工具伪代码
 

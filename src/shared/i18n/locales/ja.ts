@@ -839,6 +839,9 @@ export const ja: TranslationKeys = {
   botWorldImportImporting: 'ファイルをインポート中…',
   botWorldImportWaiting: 'エディターの応答を待機中…',
   botWorldImportTitleBlink: '新しいアセットのインポート - URDF Studio',
+  robotsHandoffBlockedTitle: 'Agile Robot から開いてください',
+  robotsHandoffBlockedBody:
+    'Agile Robot のメインサイトに戻り、「プレビュー」をクリックしてこのワークスペースを開いてください。',
   pluginLaunchedTitleBlink: 'プラグインを起動しました - URDF Studio',
   appErrorBoundaryTitle: '問題が発生しました',
   appErrorBoundaryMessage:

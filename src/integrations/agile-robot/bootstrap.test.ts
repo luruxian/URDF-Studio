@@ -18,6 +18,7 @@ import {
   BOOTSTRAP_STORAGE_KEY,
   MESSAGE_TYPE,
 } from './constants.ts';
+import { HANDOFF_GRANT_STORAGE_KEY } from './handoffGrant.ts';
 
 const validBootstrap = {
   studio_token: 'test-token',
@@ -112,6 +113,11 @@ test('storeBootstrap rejects non-object payloads', () => {
   assert.equal(storeBootstrap('token'), false);
   assert.equal(storeBootstrap(42), false);
   assert.equal(hasBootstrap(), false);
+});
+
+test('storeBootstrap grants robots handoff', () => {
+  assert.equal(storeBootstrap(validBootstrap), true);
+  assert.equal(sessionStorage.getItem(HANDOFF_GRANT_STORAGE_KEY), '1');
 });
 
 test('handleBootstrapMessage stores bootstrap from an allowed origin', () => {

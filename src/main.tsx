@@ -2,12 +2,19 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from '@/app';
 import { AppErrorBoundary } from '@/app/components/AppErrorBoundary';
+import { RobotsHandoffGate } from '@/app/components/RobotsHandoffGate';
 import { useUIStore } from '@/store';
 import {
   getInitialLanguageFromUrl,
   hideSeoLanguagePathFromUserUrl,
 } from '@/app/utils/initialLanguage';
-import { initRobotsStudioBootstrap, parseMeshDeepLink, persistMeshAuth } from '@/integrations/agile-robot';
+import {
+  initHandoffGate,
+  initRobotsAiBackend,
+  initRobotsStudioBootstrap,
+  parseMeshDeepLink,
+  persistMeshAuth,
+} from '@/integrations/agile-robot';
 import { getRuntimeLanguageTranslations } from '@/shared/i18n';
 import '@/styles/index.css';
 
@@ -18,7 +25,10 @@ const meshDeepLink = parseMeshDeepLink(window.location.search);
 if (meshDeepLink) {
   persistMeshAuth(meshDeepLink);
 }
+
+const handoff = initHandoffGate();
 initRobotsStudioBootstrap();
+initRobotsAiBackend();
 
 // ponytail: 全局安全网 —— React 渲染期之外的错误（未 await 的 Promise reject、
 // 同步抛出）在生产默认会被静默吞掉。这里落完整日志，让崩溃可诊断。
@@ -62,7 +72,9 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <AppErrorBoundary>
-      <App />
+      <RobotsHandoffGate initialBlocked={handoff.blocked}>
+        <App />
+      </RobotsHandoffGate>
     </AppErrorBoundary>
   </React.StrictMode>,
 );
