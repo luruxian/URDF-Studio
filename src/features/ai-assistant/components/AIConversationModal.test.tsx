@@ -4,15 +4,20 @@ import test from 'node:test';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { JSDOM } from 'jsdom';
-import OpenAI from 'openai';
 
 import { createSingleComponentWorkspace } from '@/core/robot';
 import { __setAgentOpenAIClientFactoryForTests } from '../services/aiAgent';
+import {
+  __setConversationTurnStreamForTests,
+  type ConversationToolCall,
+} from '../services/conversationService';
+import { setAiBackendBaseUrlResolver } from '@/shared/hostIntegrationState';
 import { DEFAULT_MANAGED_WINDOW_ORDER, useSelectionStore, useUIStore, useWorkspaceStore } from '@/store';
 import { GeometryType, JointType, type RobotState } from '@/types';
 import type { AIConversationToolsConfig, ParsedToolCall } from '@/integrations/agile-robot/types';
 import type { AIConversationLaunchContext } from '../types';
-import { buildConversationPromptSuggestions } from '../utils/conversationPromptSuggestions';
+
+const TEST_CONVERSATION_MESSAGE = '请帮我检查这个机器人结构是否合理';
 
 function installDom() {
   const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
@@ -158,43 +163,26 @@ const clickButton = async (button: HTMLButtonElement) => {
   });
 };
 
-const API_KEY_ENV_NAMES = ['API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY'] as const;
+const ROBOTS_API_BASE = 'https://api.example.com/api/v1';
+const ROBOTS_AI_BACKEND = `${ROBOTS_API_BASE}/me/projects/ord-9/studio/ai`;
 
-const captureApiKeyEnv = (): Record<(typeof API_KEY_ENV_NAMES)[number], string | undefined> => ({
-  API_KEY: process.env.API_KEY,
-  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
-});
+interface RobotsConversationEnvSnapshot {
+  previousRobotsBase?: string;
+}
 
-const restoreApiKeyEnv = (
-  snapshot: Record<(typeof API_KEY_ENV_NAMES)[number], string | undefined>,
-) => {
-  for (const envName of API_KEY_ENV_NAMES) {
-    const value = snapshot[envName];
-    if (value === undefined) {
-      delete process.env[envName];
-    } else {
-      process.env[envName] = value;
-    }
-  }
+const setRobotsConversationEnv = (): RobotsConversationEnvSnapshot => {
+  const previousRobotsBase = process.env.VITE_ROBOTS_API_BASE_URL;
+  process.env.VITE_ROBOTS_API_BASE_URL = ROBOTS_API_BASE;
+  setAiBackendBaseUrlResolver(() => ROBOTS_AI_BACKEND);
+  return { previousRobotsBase };
 };
 
-const setDirectAiEnv = () => {
-  const apiKeySnapshot = captureApiKeyEnv();
-  const previousBackendUrl = process.env.AI_BACKEND_URL;
-  delete process.env.API_KEY;
-  process.env.OPENAI_API_KEY = 'test-openai-key';
-  delete process.env.GEMINI_API_KEY;
-  delete process.env.AI_BACKEND_URL;
-  return { apiKeySnapshot, previousBackendUrl };
-};
-
-const restoreDirectAiEnv = (env: ReturnType<typeof setDirectAiEnv>) => {
-  restoreApiKeyEnv(env.apiKeySnapshot);
-  if (env.previousBackendUrl === undefined) {
-    delete process.env.AI_BACKEND_URL;
+const restoreRobotsConversationEnv = (snapshot: RobotsConversationEnvSnapshot) => {
+  setAiBackendBaseUrlResolver(null);
+  if (snapshot.previousRobotsBase === undefined) {
+    delete process.env.VITE_ROBOTS_API_BASE_URL;
   } else {
-    process.env.AI_BACKEND_URL = env.previousBackendUrl;
+    process.env.VITE_ROBOTS_API_BASE_URL = snapshot.previousRobotsBase;
   }
 };
 
@@ -221,73 +209,64 @@ const createToolsConfig = (
   ...overrides,
 });
 
-const TOOL_CALL_STREAM_CHUNKS: Array<Record<string, unknown>> = [
+const TOOL_CALL: ConversationToolCall[] = [
   {
-    choices: [
-      {
-        delta: {
-          tool_calls: [
-            { index: 0, id: 'call_1', function: { name: 'edit_appearance' } },
-          ],
-        },
-      },
-    ],
+    function: {
+      name: 'edit_appearance',
+      arguments: '{"prompt":"把机身改成橙色"}',
+    },
   },
-  {
-    choices: [
-      {
-        delta: { tool_calls: [{ index: 0, function: { arguments: '{"prompt":"把机身改成橙色"}' } }] },
-      },
-    ],
-  },
-  { choices: [{ finish_reason: 'tool_calls' }] },
 ];
 
-const PLAIN_REPLY_CHUNKS: Array<Record<string, unknown>> = [
-  { choices: [{ delta: { content: '好的，已为你处理' } }] },
-  { choices: [{ finish_reason: 'stop' }] },
-];
-
-const installOpenAICreateMockSequence = (sequence: Array<Array<Record<string, unknown>>>) => {
-  const originalCreate = OpenAI.Chat.Completions.prototype.create;
+const installConversationToolStreamMock = (toolCalls: ConversationToolCall[]) => {
   let capturedTools: unknown;
-  let index = 0;
-
-  OpenAI.Chat.Completions.prototype.create = async function mockCreate(
-    this: unknown,
-    params: { tools?: unknown },
-  ) {
-    capturedTools = params.tools;
-    const chunks = sequence[index] ?? [];
-    index += 1;
-    return {
-      async *[Symbol.asyncIterator]() {
-        for (const chunk of chunks) {
-          yield chunk;
-        }
-      },
-    } as AsyncIterable<unknown>;
-  } as unknown as typeof OpenAI.Chat.Completions.prototype.create;
-
+  __setConversationTurnStreamForTests(async (input) => {
+    capturedTools = input.tools;
+    input.onToolCalls?.(toolCalls);
+    return { reply: '', error: null, status: 'completed' };
+  });
   return {
     capturedTools: () => capturedTools,
     restore: () => {
-      OpenAI.Chat.Completions.prototype.create = originalCreate;
+      __setConversationTurnStreamForTests(null);
     },
   };
 };
 
-const installOpenAICreateMock = (chunks: Array<Record<string, unknown>>) =>
-  installOpenAICreateMockSequence([chunks]);
+const installConversationStreamMockSequence = (
+  sequence: Array<{ toolCalls?: ConversationToolCall[]; reply?: string }>,
+) => {
+  let capturedTools: unknown;
+  let index = 0;
+  __setConversationTurnStreamForTests(async (input) => {
+    capturedTools = input.tools;
+    const step = sequence[index] ?? { reply: '' };
+    index += 1;
+    if (step.toolCalls?.length) {
+      input.onToolCalls?.(step.toolCalls);
+      return { reply: '', error: null, status: 'completed' };
+    }
+    return { reply: step.reply ?? '', error: null, status: 'completed' };
+  });
+  return {
+    capturedTools: () => capturedTools,
+    restore: () => {
+      __setConversationTurnStreamForTests(null);
+    },
+  };
+};
 
 const sendFirstPrompt = async (container: ParentNode) => {
-  const [firstPrompt] = buildConversationPromptSuggestions({
-    lang: 'zh',
-    isReportFollowup: false,
-    selectedEntityName: null,
+  await typeAndSend(container, TEST_CONVERSATION_MESSAGE);
+};
+
+const findSendButton = (scope: ParentNode): HTMLButtonElement => {
+  const match = Array.from(scope.querySelectorAll('button')).find((button) => {
+    const label = button.textContent?.trim() ?? '';
+    return label.includes('发送') || label.includes('Ask AI');
   });
-  assert.ok(firstPrompt, 'expected at least one prompt suggestion');
-  await clickButton(findButtonByText(container, firstPrompt));
+  assert.ok(match, 'expected send button to render');
+  return match as HTMLButtonElement;
 };
 
 const typeAndSend = async (container: ParentNode, text: string) => {
@@ -314,8 +293,49 @@ const typeAndSend = async (container: ParentNode, text: string) => {
       }) => void
     )({ target: textarea, currentTarget: textarea });
   });
-  await clickButton(findButtonByText(container, '发送'));
+  await clickButton(findSendButton(container));
 };
+
+test('AIConversationModal opens anchored to the bottom-right corner by default', async () => {
+  const previousApiKey = process.env.API_KEY;
+  process.env.API_KEY = '';
+  const dom = installDom();
+  Object.defineProperty(dom.window, 'innerWidth', { value: 1280, writable: true });
+  Object.defineProperty(dom.window, 'innerHeight', { value: 800, writable: true });
+  const container = dom.window.document.getElementById('root');
+  assert.ok(container, 'root container should exist');
+
+  const { AIConversationModal } = await import('./AIConversationModal.tsx');
+  const root = createRoot(container);
+
+  try {
+    await act(async () => {
+      root.render(
+        <AIConversationModal
+          isOpen
+          onClose={() => {}}
+          lang="en"
+          launchContext={createLaunchContext()}
+          onStartNewConversation={() => {}}
+          onApply={() => true}
+        />,
+      );
+    });
+
+    const windowRoot = Array.from(container.querySelectorAll<HTMLDivElement>('div')).find(
+      (element) => element.style.position === 'fixed' && element.style.width === '760px',
+    );
+    assert.ok(windowRoot, 'conversation window should render with fixed positioning');
+    assert.equal(windowRoot.style.left, '496px');
+    assert.equal(windowRoot.style.top, '156px');
+  } finally {
+    await act(async () => {
+      root.unmount();
+    });
+    process.env.API_KEY = previousApiKey;
+    dom.window.close();
+  }
+});
 
 test('AIConversationModal opens at the front and remains front when activated', async () => {
   const previousApiKey = process.env.API_KEY;
@@ -412,10 +432,7 @@ test('compact conversation layout fits the viewport and keeps content scrollable
     );
     assert.ok(scrollViewport, 'expected a dedicated conversation scroll viewport');
     assert.equal(scrollViewport.className.includes('overflow-y-auto'), true);
-
-    const emptyState = scrollViewport.firstElementChild as HTMLElement | null;
-    assert.ok(emptyState, 'expected the prompt suggestions to render');
-    assert.equal(emptyState.className.includes('justify-start'), true);
+    assert.equal(scrollViewport.childElementCount, 0, 'empty conversation should not render example prompts');
 
     const textarea = getTextarea(container);
     assert.equal(textarea.className.includes('min-h-[64px]'), true);
@@ -462,16 +479,10 @@ test('new conversation requires confirmation, preserves history, and inserts a d
     });
     await flush();
 
-    const [firstMessage] = buildConversationPromptSuggestions({
-      lang: 'zh',
-      isReportFollowup: false,
-      selectedEntityName: null,
-    });
-    assert.ok(firstMessage, 'expected at least one prompt suggestion');
-    await clickButton(findButtonByText(container, firstMessage));
+    await typeAndSend(container, TEST_CONVERSATION_MESSAGE);
     await flush();
 
-    assert.equal(container.textContent?.includes(firstMessage), true);
+    assert.equal(container.textContent?.includes(TEST_CONVERSATION_MESSAGE), true);
     assert.equal(getCopyButtons(container).length > 0, true);
 
     await clickButton(findButtonByText(container, '新开对话'));
@@ -488,7 +499,7 @@ test('new conversation requires confirmation, preserves history, and inserts a d
     assert.equal(onStartNewConversationCalls.length, 1);
     assert.equal(onStartNewConversationCalls[0], launchContext);
     assert.equal(getTextarea(container).value, '');
-    assert.equal(container.textContent?.includes(firstMessage), true);
+    assert.equal(container.textContent?.includes(TEST_CONVERSATION_MESSAGE), true);
     assert.equal(container.textContent?.includes('新对话从这里开始'), true);
     assert.equal(getCopyButtons(container).length > 0, true);
   } finally {
@@ -533,16 +544,10 @@ test('clear history requires confirmation and removes prior messages after reset
     });
     await flush();
 
-    const [sentMessage] = buildConversationPromptSuggestions({
-      lang: 'zh',
-      isReportFollowup: false,
-      selectedEntityName: null,
-    });
-    assert.ok(sentMessage, 'expected at least one prompt suggestion');
-    await clickButton(findButtonByText(container, sentMessage));
+    await typeAndSend(container, TEST_CONVERSATION_MESSAGE);
     await flush();
 
-    assert.equal(container.textContent?.includes(sentMessage), true);
+    assert.equal(container.textContent?.includes(TEST_CONVERSATION_MESSAGE), true);
     assert.equal(getCopyButtons(container).length > 0, true);
 
     await clickButton(findButtonByText(container, '清除历史'));
@@ -575,15 +580,10 @@ test('clear history requires confirmation and removes prior messages after reset
   }
 });
 
-test('missing API key surfaces a real assistant reply instead of a banner', async () => {
-  const envSnapshot = {
-    API_KEY: process.env.API_KEY,
-    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
-  };
-  delete process.env.API_KEY;
-  delete process.env.OPENAI_API_KEY;
-  delete process.env.GEMINI_API_KEY;
+test('robots handoff required surfaces a real assistant reply instead of a banner', async () => {
+  const previousRobotsBase = process.env.VITE_ROBOTS_API_BASE_URL;
+  delete process.env.VITE_ROBOTS_API_BASE_URL;
+  setAiBackendBaseUrlResolver(null);
   const dom = installDom();
   const container = dom.window.document.getElementById('root');
   assert.ok(container, 'root container should exist');
@@ -606,40 +606,20 @@ test('missing API key surfaces a real assistant reply instead of a banner', asyn
     });
     await flush();
 
-    const [firstPrompt] = buildConversationPromptSuggestions({
-      lang: 'zh',
-      isReportFollowup: false,
-      selectedEntityName: null,
-    });
-    assert.ok(firstPrompt, 'expected at least one prompt suggestion');
-
-    await clickButton(findButtonByText(container, firstPrompt));
+    await typeAndSend(container, TEST_CONVERSATION_MESSAGE);
     await flush();
 
-    // Agent (no key) throws -> falls back to generateRobotFromPrompt, which returns
-    // the apiKeyMissing advice as a real assistant message (no danger banner).
-    assert.equal(container.textContent?.includes(firstPrompt), true);
-    assert.match(container.textContent || '', /API Key/i);
+    assert.equal(container.textContent?.includes(TEST_CONVERSATION_MESSAGE), true);
+    assert.match(container.textContent || '', /Agile Robot|主站/);
     assert.equal(container.textContent?.includes('对话服务错误：'), false);
     assert.equal(getCopyButtons(container).length, 2);
     assert.equal(findButtonByText(container, '重新生成').textContent?.includes('重新生成'), true);
   } finally {
-    if (envSnapshot.API_KEY === undefined) {
-      delete process.env.API_KEY;
+    setAiBackendBaseUrlResolver(null);
+    if (previousRobotsBase === undefined) {
+      delete process.env.VITE_ROBOTS_API_BASE_URL;
     } else {
-      process.env.API_KEY = envSnapshot.API_KEY;
-    }
-
-    if (envSnapshot.OPENAI_API_KEY === undefined) {
-      delete process.env.OPENAI_API_KEY;
-    } else {
-      process.env.OPENAI_API_KEY = envSnapshot.OPENAI_API_KEY;
-    }
-
-    if (envSnapshot.GEMINI_API_KEY === undefined) {
-      delete process.env.GEMINI_API_KEY;
-    } else {
-      process.env.GEMINI_API_KEY = envSnapshot.GEMINI_API_KEY;
+      process.env.VITE_ROBOTS_API_BASE_URL = previousRobotsBase;
     }
 
     await act(async () => {
@@ -687,7 +667,7 @@ test('transparent AI conversation backdrop does not intercept pointer events', a
   }
 });
 
-test('suggested prompts expose hover and focus border highlight styles', async () => {
+test('header actions expose hover and focus border highlight styles', async () => {
   const dom = installDom();
   const container = dom.window.document.getElementById('root');
   assert.ok(container, 'root container should exist');
@@ -710,20 +690,7 @@ test('suggested prompts expose hover and focus border highlight styles', async (
     });
     await flush();
 
-    const [firstPrompt] = buildConversationPromptSuggestions({
-      lang: 'zh',
-      isReportFollowup: false,
-      selectedEntityName: null,
-    });
-    assert.ok(firstPrompt, 'expected at least one prompt suggestion');
-
-    const promptButton = findButtonByText(container, firstPrompt);
     const newConversationButton = findButtonByText(container, '新开对话');
-    const promptLabel = Array.from(promptButton.querySelectorAll('span')).find(
-      (span) =>
-        span.className.includes('group-hover:text-text-primary') &&
-        span.textContent?.trim().includes(firstPrompt),
-    );
 
     assert.equal(
       newConversationButton.className.includes('hover:border-system-blue/35'),
@@ -745,32 +712,6 @@ test('suggested prompts expose hover and focus border highlight styles', async (
       true,
       'new conversation button should preserve label and icon emphasis on keyboard focus',
     );
-    assert.equal(
-      promptButton.className.includes('hover:border-system-blue/35'),
-      true,
-      'suggested prompt should highlight its border on hover',
-    );
-    assert.equal(
-      promptButton.className.includes('focus:border-system-blue/35'),
-      true,
-      'suggested prompt should preserve border emphasis on keyboard focus',
-    );
-    assert.equal(
-      promptButton.className.includes('hover:-translate-y-0.5'),
-      true,
-      'suggested prompt should feel more interactive on hover',
-    );
-    assert.ok(promptLabel, 'expected suggested prompt label to render');
-    assert.equal(
-      promptLabel.className.includes('group-hover:text-text-primary'),
-      true,
-      'suggested prompt label should highlight together with the card on hover',
-    );
-    assert.equal(
-      promptLabel.className.includes('group-focus-visible:text-text-primary'),
-      true,
-      'suggested prompt label should stay emphasized for keyboard focus',
-    );
   } finally {
     await act(async () => {
       root.unmount();
@@ -782,6 +723,7 @@ test('suggested prompts expose hover and focus border highlight styles', async (
 test('agent receives the live (post-launch) robot context', async () => {
   const previousApiKey = process.env.API_KEY;
   process.env.API_KEY = 'test-key';
+  const robotsEnv = setRobotsConversationEnv();
 
   const capturedSystemPrompts: string[] = [];
   const mockOpenAiClient = {
@@ -861,13 +803,7 @@ test('agent receives the live (post-launch) robot context', async () => {
       childLinkId: 'tool_link',
     };
 
-    const [prompt] = buildConversationPromptSuggestions({
-      lang: 'en',
-      isReportFollowup: false,
-      selectedEntityName: null,
-    });
-    assert.ok(prompt, 'expected at least one suggested prompt');
-    await clickButton(findButtonByText(container, prompt));
+    await typeAndSend(container, 'List the current links');
     await flush();
 
     // The agent re-resolves the live workspace robot at submit time, so its
@@ -894,6 +830,7 @@ test('agent receives the live (post-launch) robot context', async () => {
     useWorkspaceStore.setState(initialWorkspaceState);
     useSelectionStore.setState(initialSelectionState);
     __setAgentOpenAIClientFactoryForTests(null);
+    restoreRobotsConversationEnv(robotsEnv);
     if (previousApiKey === undefined) {
       delete process.env.API_KEY;
     } else {
@@ -909,6 +846,7 @@ test('agent receives the live (post-launch) robot context', async () => {
 test('Auto-apply permission applies the agent edit directly without a confirmation card', async () => {
   const previousApiKey = process.env.API_KEY;
   process.env.API_KEY = 'test-key';
+  const robotsEnv = setRobotsConversationEnv();
 
   let callIndex = 0;
   const mockOpenAiClient = {
@@ -1001,13 +939,7 @@ test('Auto-apply permission applies the agent edit directly without a confirmati
     });
     await flush();
 
-    const [prompt] = buildConversationPromptSuggestions({
-      lang: 'en',
-      isReportFollowup: false,
-      selectedEntityName: null,
-    });
-    assert.ok(prompt, 'expected at least one suggested prompt');
-    await clickButton(findButtonByText(container, prompt));
+    await typeAndSend(container, 'List the current links');
     await flush();
 
     assert.equal(onApplyCalls.length, 1, 'Auto mode must call onApply directly');
@@ -1028,6 +960,7 @@ test('Auto-apply permission applies the agent edit directly without a confirmati
     useWorkspaceStore.setState(initialWorkspaceState);
     useSelectionStore.setState(initialSelectionState);
     __setAgentOpenAIClientFactoryForTests(null);
+    restoreRobotsConversationEnv(robotsEnv);
     if (previousApiKey === undefined) {
       delete process.env.API_KEY;
     } else {
@@ -1041,8 +974,8 @@ test('Auto-apply permission applies the agent edit directly without a confirmati
 });
 
 test('toolsConfig passes tools to the stream and renders a confirmation banner', async () => {
-  const directEnv = setDirectAiEnv();
-  const openaiMock = installOpenAICreateMock(TOOL_CALL_STREAM_CHUNKS);
+  const robotsEnv = setRobotsConversationEnv();
+  const streamMock = installConversationToolStreamMock(TOOL_CALL);
   const toolsConfig = createToolsConfig();
   const dom = installDom();
   const container = dom.window.document.getElementById('root');
@@ -1069,21 +1002,21 @@ test('toolsConfig passes tools to the stream and renders a confirmation banner',
     await flush();
     await flush();
 
-    assert.deepEqual(openaiMock.capturedTools(), toolsConfig.tools);
+    assert.deepEqual(streamMock.capturedTools(), toolsConfig.tools);
     assert.equal(container.textContent?.includes('将机身改成橙色'), true);
     findButtonByText(container, '确认');
     findButtonByText(container, '取消');
   } finally {
-    openaiMock.restore();
-    restoreDirectAiEnv(directEnv);
+    streamMock.restore();
+    restoreRobotsConversationEnv(robotsEnv);
     await act(async () => root.unmount());
     dom.window.close();
   }
 });
 
 test('confirm executes the Agile Robot tool and renders its result', async () => {
-  const directEnv = setDirectAiEnv();
-  const openaiMock = installOpenAICreateMock(TOOL_CALL_STREAM_CHUNKS);
+  const robotsEnv = setRobotsConversationEnv();
+  const streamMock = installConversationToolStreamMock(TOOL_CALL);
   const executedCalls: ParsedToolCall[] = [];
   const toolsConfig = createToolsConfig({
     onExecute: async (call) => {
@@ -1123,16 +1056,16 @@ test('confirm executes the Agile Robot tool and renders its result', async () =>
     assert.equal(container.textContent?.includes('改图任务已提交'), true);
     assert.equal(container.textContent?.includes('将机身改成橙色'), false);
   } finally {
-    openaiMock.restore();
-    restoreDirectAiEnv(directEnv);
+    streamMock.restore();
+    restoreRobotsConversationEnv(robotsEnv);
     await act(async () => root.unmount());
     dom.window.close();
   }
 });
 
 test('cancel dismisses the tool banner and records the cancellation', async () => {
-  const directEnv = setDirectAiEnv();
-  const openaiMock = installOpenAICreateMock(TOOL_CALL_STREAM_CHUNKS);
+  const robotsEnv = setRobotsConversationEnv();
+  const streamMock = installConversationToolStreamMock(TOOL_CALL);
   const dom = installDom();
   const container = dom.window.document.getElementById('root');
   assert.ok(container, 'root container should exist');
@@ -1164,16 +1097,16 @@ test('cancel dismisses the tool banner and records the cancellation', async () =
     assert.equal(container.textContent?.includes('将机身改成橙色'), false);
     assert.equal(container.textContent?.includes('确认'), false);
   } finally {
-    openaiMock.restore();
-    restoreDirectAiEnv(directEnv);
+    streamMock.restore();
+    restoreRobotsConversationEnv(robotsEnv);
     await act(async () => root.unmount());
     dom.window.close();
   }
 });
 
 test('successful tool banner auto-dismisses after three seconds', async () => {
-  const directEnv = setDirectAiEnv();
-  const openaiMock = installOpenAICreateMock(TOOL_CALL_STREAM_CHUNKS);
+  const robotsEnv = setRobotsConversationEnv();
+  const streamMock = installConversationToolStreamMock(TOOL_CALL);
   const dom = installDom();
   const container = dom.window.document.getElementById('root');
   assert.ok(container, 'root container should exist');
@@ -1208,18 +1141,18 @@ test('successful tool banner auto-dismisses after three seconds', async () => {
     await flush();
     assert.equal(container.textContent?.includes('改图任务已提交'), false);
   } finally {
-    openaiMock.restore();
-    restoreDirectAiEnv(directEnv);
+    streamMock.restore();
+    restoreRobotsConversationEnv(robotsEnv);
     await act(async () => root.unmount());
     dom.window.close();
   }
 });
 
 test('starting a new send clears a stale tool confirmation banner', async () => {
-  const directEnv = setDirectAiEnv();
-  const openaiMock = installOpenAICreateMockSequence([
-    TOOL_CALL_STREAM_CHUNKS,
-    PLAIN_REPLY_CHUNKS,
+  const robotsEnv = setRobotsConversationEnv();
+  const streamMock = installConversationStreamMockSequence([
+    { toolCalls: TOOL_CALL },
+    { reply: '好的，已为你处理' },
   ]);
   const dom = installDom();
   const container = dom.window.document.getElementById('root');
@@ -1255,8 +1188,8 @@ test('starting a new send clears a stale tool confirmation banner', async () => 
     assert.equal(container.textContent?.includes('改图任务已提交'), false);
     assert.equal(container.textContent?.includes('确认'), false);
   } finally {
-    openaiMock.restore();
-    restoreDirectAiEnv(directEnv);
+    streamMock.restore();
+    restoreRobotsConversationEnv(robotsEnv);
     await act(async () => root.unmount());
     dom.window.close();
   }

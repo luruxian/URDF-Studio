@@ -111,7 +111,12 @@ export interface AIConversationLaunchContext {
 }
 
 export interface AIConversationTurnError {
-  code: 'empty_user_message' | 'missing_api_key' | 'empty_response' | 'request_failed';
+  code:
+    | 'empty_user_message'
+    | 'robots_handoff_required'
+    | 'missing_api_key'
+    | 'empty_response'
+    | 'request_failed';
   message: string;
 }
 

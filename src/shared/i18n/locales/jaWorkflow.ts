@@ -204,6 +204,8 @@ export const jaWorkflow: TranslationWorkflowKeys = {
   reportChatNoReply: '申し訳ありません。応答を生成できませんでした。',
   reportChatSendError: 'メッセージの送信に失敗しました。もう一度お試しください。',
   apiKeyMissing: 'API Key が設定されていません。環境設定を確認してください。',
+  aiConversationRobotsHandoffRequired:
+    'AI チャットを利用するには、Agile Robot 本サイトから Studio を開いてください。',
   aiLoginRequired: 'AI アシスタントを利用するには、先にログインしてください。',
   apiReturnedEmptyContent: 'API から空の応答が返されました。もう一度お試しください。',
   rawResponse: '生の応答',

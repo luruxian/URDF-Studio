@@ -325,7 +325,7 @@ const defaultPanels: PanelsState = {
 
 const defaultSidebar: SidebarState = {
   leftCollapsed: false,
-  rightCollapsed: false,
+  rightCollapsed: true,
 };
 
 const defaultPanelLayout: PanelLayoutState = {
@@ -393,17 +393,6 @@ const getSavedTheme = (): Theme => {
     }
   }
   return 'system';
-};
-
-// Get saved sidebar state
-const getSavedSidebar = (): SidebarState => {
-  if (typeof window !== 'undefined') {
-    return {
-      leftCollapsed: localStorage.getItem('leftSidebarCollapsed') === 'true',
-      rightCollapsed: localStorage.getItem('rightSidebarCollapsed') === 'true',
-    };
-  }
-  return defaultSidebar;
 };
 
 // Helper to apply font size (affects text size via CSS variable)
@@ -526,7 +515,7 @@ export const useUIStore = create<UIState>()(
         })),
 
       // Sidebar
-      sidebar: getSavedSidebar(),
+      sidebar: defaultSidebar,
       toggleSidebar: (side) =>
         set((state) => {
           const key = side === 'left' ? 'leftCollapsed' : 'rightCollapsed';
@@ -671,7 +660,7 @@ export const useUIStore = create<UIState>()(
     }),
     {
       name: 'urdf-studio-ui',
-      version: 23,
+      version: 25,
       migrate: (persistedState: unknown, persistedVersion) => {
         if (!persistedState || typeof persistedState !== 'object') {
           return persistedState;
@@ -680,6 +669,7 @@ export const useUIStore = create<UIState>()(
         const state = persistedState as {
           panelLayout?: Partial<PanelLayoutState>;
           viewOptions?: Partial<ViewOptions>;
+          sidebar?: Partial<SidebarState>;
           detailLinkTab?: unknown;
           fontSize?: unknown;
           codeEditorFontFamily?: unknown;
@@ -735,8 +725,26 @@ export const useUIStore = create<UIState>()(
           migratedViewOptions.showAxes = false;
         }
 
+        let migratedSidebar: SidebarState = {
+          ...defaultSidebar,
+          ...state.sidebar,
+        };
+
+        // Property editor sidebar is now collapsed by default. Earlier sessions
+        // could still carry the expanded default from ui persist or legacy keys.
+        if ((persistedVersion ?? 0) < 25) {
+          migratedSidebar = {
+            ...migratedSidebar,
+            rightCollapsed: true,
+          };
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('rightSidebarCollapsed', 'true');
+          }
+        }
+
         return {
           ...state,
+          sidebar: migratedSidebar,
           viewOptions: migratedViewOptions,
           panelLayout: {
             ...defaultPanelLayout,
@@ -787,6 +795,10 @@ export const useUIStore = create<UIState>()(
       onRehydrateStorage: () => (state) => {
         // Re-apply theme and font size on hydration
         if (state) {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('leftSidebarCollapsed', String(state.sidebar.leftCollapsed));
+            localStorage.setItem('rightSidebarCollapsed', String(state.sidebar.rightCollapsed));
+          }
           applyDocumentTheme(state.theme);
           document.documentElement.style.fontSize = '100%';
           // Re-apply font size

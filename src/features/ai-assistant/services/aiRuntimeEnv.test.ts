@@ -21,6 +21,7 @@ test('resolveAiRuntimeEnv reads Vite-prefixed browser env first', () => {
     baseUrl: 'https://example.test/v1',
     model: 'deepseek-v4-pro',
     backendUrl: '',
+    robotsApiBaseUrl: '',
   });
 });
 

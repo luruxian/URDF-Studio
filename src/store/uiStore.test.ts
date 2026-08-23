@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 
 type UIStoreModule = typeof import('./uiStore.ts');
-const UI_STORE_PERSIST_VERSION = 23;
+const UI_STORE_PERSIST_VERSION = 25;
 
 function installDom() {
   const dom = new JSDOM('<!doctype html><html><body></body></html>', {
@@ -101,6 +101,63 @@ test('MJCF world visibility defaults to visible for fresh sessions', async () =>
   assert.equal(state.viewOptions.showIkHandles, false);
   assert.equal(state.viewOptions.renderQuality, 'high');
   assert.equal(state.panelLayout.treePanelHeightMode, 'balanced');
+  assert.equal(state.sidebar.rightCollapsed, true);
+
+  dom.window.close();
+});
+
+test('property editor sidebar defaults to collapsed for fresh sessions', async () => {
+  const { dom, useUIStore } = await loadUIStore();
+
+  const state = useUIStore.getState();
+  assert.equal(state.sidebar.rightCollapsed, true);
+  assert.equal(state.sidebar.leftCollapsed, false);
+
+  dom.window.close();
+});
+
+test('legacy sessions without an explicit right-sidebar preference migrate to collapsed', async () => {
+  const { dom, useUIStore } = await loadUIStore(
+    {
+      sidebar: {
+        leftCollapsed: false,
+        rightCollapsed: false,
+      },
+    },
+    23,
+  );
+
+  const state = useUIStore.getState();
+  assert.equal(state.sidebar.rightCollapsed, true);
+  assert.equal(dom.window.localStorage.getItem('rightSidebarCollapsed'), 'true');
+
+  dom.window.close();
+});
+
+test('legacy sessions with an explicit expanded right sidebar migrate to collapsed', async () => {
+  const dom = installDom();
+  dom.window.localStorage.setItem('rightSidebarCollapsed', 'false');
+
+  dom.window.localStorage.setItem(
+    'urdf-studio-ui',
+    JSON.stringify({
+      state: {
+        sidebar: {
+          leftCollapsed: false,
+          rightCollapsed: false,
+        },
+      },
+      version: 24,
+    }),
+  );
+
+  const moduleUrl = new URL(`./uiStore.ts?test=${Date.now()}-${Math.random()}`, import.meta.url);
+  const uiStoreModule = (await import(moduleUrl.href)) as UIStoreModule;
+  await uiStoreModule.useUIStore.persist.rehydrate();
+
+  const state = uiStoreModule.useUIStore.getState();
+  assert.equal(state.sidebar.rightCollapsed, true);
+  assert.equal(dom.window.localStorage.getItem('rightSidebarCollapsed'), 'true');
 
   dom.window.close();
 });

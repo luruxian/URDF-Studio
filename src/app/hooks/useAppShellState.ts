@@ -32,8 +32,8 @@ export function useAppShellState() {
   const [toast, setToast] = useState<AppToastState>(DEFAULT_TOAST_STATE);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isAIInspectionOpen, setIsAIInspectionOpen] = useState(false);
-  const [isAIConversationOpen, setIsAIConversationOpen] = useState(false);
-  const [aiLaunchMode, setAILaunchMode] = useState<AILaunchMode>(null);
+  const [isAIConversationOpen, setIsAIConversationOpen] = useState(true);
+  const [aiLaunchMode, setAILaunchMode] = useState<AILaunchMode>('conversation');
   const [isCodeViewerOpen, setIsCodeViewerOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);

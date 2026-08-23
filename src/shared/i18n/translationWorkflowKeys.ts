@@ -178,6 +178,7 @@ export interface TranslationFeatureConvergenceKeys {
   reportChatNoReply: string;
   reportChatSendError: string;
   apiKeyMissing: string;
+  aiConversationRobotsHandoffRequired: string;
   aiLoginRequired: string;
   apiReturnedEmptyContent: string;
   rawResponse: string;

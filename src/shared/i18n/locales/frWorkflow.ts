@@ -214,6 +214,8 @@ export const frWorkflow: TranslationWorkflowKeys = {
   reportChatNoReply: 'Désolé, impossible de générer une réponse.',
   reportChatSendError: 'Erreur lors de l’envoi du message, veuillez réessayer.',
   apiKeyMissing: 'La clé API est manquante. Veuillez configurer l’environnement.',
+  aiConversationRobotsHandoffRequired:
+    'Ouvrez Studio depuis le site principal Agile Robot pour utiliser le chat IA.',
   aiLoginRequired: 'Veuillez vous connecter pour utiliser l’assistant IA.',
   apiReturnedEmptyContent: 'L’API a renvoyé un contenu vide. Veuillez réessayer.',
   rawResponse: 'Réponse brute',

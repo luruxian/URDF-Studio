@@ -6,6 +6,7 @@ interface AiRuntimeEnvSource {
   VITE_OPENAI_BASE_URL?: string;
   VITE_OPENAI_MODEL?: string;
   VITE_AI_BACKEND_URL?: string;
+  VITE_ROBOTS_API_BASE_URL?: string;
   API_KEY?: string;
   OPENAI_API_KEY?: string;
   GEMINI_API_KEY?: string;
@@ -26,6 +27,8 @@ export interface AiRuntimeEnv {
    * (apiKey/baseUrl/model) applies.
    */
   backendUrl: string;
+  /** robots 主站 API 根地址（`VITE_ROBOTS_API_BASE_URL`）。 */
+  robotsApiBaseUrl: string;
 }
 
 const readImportMetaEnv = (): AiRuntimeEnvSource => {
@@ -93,5 +96,9 @@ export function resolveAiRuntimeEnv(
       /\/+$/,
       '',
     ),
+    robotsApiBaseUrl: firstNonEmpty(
+      viteEnv.VITE_ROBOTS_API_BASE_URL,
+      processEnv.VITE_ROBOTS_API_BASE_URL,
+    ).replace(/\/+$/, ''),
   };
 }

@@ -206,6 +206,8 @@ export const enWorkflow: TranslationWorkflowKeys = {
   reportChatNoReply: 'Sorry, unable to generate response.',
   reportChatSendError: 'Error sending message, please try again.',
   apiKeyMissing: 'API Key is missing. Please configure the environment.',
+  aiConversationRobotsHandoffRequired:
+    'Open Studio from the Agile Robot main site to use AI conversation.',
   aiLoginRequired: 'Please log in first to use the AI assistant.',
   apiReturnedEmptyContent: 'The API returned empty content. Please try again.',
   rawResponse: 'Raw response',

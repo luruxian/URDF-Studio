@@ -27,10 +27,10 @@ import {
   sendConversationTurnStream,
   type ConversationHistoryTurn,
 } from '../services/conversationService';
+import { isRobotsAiConversationReady } from '../services/robotsConversationBackend';
 import { ConversationMessageMarkdown } from './ConversationMessageMarkdown';
 import { buildConversationContext } from '../utils/buildConversationContext';
 import { shouldSubmitConversationInput } from '../utils/conversationInput';
-import { buildConversationPromptSuggestions } from '../utils/conversationPromptSuggestions';
 import {
   createConversationMessage,
   getActiveConversationHistory,
@@ -78,17 +78,6 @@ interface ConversationSubmissionState {
 }
 
 type ConversationResetAction = 'new-conversation' | 'clear-history';
-
-function resolveSelectedEntityName(context: AIConversationLaunchContext | null): string | null {
-  if (!context?.selectedEntity) {
-    return null;
-  }
-
-  const { type, entityId, snapshotEntityId = entityId } = context.selectedEntity;
-  return type === 'link'
-    ? context.robotSnapshot.links[snapshotEntityId]?.name || entityId
-    : context.robotSnapshot.joints[snapshotEntityId]?.name || entityId;
-}
 
 function replaceTrailingAssistantMessage(
   messages: AIConversationMessage[],
@@ -160,12 +149,31 @@ export function AIConversationModal({
       height: Math.min(620, Math.max(420, window.innerHeight - 64)),
     };
   }, []);
+  const defaultPosition = useMemo(() => {
+    const viewportMargin = 24;
+
+    if (typeof window === 'undefined') {
+      return { x: viewportMargin, y: viewportMargin };
+    }
+
+    return {
+      x: Math.max(
+        viewportMargin,
+        window.innerWidth - defaultWindowSize.width - viewportMargin,
+      ),
+      y: Math.max(
+        viewportMargin,
+        window.innerHeight - defaultWindowSize.height - viewportMargin,
+      ),
+    };
+  }, [defaultWindowSize.height, defaultWindowSize.width]);
   const windowState = useDraggableWindow({
     isOpen,
+    defaultPosition,
     defaultSize: defaultWindowSize,
     minSize: { width: 480, height: 420 },
     viewportMinSize: { width: 360, height: 320 },
-    centerOnMount: true,
+    centerOnMount: false,
     enableMinimize: true,
     clampResizeToViewport: true,
     dragBounds: {
@@ -202,10 +210,6 @@ export function AIConversationModal({
   const abortControllerRef = useRef<AbortController | null>(null);
   const skipNextSessionResetRef = useRef(false);
 
-  const selectedEntityName = useMemo(
-    () => resolveSelectedEntityName(launchContext),
-    [launchContext],
-  );
   const aiAutoApply = useUIStore((s) => s.aiAutoApplyEdits);
   const isReportFollowup = launchContext?.mode === 'inspection-followup';
   const focusedIssue = isReportFollowup ? (launchContext?.focusedIssue ?? null) : null;
@@ -227,16 +231,6 @@ export function AIConversationModal({
     return '';
   })();
   const showHeaderActionLabels = !isMinimized && !isCompactLayout;
-  const suggestedPrompts = useMemo(
-    () =>
-      buildConversationPromptSuggestions({
-        lang,
-        isReportFollowup: Boolean(isReportFollowup),
-        selectedEntityName,
-        focusedIssueTitle: focusedIssue?.title,
-      }),
-    [focusedIssue?.title, isReportFollowup, lang, selectedEntityName],
-  );
 
   const resetConversationState = useCallback(
     (options?: { preserveMessages?: boolean; startNewConversation?: boolean }) => {
@@ -506,15 +500,6 @@ export function AIConversationModal({
     }
   };
 
-  const handleSuggestedPromptSelect = async (prompt: string) => {
-    if (!prompt.trim() || isSending) {
-      return;
-    }
-
-    setInput('');
-    await submitModificationTurn(prompt, { history: [] });
-  };
-
   const handleSend = async () => {
     const trimmedInput = input.trim();
     if (!trimmedInput) {
@@ -556,6 +541,28 @@ export function AIConversationModal({
     }
 
     const trimmedMessage = userMessage.trim();
+    if (!isRobotsAiConversationReady()) {
+      if (doneTimeoutRef.current) {
+        clearTimeout(doneTimeoutRef.current);
+        doneTimeoutRef.current = null;
+      }
+      setToolConfirmState('idle');
+      setPendingToolCall(null);
+      setToolResult(null);
+      setRequestError(t.aiConversationRobotsHandoffRequired);
+      setInput('');
+      setMessages((prev) => [
+        ...removeTrailingAssistantPlaceholder(prev),
+        createConversationMessage('user', trimmedMessage),
+        createConversationMessage('assistant', t.aiConversationRobotsHandoffRequired),
+      ]);
+      setLastSubmittedTurn({
+        history: toolSubmission?.history ?? [],
+        userMessage: trimmedMessage,
+      });
+      return;
+    }
+
     if (doneTimeoutRef.current) {
       clearTimeout(doneTimeoutRef.current);
       doneTimeoutRef.current = null;
@@ -873,56 +880,7 @@ export function AIConversationModal({
               aria-relevant="additions text"
               aria-label={headerTitle}
             >
-              {messages.length === 0 ? (
-                <div
-                  className={`flex min-h-full flex-col items-center text-center ${
-                    isCompactLayout ? 'justify-start px-0' : 'justify-end px-10'
-                  }`}
-                >
-                  <div className={`${isCompactLayout ? '' : 'mt-4'} w-full max-w-2xl`}>
-                    <div
-                      className={`space-y-2.5 rounded-2xl border border-border-black bg-panel-bg/80 text-left shadow-sm dark:bg-element-bg/70 ${
-                        isCompactLayout ? 'px-2 py-2' : 'px-2.5 py-2.5'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 rounded-xl border border-border-black/60 bg-element-bg/70 px-2 py-2 dark:bg-element-bg">
-                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-system-blue/20 bg-system-blue/10 text-system-blue">
-                          <MessageCircle className="h-3.5 w-3.5" />
-                        </div>
-                        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-text-secondary">
-                          {t.examples}
-                        </div>
-                      </div>
-                      <div
-                        className={`grid grid-cols-1 gap-2 ${
-                          isCompactLayout ? '' : 'md:grid-cols-2'
-                        }`}
-                      >
-                        {suggestedPrompts.map((prompt) => (
-                          <button
-                            key={prompt}
-                            type="button"
-                            onClick={() => {
-                              void handleSuggestedPromptSelect(prompt);
-                            }}
-                            className="group flex items-start gap-2.5 rounded-xl border border-border-black bg-panel-bg px-2.5 py-2 text-left shadow-sm transition-all duration-100 hover:-translate-y-0.5 hover:border-system-blue/35 hover:bg-element-hover focus:border-system-blue/35 focus:bg-element-hover focus:outline-none focus:ring-2 focus:ring-system-blue/30 dark:bg-panel-bg"
-                            title={prompt}
-                          >
-                            <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-system-blue/20 bg-system-blue/10 text-system-blue transition-colors group-hover:border-system-blue/35 group-hover:bg-system-blue/15 group-hover:text-system-blue-hover group-focus-visible:border-system-blue/35 group-focus-visible:bg-system-blue/15 group-focus-visible:text-system-blue-hover">
-                              <Send className="h-3 w-3" />
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block text-[11px] leading-relaxed text-text-secondary transition-colors group-hover:text-text-primary group-focus-visible:text-text-primary">
-                                {prompt}
-                              </span>
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
+              {messages.length > 0 ? (
                 <div className="space-y-2.5">
                   {messages.map((message, index) => {
                     if (message.kind === 'modification-card') {
@@ -1028,7 +986,7 @@ export function AIConversationModal({
 
                   <div ref={messagesEndRef} aria-hidden="true" />
                 </div>
-              )}
+              ) : null}
             </div>
 
             {toolsConfig && pendingToolCall && (

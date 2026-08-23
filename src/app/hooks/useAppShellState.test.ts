@@ -139,15 +139,6 @@ test('useAppShellState tracks split AI entry points and preserves legacy modal s
   const rendered = renderHook();
 
   try {
-    assert.equal(rendered.hook.isAIModalOpen, false);
-    assert.equal(rendered.hook.isAIInspectionOpen, false);
-    assert.equal(rendered.hook.isAIConversationOpen, false);
-    assert.equal(rendered.hook.aiLaunchMode, null);
-
-    flushSync(() => {
-      rendered.hook.openAIConversation();
-    });
-
     assert.equal(rendered.hook.isAIModalOpen, true);
     assert.equal(rendered.hook.isAIInspectionOpen, false);
     assert.equal(rendered.hook.isAIConversationOpen, true);

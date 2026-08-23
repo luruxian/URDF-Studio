@@ -144,12 +144,13 @@ export interface AiBackendChatStreamResult {
  */
 export async function streamAiBackendChat(
   body: unknown,
-  options: { signal?: AbortSignal; onDelta?: (delta: string) => void } = {},
+  options: { signal?: AbortSignal; onDelta?: (delta: string) => void; baseUrl?: string } = {},
 ): Promise<AiBackendChatStreamResult> {
   let reply = '';
+  const backendBaseUrl = (options.baseUrl ?? getAiBackendBaseUrl()).replace(/\/+$/, '');
 
   try {
-    const response = await fetch(`${getAiBackendBaseUrl()}/chat`, {
+    const response = await fetch(`${backendBaseUrl}/chat`, {
       method: 'POST',
       headers: buildRequestHeaders(),
       body: JSON.stringify(body),

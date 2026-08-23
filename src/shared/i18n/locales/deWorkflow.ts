@@ -213,6 +213,8 @@ export const deWorkflow: TranslationWorkflowKeys = {
   reportChatNoReply: 'Leider konnte keine Antwort erzeugt werden.',
   reportChatSendError: 'Fehler beim Senden der Nachricht, bitte erneut versuchen.',
   apiKeyMissing: 'Der API-Key fehlt. Bitte konfigurieren Sie die Umgebung.',
+  aiConversationRobotsHandoffRequired:
+    'Öffnen Sie Studio über die Agile-Robot-Hauptseite, um den KI-Chat zu nutzen.',
   aiLoginRequired: 'Bitte melden Sie sich zuerst an, um den KI-Assistenten zu nutzen.',
   apiReturnedEmptyContent: 'Die API hat leeren Inhalt zurückgegeben. Bitte erneut versuchen.',
   rawResponse: 'Rohantwort',

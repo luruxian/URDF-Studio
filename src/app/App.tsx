@@ -63,6 +63,16 @@ function preloadOverlay(label: string, preload: () => Promise<unknown>): void {
   });
 }
 
+const INITIAL_AI_CONVERSATION_SESSION_ID = 1;
+
+function createInitialAIConversationLaunchContext(): AIConversationLaunchContext {
+  return createConversationLaunchContext({
+    sessionId: INITIAL_AI_CONVERSATION_SESSION_ID,
+    mode: 'general',
+    robotSnapshot: resolveCurrentAIRobotSnapshot(),
+  });
+}
+
 export function AppContent({ extensions, onExposeActions }: AppContentProps = {}) {
   useUnsavedChangesPrompt();
 
@@ -72,11 +82,11 @@ export function AppContent({ extensions, onExposeActions }: AppContentProps = {}
   // Refs for file inputs
   const importInputRef = useRef<HTMLInputElement>(null);
   const importFolderInputRef = useRef<HTMLInputElement>(null);
-  const aiConversationSessionIdRef = useRef(0);
+  const aiConversationSessionIdRef = useRef(INITIAL_AI_CONVERSATION_SESSION_ID);
   const [shouldRenderAIInspectionModal, setShouldRenderAIInspectionModal] = useState(false);
-  const [shouldRenderAIConversationModal, setShouldRenderAIConversationModal] = useState(false);
+  const [shouldRenderAIConversationModal, setShouldRenderAIConversationModal] = useState(true);
   const [aiConversationLaunchContext, setAIConversationLaunchContext] =
-    useState<AIConversationLaunchContext | null>(null);
+    useState<AIConversationLaunchContext | null>(createInitialAIConversationLaunchContext);
   const [exportDialogTarget, setExportDialogTarget] = useState<ExportTarget>({
     type: 'current',
   });
@@ -142,7 +152,10 @@ export function AppContent({ extensions, onExposeActions }: AppContentProps = {}
       showToast,
     });
 
-  useEffect(() => scheduleUsdRuntimeStartupIdlePrewarm(), []);
+  useEffect(() => {
+    scheduleUsdRuntimeStartupIdlePrewarm();
+    preloadOverlay('AI conversation connector', preloadAIConversationConnector);
+  }, []);
 
   useRegressionDebugApi(loadRobotByNameRef);
 
