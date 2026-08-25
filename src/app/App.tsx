@@ -24,7 +24,7 @@ import { resolveExportErrorMessage } from './utils/exportErrorMessage';
 import { useUIStore, useAssetsStore } from '@/store';
 import type { InspectionReport, RobotFile, RobotState } from '@/types';
 import { translations } from '@/shared/i18n';
-import { useAgileRobotBootstrap, type MeshReloadImportPort } from '@/integrations/agile-robot';
+import { useAgileRobotBootstrap } from '@/integrations/agile-robot';
 import {
   EXPORT_FORMATS,
   type ExportDialogConfig,
@@ -204,14 +204,6 @@ export function AppContent({ extensions, onExposeActions }: AppContentProps = {}
       showToast(t.importFailedCheckFiles, 'error');
     },
   });
-  // Agile Robot mesh hot-reload: reuse the ?mesh= import pipeline so a
-  // regenerated GLB replaces the model shown in the 3D viewport.
-  const agileRobotMeshReloadPort = useMemo<MeshReloadImportPort>(
-    () => ({
-      importMeshFile: (file) => handleImport([file], { forceLoadRobot: true }),
-    }),
-    [handleImport],
-  );
   const {
     handleExportProject: runProjectExport,
     handleExportWithConfig,
@@ -646,7 +638,6 @@ export function AppContent({ extensions, onExposeActions }: AppContentProps = {}
         lang={lang}
         loadingLabel={loadingLabel}
         projectExportProgress={projectExportProgress}
-        reloadMesh={agileRobotMeshReloadPort}
         setDisconnectedWorkspaceUrdfDialog={setDisconnectedWorkspaceUrdfDialog}
         setIsAIConversationOpen={setIsAIConversationOpen}
         setIsAIInspectionOpen={setIsAIInspectionOpen}

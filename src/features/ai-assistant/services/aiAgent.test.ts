@@ -156,10 +156,12 @@ test('runRobotEditAgent throws AgentToolsUnsupportedError when endpoint rejects 
   });
 });
 
-test('runRobotEditAgent throws AgentToolsUnsupportedError when API key is missing', async () => {
+test('runRobotEditAgent throws AgentToolsUnsupportedError when API key is missing and robots LLM is not configured', async () => {
   const previous = process.env.API_KEY;
+  const previousRobotsBase = process.env.VITE_ROBOTS_API_BASE_URL;
   delete process.env.API_KEY;
-  installClient(scriptedClient([{ content: 'x' }]));
+  delete process.env.VITE_ROBOTS_API_BASE_URL;
+  __setAgentOpenAIClientFactoryForTests(null);
   try {
     await assert.rejects(
       runRobotEditAgent('change radius', buildRobot(), 'en'),
@@ -173,6 +175,11 @@ test('runRobotEditAgent throws AgentToolsUnsupportedError when API key is missin
       delete process.env.API_KEY;
     } else {
       process.env.API_KEY = previous;
+    }
+    if (previousRobotsBase === undefined) {
+      delete process.env.VITE_ROBOTS_API_BASE_URL;
+    } else {
+      process.env.VITE_ROBOTS_API_BASE_URL = previousRobotsBase;
     }
   }
 });

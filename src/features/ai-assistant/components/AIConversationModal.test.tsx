@@ -7,14 +7,9 @@ import { JSDOM } from 'jsdom';
 
 import { createSingleComponentWorkspace } from '@/core/robot';
 import { __setAgentOpenAIClientFactoryForTests } from '../services/aiAgent';
-import {
-  __setConversationTurnStreamForTests,
-  type ConversationToolCall,
-} from '../services/conversationService';
 import { setAiBackendBaseUrlResolver } from '@/shared/hostIntegrationState';
 import { DEFAULT_MANAGED_WINDOW_ORDER, useSelectionStore, useUIStore, useWorkspaceStore } from '@/store';
 import { GeometryType, JointType, type RobotState } from '@/types';
-import type { AIConversationToolsConfig, ParsedToolCall } from '@/integrations/agile-robot/types';
 import type { AIConversationLaunchContext } from '../types';
 
 const TEST_CONVERSATION_MESSAGE = '请帮我检查这个机器人结构是否合理';
@@ -184,80 +179,6 @@ const restoreRobotsConversationEnv = (snapshot: RobotsConversationEnvSnapshot) =
   } else {
     process.env.VITE_ROBOTS_API_BASE_URL = snapshot.previousRobotsBase;
   }
-};
-
-const createToolsConfig = (
-  overrides?: Partial<AIConversationToolsConfig>,
-): AIConversationToolsConfig => ({
-  tools: [
-    {
-      type: 'function',
-      function: {
-        name: 'edit_appearance',
-        description: '改图',
-        parameters: { type: 'object', properties: { prompt: { type: 'string' } } },
-      },
-    },
-  ],
-  parseToolCalls: (calls) => {
-    const named = calls.find((call) => call.function.name === 'edit_appearance');
-    return named
-      ? { toolName: 'edit_appearance', args: {}, summary: '将机身改成橙色' }
-      : null;
-  },
-  onExecute: async () => ({ success: true, message: '改图任务已提交' }),
-  ...overrides,
-});
-
-const TOOL_CALL: ConversationToolCall[] = [
-  {
-    function: {
-      name: 'edit_appearance',
-      arguments: '{"prompt":"把机身改成橙色"}',
-    },
-  },
-];
-
-const installConversationToolStreamMock = (toolCalls: ConversationToolCall[]) => {
-  let capturedTools: unknown;
-  __setConversationTurnStreamForTests(async (input) => {
-    capturedTools = input.tools;
-    input.onToolCalls?.(toolCalls);
-    return { reply: '', error: null, status: 'completed' };
-  });
-  return {
-    capturedTools: () => capturedTools,
-    restore: () => {
-      __setConversationTurnStreamForTests(null);
-    },
-  };
-};
-
-const installConversationStreamMockSequence = (
-  sequence: Array<{ toolCalls?: ConversationToolCall[]; reply?: string }>,
-) => {
-  let capturedTools: unknown;
-  let index = 0;
-  __setConversationTurnStreamForTests(async (input) => {
-    capturedTools = input.tools;
-    const step = sequence[index] ?? { reply: '' };
-    index += 1;
-    if (step.toolCalls?.length) {
-      input.onToolCalls?.(step.toolCalls);
-      return { reply: '', error: null, status: 'completed' };
-    }
-    return { reply: step.reply ?? '', error: null, status: 'completed' };
-  });
-  return {
-    capturedTools: () => capturedTools,
-    restore: () => {
-      __setConversationTurnStreamForTests(null);
-    },
-  };
-};
-
-const sendFirstPrompt = async (container: ParentNode) => {
-  await typeAndSend(container, TEST_CONVERSATION_MESSAGE);
 };
 
 const findSendButton = (scope: ParentNode): HTMLButtonElement => {
@@ -580,9 +501,11 @@ test('clear history requires confirmation and removes prior messages after reset
   }
 });
 
-test('robots handoff required surfaces a real assistant reply instead of a banner', async () => {
+test('missing AI config surfaces a configuration hint instead of a handoff banner', async () => {
   const previousRobotsBase = process.env.VITE_ROBOTS_API_BASE_URL;
+  const previousApiKey = process.env.API_KEY;
   delete process.env.VITE_ROBOTS_API_BASE_URL;
+  delete process.env.API_KEY;
   setAiBackendBaseUrlResolver(null);
   const dom = installDom();
   const container = dom.window.document.getElementById('root');
@@ -610,7 +533,7 @@ test('robots handoff required surfaces a real assistant reply instead of a banne
     await flush();
 
     assert.equal(container.textContent?.includes(TEST_CONVERSATION_MESSAGE), true);
-    assert.match(container.textContent || '', /Agile Robot|主站/);
+    assert.match(container.textContent || '', /未配置 AI|VITE_ROBOTS_API_BASE_URL/);
     assert.equal(container.textContent?.includes('对话服务错误：'), false);
     assert.equal(getCopyButtons(container).length, 2);
     assert.equal(findButtonByText(container, '重新生成').textContent?.includes('重新生成'), true);
@@ -620,6 +543,11 @@ test('robots handoff required surfaces a real assistant reply instead of a banne
       delete process.env.VITE_ROBOTS_API_BASE_URL;
     } else {
       process.env.VITE_ROBOTS_API_BASE_URL = previousRobotsBase;
+    }
+    if (previousApiKey === undefined) {
+      delete process.env.API_KEY;
+    } else {
+      process.env.API_KEY = previousApiKey;
     }
 
     await act(async () => {
@@ -969,228 +897,6 @@ test('Auto-apply permission applies the agent edit directly without a confirmati
     await act(async () => {
       root.unmount();
     });
-    dom.window.close();
-  }
-});
-
-test('toolsConfig passes tools to the stream and renders a confirmation banner', async () => {
-  const robotsEnv = setRobotsConversationEnv();
-  const streamMock = installConversationToolStreamMock(TOOL_CALL);
-  const toolsConfig = createToolsConfig();
-  const dom = installDom();
-  const container = dom.window.document.getElementById('root');
-  assert.ok(container, 'root container should exist');
-  const { AIConversationModal } = await import('./AIConversationModal.tsx');
-  const root = createRoot(container);
-
-  try {
-    await act(async () => {
-      root.render(
-        <AIConversationModal
-          isOpen
-          onClose={() => {}}
-          lang="zh"
-          launchContext={createLaunchContext()}
-          onStartNewConversation={() => {}}
-          onApply={() => true}
-          toolsConfig={toolsConfig}
-        />,
-      );
-    });
-    await flush();
-    await sendFirstPrompt(container);
-    await flush();
-    await flush();
-
-    assert.deepEqual(streamMock.capturedTools(), toolsConfig.tools);
-    assert.equal(container.textContent?.includes('将机身改成橙色'), true);
-    findButtonByText(container, '确认');
-    findButtonByText(container, '取消');
-  } finally {
-    streamMock.restore();
-    restoreRobotsConversationEnv(robotsEnv);
-    await act(async () => root.unmount());
-    dom.window.close();
-  }
-});
-
-test('confirm executes the Agile Robot tool and renders its result', async () => {
-  const robotsEnv = setRobotsConversationEnv();
-  const streamMock = installConversationToolStreamMock(TOOL_CALL);
-  const executedCalls: ParsedToolCall[] = [];
-  const toolsConfig = createToolsConfig({
-    onExecute: async (call) => {
-      executedCalls.push(call);
-      return { success: true, message: '改图任务已提交' };
-    },
-  });
-  const dom = installDom();
-  const container = dom.window.document.getElementById('root');
-  assert.ok(container, 'root container should exist');
-  const { AIConversationModal } = await import('./AIConversationModal.tsx');
-  const root = createRoot(container);
-
-  try {
-    await act(async () => {
-      root.render(
-        <AIConversationModal
-          isOpen
-          onClose={() => {}}
-          lang="zh"
-          launchContext={createLaunchContext()}
-          onStartNewConversation={() => {}}
-          onApply={() => true}
-          toolsConfig={toolsConfig}
-        />,
-      );
-    });
-    await flush();
-    await sendFirstPrompt(container);
-    await flush();
-    await flush();
-    await clickButton(findButtonByText(container, '确认'));
-    await flush();
-
-    assert.equal(executedCalls.length, 1);
-    assert.equal(executedCalls[0]?.toolName, 'edit_appearance');
-    assert.equal(container.textContent?.includes('改图任务已提交'), true);
-    assert.equal(container.textContent?.includes('将机身改成橙色'), false);
-  } finally {
-    streamMock.restore();
-    restoreRobotsConversationEnv(robotsEnv);
-    await act(async () => root.unmount());
-    dom.window.close();
-  }
-});
-
-test('cancel dismisses the tool banner and records the cancellation', async () => {
-  const robotsEnv = setRobotsConversationEnv();
-  const streamMock = installConversationToolStreamMock(TOOL_CALL);
-  const dom = installDom();
-  const container = dom.window.document.getElementById('root');
-  assert.ok(container, 'root container should exist');
-  const { AIConversationModal } = await import('./AIConversationModal.tsx');
-  const root = createRoot(container);
-
-  try {
-    await act(async () => {
-      root.render(
-        <AIConversationModal
-          isOpen
-          onClose={() => {}}
-          lang="zh"
-          launchContext={createLaunchContext()}
-          onStartNewConversation={() => {}}
-          onApply={() => true}
-          toolsConfig={createToolsConfig()}
-        />,
-      );
-    });
-    await flush();
-    await sendFirstPrompt(container);
-    await flush();
-    await flush();
-    await clickButton(findButtonByText(container, '取消'));
-    await flush();
-
-    assert.equal(container.textContent?.includes('已取消'), true);
-    assert.equal(container.textContent?.includes('将机身改成橙色'), false);
-    assert.equal(container.textContent?.includes('确认'), false);
-  } finally {
-    streamMock.restore();
-    restoreRobotsConversationEnv(robotsEnv);
-    await act(async () => root.unmount());
-    dom.window.close();
-  }
-});
-
-test('successful tool banner auto-dismisses after three seconds', async () => {
-  const robotsEnv = setRobotsConversationEnv();
-  const streamMock = installConversationToolStreamMock(TOOL_CALL);
-  const dom = installDom();
-  const container = dom.window.document.getElementById('root');
-  assert.ok(container, 'root container should exist');
-  const { AIConversationModal } = await import('./AIConversationModal.tsx');
-  const root = createRoot(container);
-
-  try {
-    await act(async () => {
-      root.render(
-        <AIConversationModal
-          isOpen
-          onClose={() => {}}
-          lang="zh"
-          launchContext={createLaunchContext()}
-          onStartNewConversation={() => {}}
-          onApply={() => true}
-          toolsConfig={createToolsConfig()}
-        />,
-      );
-    });
-    await flush();
-    await sendFirstPrompt(container);
-    await flush();
-    await flush();
-    await clickButton(findButtonByText(container, '确认'));
-    await flush();
-    assert.equal(container.textContent?.includes('改图任务已提交'), true);
-
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 3200));
-    });
-    await flush();
-    assert.equal(container.textContent?.includes('改图任务已提交'), false);
-  } finally {
-    streamMock.restore();
-    restoreRobotsConversationEnv(robotsEnv);
-    await act(async () => root.unmount());
-    dom.window.close();
-  }
-});
-
-test('starting a new send clears a stale tool confirmation banner', async () => {
-  const robotsEnv = setRobotsConversationEnv();
-  const streamMock = installConversationStreamMockSequence([
-    { toolCalls: TOOL_CALL },
-    { reply: '好的，已为你处理' },
-  ]);
-  const dom = installDom();
-  const container = dom.window.document.getElementById('root');
-  assert.ok(container, 'root container should exist');
-  const { AIConversationModal } = await import('./AIConversationModal.tsx');
-  const root = createRoot(container);
-
-  try {
-    await act(async () => {
-      root.render(
-        <AIConversationModal
-          isOpen
-          onClose={() => {}}
-          lang="zh"
-          launchContext={createLaunchContext()}
-          onStartNewConversation={() => {}}
-          onApply={() => true}
-          toolsConfig={createToolsConfig()}
-        />,
-      );
-    });
-    await flush();
-    await sendFirstPrompt(container);
-    await flush();
-    await flush();
-    await clickButton(findButtonByText(container, '确认'));
-    await flush();
-    assert.equal(container.textContent?.includes('改图任务已提交'), true);
-
-    await typeAndSend(container, '再来一次');
-    await flush();
-    await flush();
-    assert.equal(container.textContent?.includes('改图任务已提交'), false);
-    assert.equal(container.textContent?.includes('确认'), false);
-  } finally {
-    streamMock.restore();
-    restoreRobotsConversationEnv(robotsEnv);
-    await act(async () => root.unmount());
     dom.window.close();
   }
 });

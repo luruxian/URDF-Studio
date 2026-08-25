@@ -13,6 +13,7 @@ import type { Language } from '@/shared/i18n';
 import type { MotorSpec, RobotData, RobotState } from '@/types';
 import { generateRobotFromPrompt } from '../services/aiService';
 import { runRobotEditAgent, AgentToolsUnsupportedError } from '../services/aiAgent';
+import { isRobotsAgentLlmConfigured } from '../services/robotsAgentLlm';
 
 export type ModificationProposal =
   | { kind: 'change'; robot: Partial<RobotState>; explanation: string }
@@ -53,17 +54,20 @@ export async function resolveModificationProposal(
     }
     if (agentError instanceof AgentToolsUnsupportedError) {
       const errorMessage = (agentError as Error).message || '';
-      if (/api.?key/i.test(errorMessage)) {
+      if (/api.?key/i.test(errorMessage) && !isRobotsAgentLlmConfigured()) {
         const response = await generateRobotFromPrompt(message, currentRobot, motorLibrary, lang);
         if (!response || !response.robotData) {
           return { kind: 'no-change', explanation: response?.explanation ?? '' };
         }
         return { kind: 'change', robot: response.robotData, explanation: response.explanation ?? '' };
       }
-      const hint =
-        lang === 'zh'
-          ? '当前模型不支持工具调用（function calling），无法执行精准修改。请在环境变量中配置支持 function calling 的模型（如 gpt-4o、gpt-4.1-mini 等）。'
-          : 'The current model does not support tool calling (function calling). Please configure a model that supports function calling (e.g., gpt-4o, gpt-4.1-mini) in your environment variables.';
+      const hint = isRobotsAgentLlmConfigured()
+        ? lang === 'zh'
+          ? '当前托管 LLM 不支持工具调用（function calling），无法执行精准修改。请确认 robots BFF 已暴露 OpenAI 兼容的 /chat/completions 且模型支持 function calling。'
+          : 'The managed LLM does not support tool calling (function calling). Ensure the robots BFF exposes an OpenAI-compatible /chat/completions endpoint with a tool-capable model.'
+        : lang === 'zh'
+          ? '当前模型不支持工具调用（function calling），无法执行精准修改。请配置 VITE_ROBOTS_API_BASE_URL，或使用支持 function calling 的 BYOK 模型。'
+          : 'The current model does not support tool calling (function calling). Configure VITE_ROBOTS_API_BASE_URL or a BYOK model that supports function calling.';
       return { kind: 'no-change', explanation: hint };
     }
     console.warn('AI edit agent unavailable, falling back to generation', agentError);

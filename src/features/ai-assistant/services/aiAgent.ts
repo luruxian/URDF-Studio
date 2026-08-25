@@ -24,6 +24,10 @@ import type { RobotData } from '@/types';
 import { buildRobotCapabilities } from '../capabilities/robotCapabilities';
 import { resolveAiRuntimeEnv } from './aiRuntimeEnv';
 import {
+  createRobotsAgentOpenAIClient,
+  isRobotsAgentLlmConfigured,
+} from './robotsAgentLlm';
+import {
   AgentToolsUnsupportedError,
   runAgentEngine,
   type RobotEditAgentResult,
@@ -53,6 +57,16 @@ const createOpenAIClient = (): OpenAI => {
 /** Test seam: inject a mock OpenAI client (see aiAgent.test.ts). */
 export function __setAgentOpenAIClientFactoryForTests(factory: (() => OpenAI) | null): void {
   openAIClientFactoryForTests = factory;
+}
+
+function resolveAgentClientFactory(): () => OpenAI {
+  if (openAIClientFactoryForTests) {
+    return openAIClientFactoryForTests;
+  }
+  if (isRobotsAgentLlmConfigured()) {
+    return createRobotsAgentOpenAIClient;
+  }
+  return createOpenAIClient;
 }
 
 // -------------------------------------------------------------------------------------
@@ -135,15 +149,15 @@ export async function runRobotEditAgent(
   onToolCall?: (step: string) => void,
 ): Promise<RobotEditAgentResult> {
   const runtime = resolveAiRuntimeEnv();
-  if (!runtime.apiKey) {
-    // No key — caller falls back to the legacy path, which has its own advice.
+  const useRobotsManagedLlm = isRobotsAgentLlmConfigured();
+  if (!useRobotsManagedLlm && !runtime.apiKey && !openAIClientFactoryForTests) {
     throw new AgentToolsUnsupportedError('API key missing');
   }
 
   return runAgentEngine(
     userMessage,
     robot,
-    createOpenAIClient,
+    resolveAgentClientFactory(),
     runtime.model,
     signal,
     {
