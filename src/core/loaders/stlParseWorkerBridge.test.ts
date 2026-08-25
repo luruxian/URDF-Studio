@@ -39,12 +39,14 @@ class FakeWorker {
   }
 }
 
-test('STL parse worker failures reject instead of silently reparsing on the main thread', async () => {
+test('STL parse worker failures fall back to main-thread parsing', async () => {
   const originalFetch = globalThis.fetch;
   const originalConsoleError = console.error;
+  const originalConsoleWarn = console.warn;
   let fetchCount = 0;
   const fakeWorker = new FakeWorker();
   const consoleErrors: unknown[][] = [];
+  const consoleWarnings: unknown[][] = [];
 
   globalThis.fetch = (async () => {
     fetchCount += 1;
@@ -52,11 +54,27 @@ test('STL parse worker failures reject instead of silently reparsing on the main
       ok: true,
       status: 200,
       statusText: 'OK',
-      arrayBuffer: async () => new ArrayBuffer(32),
+      arrayBuffer: async () =>
+        new TextEncoder().encode(
+          [
+            'solid triangle',
+            'facet normal 0 0 1',
+            'outer loop',
+            'vertex 0 0 0',
+            'vertex 1 0 0',
+            'vertex 0 1 0',
+            'endloop',
+            'endfacet',
+            'endsolid triangle',
+          ].join('\n'),
+        ).buffer,
     } as Response;
   }) as typeof fetch;
   console.error = (...args: unknown[]) => {
     consoleErrors.push(args);
+  };
+  console.warn = (...args: unknown[]) => {
+    consoleWarnings.push(args);
   };
 
   try {
@@ -71,18 +89,21 @@ test('STL parse worker failures reject instead of silently reparsing on the main
 
     fakeWorker.emitError(new Error('stl worker exploded'));
 
-    await assert.rejects(resultPromise, /stl worker exploded/i);
-    // Subsequent loads for the same failed asset hit the bridge-level
-    // failureCache and re-throw the original error without re-dispatching to
-    // the (now-disabled) worker or falling back to inline fetch.
-    await assert.rejects(client.load('/demo.stl'), /stl worker exploded/i);
-    assert.equal(fetchCount, 0);
+    const result = await resultPromise;
+    assert.equal(fetchCount, 1);
+    assert.equal(new Float32Array(result.positions).length, 9);
+    assert.equal(result.maxDimension, 1);
     assert.equal(consoleErrors.length, 1);
     assert.match(String(consoleErrors[0]?.[0] || ''), /STL parse worker crashed/i);
-    assert.match(String(consoleErrors[0]?.[1] || ''), /stl worker exploded/i);
+    assert.match(String(consoleWarnings[0]?.[0] || ''), /falling back to main-thread STL parsing/i);
+
+    const cachedResult = await client.load('/demo.stl');
+    assert.equal(fetchCount, 1);
+    assert.equal(new Float32Array(cachedResult.positions).length, 9);
   } finally {
     globalThis.fetch = originalFetch;
     console.error = originalConsoleError;
+    console.warn = originalConsoleWarn;
   }
 });
 

@@ -90,11 +90,24 @@ export function createStlParseWorkerPoolClient({
       return await pendingLoad;
     }
 
-    const nextLoad = (
-      client.canUseWorker
-        ? client.dispatch({ type: 'parse-stl', assetUrl })
-        : loadSerializedStlGeometryDataInline(assetUrl)
-    )
+    const nextLoad = (async () => {
+      if (!client.canUseWorker || client.unavailable) {
+        return await loadSerializedStlGeometryDataInline(assetUrl);
+      }
+
+      try {
+        return await client.dispatch({ type: 'parse-stl', assetUrl });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (/worker/i.test(message)) {
+          console.warn(
+            '[STL parseWorkerBridge] falling back to main-thread STL parsing (worker request failed)',
+          );
+          return await loadSerializedStlGeometryDataInline(assetUrl);
+        }
+        throw error;
+      }
+    })()
       .then((result) => {
         client.setCached(assetUrl, result);
         return result;
