@@ -6,7 +6,6 @@ import {
   isAiBackendEnabled,
   requestAiBackendContent,
   setAiBackendAuthTokenProvider,
-  streamAiBackendChat,
 } from './aiBackendTransport.ts';
 import { setAiBackendBaseUrlResolver } from '../../../shared/hostIntegrationState';
 
@@ -54,18 +53,6 @@ const jsonResponse = (status: number, payload: unknown): unknown => ({
   status,
   json: async () => payload,
 });
-
-const sseBody = (chunks: string[]): ReadableStream<Uint8Array> => {
-  const encoder = new TextEncoder();
-  return new ReadableStream({
-    start(controller) {
-      for (const chunk of chunks) {
-        controller.enqueue(encoder.encode(chunk));
-      }
-      controller.close();
-    },
-  });
-};
 
 test('isAiBackendEnabled reflects the backend URL env', async () => {
   assert.equal(isAiBackendEnabled(), false);
@@ -156,102 +143,6 @@ test('requestAiBackendContent rejects empty content', async () => {
           requestAiBackendContent('/generate', { prompt: 'hi' }),
           AiBackendRequestError,
         );
-      },
-    ),
-  );
-});
-
-test('streamAiBackendChat forwards deltas and resolves on done', async () => {
-  await withBackendEnv(() =>
-    withFetch(
-      async () => ({
-        ok: true,
-        status: 200,
-        body: sseBody([
-          'data: {"delta":"你好"}\n\n',
-          'data: {"del',
-          'ta":"，世界"}\n\ndata: {"done":true}\n\n',
-        ]),
-        json: async () => null,
-      }),
-      async (requests) => {
-        const deltas: string[] = [];
-        const result = await streamAiBackendChat(
-          { userMessage: 'hi' },
-          { onDelta: (delta) => deltas.push(delta) },
-        );
-        assert.equal(requests[0].url, `${BACKEND_URL}/chat`);
-        assert.deepEqual(deltas, ['你好', '，世界']);
-        assert.deepEqual(result, { reply: '你好，世界', status: 'completed' });
-      },
-    ),
-  );
-});
-
-test('streamAiBackendChat throws on protocol error events', async () => {
-  await withBackendEnv(() =>
-    withFetch(
-      async () => ({
-        ok: true,
-        status: 200,
-        body: sseBody(['data: {"delta":"部分"}\n\n', 'data: {"error":"provider exploded"}\n\n']),
-        json: async () => null,
-      }),
-      async () => {
-        await assert.rejects(streamAiBackendChat({ userMessage: 'hi' }), (error: unknown) => {
-          assert.ok(error instanceof AiBackendRequestError);
-          assert.equal(error.message, 'provider exploded');
-          return true;
-        });
-      },
-    ),
-  );
-});
-
-test('streamAiBackendChat throws when the stream ends without done', async () => {
-  await withBackendEnv(() =>
-    withFetch(
-      async () => ({
-        ok: true,
-        status: 200,
-        body: sseBody(['data: {"delta":"半截"}\n\n']),
-        json: async () => null,
-      }),
-      async () => {
-        await assert.rejects(streamAiBackendChat({ userMessage: 'hi' }), AiBackendRequestError);
-      },
-    ),
-  );
-});
-
-test('streamAiBackendChat returns the partial reply when aborted', async () => {
-  const controller = new AbortController();
-  const abortError = Object.assign(new Error('aborted'), { name: 'AbortError' });
-  const encoder = new TextEncoder();
-  let pullCount = 0;
-  const body = new ReadableStream<Uint8Array>({
-    pull(streamController) {
-      pullCount += 1;
-      if (pullCount === 1) {
-        streamController.enqueue(encoder.encode('data: {"delta":"第一段"}\n\n'));
-        return;
-      }
-      throw abortError;
-    },
-  });
-
-  await withBackendEnv(() =>
-    withFetch(
-      async () => ({ ok: true, status: 200, body, json: async () => null }),
-      async () => {
-        const result = await streamAiBackendChat(
-          { userMessage: 'hi' },
-          {
-            signal: controller.signal,
-            onDelta: () => controller.abort(),
-          },
-        );
-        assert.deepEqual(result, { reply: '第一段', status: 'aborted' });
       },
     ),
   );

@@ -24,13 +24,13 @@ Studio 侧 AI 生成 / 审阅 / 对话已改为 **Mode B（托管后端）**：�
 | 混元 3D | `.../studio/hunyuan/submit` + `.../job` | 同上 | 已有 |
 | **Studio AI 生成** | `.../studio/ai/generate` | 同上 | **待实现** |
 | **Studio AI 审阅** | `.../studio/ai/inspect` | 同上 | **待实现** |
-| **Studio AI 对话** | `.../studio/ai/chat` | 同上 | **待实现** |
-| **Studio AI 对话（tool calling）** | `.../studio/ai/v1/chat/completions` | 同上 | **待实现**（见 §11、§15） |
-| **Studio AI 对话会话** | `POST/PUT/DELETE .../studio/ai/conversation-sessions` | 同上 | **待实现**（见 §11） |
+| **Studio AI 对话（session + tool calling）** | `.../studio/ai/conversation-sessions` + `.../studio/ai/v1/chat/completions` | 同上 | **待实现**（见 §11、§15） |
 | **需求确认书修订** | `.../studio/requirements-document` | 同上 | **待实现**（见 §11） |
 | **URDF+STL 再生成** | `.../studio/mesh/regenerate` + `.../mesh/job` + `.../mesh/import-grant` | 同上 | **待实现**（见 §14） |
 
-**不要**让 Studio 调用主站通用 `/agent/chat` 或其它未在本文定义的 Agent 路由。Studio 对话 Modal 以 §14 的 completions + 确认书修订为准；`/chat` SSE 保留给兼容或弃用路径。
+**不要**让 Studio 调用主站通用 `/agent/chat` 或其它未在本文定义的 Agent 路由。Studio 对话 Modal 以 §11 的 conversation session + completions + 确认书修订为准。
+
+**已移除：** legacy `POST .../studio/ai/chat`（客户端 `context`/`history` SSE）已下线；勿再实现或调用。
 
 **不要**在 Studio 部署环境配置 LLM Provider AK/SK；密钥只存在于 robots 后端（或 BotPilot 等上游）。
 
@@ -59,13 +59,15 @@ AI 功能 **依赖有效 bootstrap**（含 `order_id` + `studio_token`）。纯 
 ```http
 POST {api_base_url}/me/projects/{order_id}/studio/ai/generate
 POST {api_base_url}/me/projects/{order_id}/studio/ai/inspect
-POST {api_base_url}/me/projects/{order_id}/studio/ai/chat
+POST {api_base_url}/me/projects/{order_id}/studio/ai/conversation-sessions
+PUT  {api_base_url}/me/projects/{order_id}/studio/ai/conversation-sessions/{session_id}
+POST {api_base_url}/me/projects/{order_id}/studio/ai/v1/chat/completions
 ```
 
 示例（`api_base_url = https://api.enkeebot.com/api/v1`，`order_id = ord_abc123`）：
 
 ```text
-POST https://api.enkeebot.com/api/v1/me/projects/ord_abc123/studio/ai/chat
+POST https://api.enkeebot.com/api/v1/me/projects/ord_abc123/studio/ai/v1/chat/completions
 ```
 
 ### 3.2 路径参数
@@ -83,9 +85,9 @@ POST https://api.enkeebot.com/api/v1/me/projects/ord_abc123/studio/ai/chat
 
 - `Authorization`
 - `Content-Type: application/json`
-- 方法 `POST`
+- 方法 `POST`（以及 session 的 `PUT` / `DELETE`）
 
-`/chat` 响应为 SSE 时，还需允许浏览器读取流式 body（`Content-Type: text/event-stream`）。
+`/v1/chat/completions` 响应为 SSE 时，还需允许浏览器读取流式 body（`Content-Type: text/event-stream`）。
 
 ---
 
@@ -124,7 +126,7 @@ Studio 会读取 `message` 字段展示给用户。
 2. **加载提示词模板**（与 URDF-Studio 仓库镜像一致，见 §8）。
 3. **注入占位符**（robot 快照、criteria、history 等）。
 4. **调用 LLM Provider**（OpenAI 兼容或其它已接入网关）。
-5. **返回原始模型文本**（`/generate`、`/inspect`）或 **SSE 增量**（`/chat`）。
+5. **返回原始模型文本**（`/generate`、`/inspect`）或 **OpenAI SSE**（`/v1/chat/completions`）。
 
 Studio 在收到 `data.content` 或 SSE delta 后 **自行 JSON 解析 / Markdown 渲染**；BFF **不要**返回已解析的 `InspectionReport` 等业务对象，除非未来双方显式升级契约。
 
@@ -134,7 +136,7 @@ Studio 在收到 `data.content` 或 SSE delta 后 **自行 JSON 解析 / Markdow
 |------|------|
 | `/generate` | `response_format: json_object`，`temperature: 0.7` |
 | `/inspect` | `response_format: json_object`，`temperature: 0.7` |
-| `/chat` | 普通文本流，无 `json_object` 约束 |
+| `/v1/chat/completions` | 普通文本流 + tool calling；`temperature: 0.3` |
 
 若 Provider 支持 thinking/reasoning，建议对对话关闭或 strip 思考标签，避免污染 SSE。
 
@@ -254,68 +256,14 @@ AI 审阅机器人结构。
 
 ---
 
-## 8. `POST .../studio/ai/chat`
+## 8. 对话（session + completions）
 
-对话助手（流式 SSE）。
+Legacy `POST .../studio/ai/chat` 已移除。对话统一走：
 
-### 8.1 Request body
+1. `POST/PUT .../studio/ai/conversation-sessions` — BFF 持有 snapshot + history
+2. `POST .../studio/ai/v1/chat/completions` — `{ studio: { session_id, user_message } }`
 
-```json
-{
-  "mode": "general",
-  "lang": "zh",
-  "context": "{\n  \"mode\": \"general\",\n  \"robot\": { ... },\n  \"inspectionReport\": { ... }\n}",
-  "history": [
-    { "role": "user", "content": "这个关节限位合理吗？" },
-    { "role": "assistant", "content": "..." }
-  ],
-  "userMessage": "如果改成 90 度上限呢？"
-}
-```
-
-| 字段 | 说明 |
-|------|------|
-| `mode` | `"general"` \| `"inspection-followup"` |
-| `lang` | UI 语言 |
-| `context` | **JSON 字符串**（不是 nested object），由 Studio `buildConversationContext()` 生成 |
-| `history` | 最近最多 **8** 轮 `{role, content}`；不含当前 `userMessage` |
-| `userMessage` | 当前用户输入（已 trim） |
-
-服务端应：
-
-1. 用 `conversation.en` / `conversation.zh` 模板构建 system prompt。
-2. 将 `context` 填入 `__CONVERSATION_CONTEXT__`。
-3. `history` + `userMessage` 组装为 chat messages（**不要**在 system 里重复 history）。
-
-### 8.2 Response：`200` + SSE
-
-响应头：
-
-```http
-Content-Type: text/event-stream
-Cache-Control: no-cache
-Connection: keep-alive
-```
-
-事件格式（UTF-8，事件以 `\n\n` 分隔）：
-
-```
-data: {"delta":"第一段文本"}
-
-data: {"delta":"第二段"}
-
-data: {"done":true}
-```
-
-| 事件 | 含义 |
-|------|------|
-| `{"delta":"<string>"}` | 增量文本；Studio 追加到回复 |
-| `{"done":true}` | **必须**发送；否则 Studio 报 `stream ended unexpectedly` |
-| `{"error":"<string>"}` | 协议错误；Studio 中断并展示 error |
-
-**非 200**：返回 JSON `{ "success": false, "message": "..." }`（Studio 不读 SSE）。
-
-**注意：** 当前 `/chat` 契约 **不含 tool_calls**。即梦改图 / 混元 3D 仍由 Studio 在客户端执行（`useAgileRobotTools` → 现有 `jimeng` / `hunyuan` BFF），不经过 `/studio/ai/chat`。
+完整契约见 §11.4。
 
 ---
 
@@ -510,7 +458,7 @@ OpenAI Chat Completions 兼容路径；`stream: true` **必填**。
 
 **Breaking change：** 若请求含 legacy `studio.context` / `studio.history` / `studio.mode` / `studio.lang` 且无 `session_id`，BFF 返回 **400** `session_required`。URDF-Studio 与 robots **须同版本部署**。
 
-**Response：** 标准 OpenAI SSE（`chat.completion.chunk`），以 `data: [DONE]` 结束。Legacy `POST .../studio/ai/chat`（§8）仍保留自定义 `{ "delta" }` / `{ "done": true }` SSE，但 Studio 对话 Modal 已改用 completions + session。
+**Response：** 标准 OpenAI SSE（`chat.completion.chunk`），以 `data: [DONE]` 结束。
 
 ---
 
@@ -532,11 +480,11 @@ OpenAI Chat Completions 兼容路径；`stream: true` **必填**。
 - [ ] 校验 URL 中 `order_id` 与 token 所属订单一致
 - [ ] CORS 放行 Studio origin
 - [ ] `/generate`、`/inspect` 返回 `{ success, data: { content } }`
-- [ ] `/chat` 返回 SSE，且以 `data: {"done":true}` 结束
+- [ ] conversation session CRUD + `/v1/chat/completions` 返回 OpenAI SSE，以 `data: [DONE]` 结束
 - [ ] 401 / 403 / 502 语义与 §4 一致
 - [ ] 提示词模板与 URDF-Studio `aiPromptTemplates.md` 同步
 - [ ] LLM Provider 密钥仅在后端配置
-- [ ] 集成测试：用有效 `studio_token` curl 三个端点
+- [ ] 集成测试：用有效 `studio_token` curl generate / inspect / completions
 
 ---
 
@@ -575,31 +523,7 @@ curl -sS -X POST \
   }'
 ```
 
-### chat（SSE）
-
-```bash
-curl -N -X POST \
-  "${API_BASE}/me/projects/${ORDER}/studio/ai/chat" \
-  -H "Authorization: Bearer ${TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "mode": "general",
-    "lang": "zh",
-    "context": "{}",
-    "history": [],
-    "userMessage": "你好"
-  }'
-```
-
-期望输出片段：
-
-```text
-data: {"delta":"你好"}
-
-data: {"done":true}
-```
-
-### conversation session + completions（Phase 2）
+### conversation session + completions
 
 ```bash
 # 1. Create session

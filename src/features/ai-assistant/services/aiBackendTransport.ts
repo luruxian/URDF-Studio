@@ -9,7 +9,9 @@
  * contract:
  *
  *   POST {base}/generate | {base}/inspect  → { success, data: { content } }
- *   POST {base}/chat                       → SSE `data: {"delta"|"done"|"error"}`
+ *
+ * Conversation streaming uses robots BFF `.../v1/chat/completions` (see
+ * robotsConversationCompletions.ts), not this module.
  *
  * Authentication is pluggable: the hosting shell registers a token provider
  * via `setAiBackendAuthTokenProvider` and requests carry it as a Bearer token.
@@ -109,109 +111,4 @@ export async function requestAiBackendContent(
     throw new AiBackendRequestError('AI backend returned an empty response', response.status);
   }
   return content;
-}
-
-interface AiBackendStreamEvent {
-  delta?: unknown;
-  done?: unknown;
-  error?: unknown;
-}
-
-const parseSseEventData = (rawEvent: string): AiBackendStreamEvent | null => {
-  const dataLines = rawEvent
-    .split('\n')
-    .filter((line) => line.startsWith('data:'))
-    .map((line) => line.slice('data:'.length).trimStart());
-  if (dataLines.length === 0) {
-    return null;
-  }
-  try {
-    return JSON.parse(dataLines.join('\n')) as AiBackendStreamEvent;
-  } catch {
-    return null;
-  }
-};
-
-export interface AiBackendChatStreamResult {
-  reply: string;
-  status: 'completed' | 'aborted';
-}
-
-/**
- * Streaming chat call. Feeds `onDelta` as chunks arrive and resolves with the
- * accumulated reply. An abort (signal) resolves with `status: 'aborted'` and
- * the partial reply; protocol/transport failures throw AiBackendRequestError.
- */
-export async function streamAiBackendChat(
-  body: unknown,
-  options: { signal?: AbortSignal; onDelta?: (delta: string) => void; baseUrl?: string } = {},
-): Promise<AiBackendChatStreamResult> {
-  let reply = '';
-  const backendBaseUrl = (options.baseUrl ?? getAiBackendBaseUrl()).replace(/\/+$/, '');
-
-  try {
-    const response = await fetch(`${backendBaseUrl}/chat`, {
-      method: 'POST',
-      headers: buildRequestHeaders(),
-      body: JSON.stringify(body),
-      signal: options.signal,
-    });
-
-    if (!response.ok) {
-      const payload: unknown = await response.json().catch(() => null);
-      throw new AiBackendRequestError(
-        extractErrorMessage(payload, `AI backend HTTP ${response.status}`),
-        response.status,
-      );
-    }
-    if (!response.body) {
-      throw new AiBackendRequestError('AI backend returned no response body');
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let sawDone = false;
-
-    for (;;) {
-      const { value, done: readerDone } = await reader.read();
-      if (value) {
-        buffer += decoder.decode(value, { stream: true });
-      }
-
-      let separatorIndex = buffer.indexOf('\n\n');
-      while (separatorIndex !== -1) {
-        const rawEvent = buffer.slice(0, separatorIndex);
-        buffer = buffer.slice(separatorIndex + 2);
-        separatorIndex = buffer.indexOf('\n\n');
-
-        const event = parseSseEventData(rawEvent);
-        if (!event) {
-          continue;
-        }
-        if (typeof event.delta === 'string' && event.delta) {
-          reply += event.delta;
-          options.onDelta?.(event.delta);
-        } else if (event.error) {
-          throw new AiBackendRequestError(String(event.error));
-        } else if (event.done) {
-          sawDone = true;
-        }
-      }
-
-      if (readerDone) {
-        break;
-      }
-    }
-
-    if (!sawDone) {
-      throw new AiBackendRequestError('AI backend stream ended unexpectedly');
-    }
-    return { reply, status: 'completed' };
-  } catch (error) {
-    if (options.signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
-      return { reply, status: 'aborted' };
-    }
-    throw error;
-  }
 }
