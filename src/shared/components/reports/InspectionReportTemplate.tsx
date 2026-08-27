@@ -4,7 +4,7 @@
  */
 
 import type { InspectionReport, RobotInspectionContext } from '@/types';
-import { translations, resolveDateLocale, type Language } from '@/shared/i18n';
+import { translations, resolveDateLocale } from '@/shared/i18n';
 import { buildInspectionEvidenceSummary } from '@/shared/utils/inspectionEvidenceSummary';
 
 interface ReportTemplateProps {

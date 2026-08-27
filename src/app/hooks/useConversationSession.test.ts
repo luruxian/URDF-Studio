@@ -222,6 +222,19 @@ test('useConversationSession creates a session on mount', async () => {
   assert.equal(hook.current.sessionId, 'sess-1');
 });
 
+test('useConversationSession does not recreate session on rerender', async () => {
+  const mock = createMockApi();
+  const hook = renderHook({ lang: 'zh', api: mock.api });
+
+  await flushMicrotasks();
+  assert.equal(mock.createCalls, 1);
+
+  hook.rerender({ lang: 'zh', api: mock.api });
+  await flushMicrotasks();
+
+  assert.equal(mock.createCalls, 1);
+});
+
 test('useConversationSession debounces syncSnapshot and increments snapshot_revision', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const mock = createMockApi();

@@ -317,7 +317,7 @@ export function AIConversationModal({
     }
 
     void resetSession();
-  }, [isOpen, launchContext, resetSession, robotsConversationReady]);
+  }, [isOpen, launchContext?.sessionId, resetSession, robotsConversationReady]);
 
   useEffect(() => {
     if (!isOpen || !sessionId || !conversationContextOptions) {

@@ -49,20 +49,25 @@ function buildSnapshotPutRequest(
   };
 }
 
+const DEFAULT_CONVERSATION_SESSION_API: ConversationSessionApi = {
+  createConversationSession,
+  syncConversationSnapshot,
+};
+
 export function useConversationSession({
   lang,
   debounceMs = CONVERSATION_SNAPSHOT_SYNC_DEBOUNCE_MS,
-  api = {
-    createConversationSession,
-    syncConversationSnapshot,
-  },
+  api: apiOption,
   autoCreate = true,
 }: UseConversationSessionOptions) {
+  const apiRef = useRef(apiOption ?? DEFAULT_CONVERSATION_SESSION_API);
+  apiRef.current = apiOption ?? DEFAULT_CONVERSATION_SESSION_API;
   const [sessionId, setSessionId] = useState<string | null>(null);
   const snapshotRevisionRef = useRef(0);
   const pendingOptionsRef = useRef<ConversationContextOptions | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightSyncRef = useRef<Promise<void> | null>(null);
+  const createSessionPromiseRef = useRef<Promise<void> | null>(null);
   const sessionIdRef = useRef<string | null>(null);
 
   const clearDebounceTimer = useCallback(() => {
@@ -87,7 +92,7 @@ export function useConversationSession({
     );
     pendingOptionsRef.current = null;
 
-    const syncPromise = api.syncConversationSnapshot(activeSessionId, payload);
+    const syncPromise = apiRef.current.syncConversationSnapshot(activeSessionId, payload);
     inFlightSyncRef.current = syncPromise;
     try {
       await syncPromise;
@@ -96,7 +101,7 @@ export function useConversationSession({
         inFlightSyncRef.current = null;
       }
     }
-  }, [api, lang]);
+  }, [lang]);
 
   const scheduleSync = useCallback(() => {
     clearDebounceTimer();
@@ -107,14 +112,30 @@ export function useConversationSession({
   }, [clearDebounceTimer, debounceMs, performSync]);
 
   const resetSession = useCallback(async () => {
-    clearDebounceTimer();
-    pendingOptionsRef.current = null;
-    snapshotRevisionRef.current = 0;
+    if (createSessionPromiseRef.current) {
+      await createSessionPromiseRef.current;
+      return;
+    }
 
-    const created = await api.createConversationSession();
-    sessionIdRef.current = created.sessionId;
-    setSessionId(created.sessionId);
-  }, [api, clearDebounceTimer]);
+    const createPromise = (async () => {
+      clearDebounceTimer();
+      pendingOptionsRef.current = null;
+      snapshotRevisionRef.current = 0;
+
+      const created = await apiRef.current.createConversationSession();
+      sessionIdRef.current = created.sessionId;
+      setSessionId(created.sessionId);
+    })();
+
+    createSessionPromiseRef.current = createPromise;
+    try {
+      await createPromise;
+    } finally {
+      if (createSessionPromiseRef.current === createPromise) {
+        createSessionPromiseRef.current = null;
+      }
+    }
+  }, [clearDebounceTimer]);
 
   const syncSnapshot = useCallback((contextOptions: ConversationContextOptions) => {
     if (!sessionIdRef.current) {
