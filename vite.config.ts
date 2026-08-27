@@ -173,25 +173,6 @@ const OPTIMIZE_DEPS_INCLUDE = [
   'three/addons/loaders/GLTFLoader.js',
 ];
 
-function resolveAiRuntimeEnv(env: Record<string, string | undefined>): Record<string, string> {
-  const apiKey =
-    env.VITE_API_KEY?.trim() ||
-    env.VITE_OPENAI_API_KEY?.trim() ||
-    env.VITE_GEMINI_API_KEY?.trim() ||
-    env.API_KEY?.trim() ||
-    env.OPENAI_API_KEY?.trim() ||
-    env.GEMINI_API_KEY?.trim() ||
-    '';
-
-  return {
-    API_KEY: apiKey,
-    GEMINI_API_KEY: env.VITE_GEMINI_API_KEY?.trim() || env.GEMINI_API_KEY?.trim() || '',
-    OPENAI_API_KEY: env.VITE_OPENAI_API_KEY?.trim() || env.OPENAI_API_KEY?.trim() || '',
-    OPENAI_BASE_URL: env.VITE_OPENAI_BASE_URL?.trim() || env.OPENAI_BASE_URL?.trim() || '',
-    OPENAI_MODEL: env.VITE_OPENAI_MODEL?.trim() || env.OPENAI_MODEL?.trim() || '',
-  };
-}
-
 function resolveDevServerHost(env: Record<string, string | undefined>): string {
   const configuredHost = env.URDF_STUDIO_DEV_HOST?.trim();
   // 默认 127.0.0.1：仅本机 IPv4，无 Network URL 噪声、无局域网暴露。不用
@@ -383,7 +364,6 @@ function createStaticHostingHeadersAssetPlugin() {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
   const devServerAllowedHosts = resolveDevServerAllowedHosts(env);
-  const aiRuntimeEnv = resolveAiRuntimeEnv(env);
   const viteCacheDir = resolveViteCacheDir(env);
   const llmDevProxy = resolveLlmDevProxy(env);
 
@@ -495,11 +475,6 @@ export default defineConfig(({ mode }) => {
     ],
     define: {
       __APP_VERSION__: JSON.stringify(appPackageVersion),
-      'process.env.API_KEY': JSON.stringify(aiRuntimeEnv.API_KEY),
-      'process.env.GEMINI_API_KEY': JSON.stringify(aiRuntimeEnv.GEMINI_API_KEY),
-      'process.env.OPENAI_API_KEY': JSON.stringify(aiRuntimeEnv.OPENAI_API_KEY),
-      'process.env.OPENAI_BASE_URL': JSON.stringify(aiRuntimeEnv.OPENAI_BASE_URL),
-      'process.env.OPENAI_MODEL': JSON.stringify(aiRuntimeEnv.OPENAI_MODEL),
     },
     optimizeDeps: {
       entries: OPTIMIZE_DEPS_ENTRY_FILES,

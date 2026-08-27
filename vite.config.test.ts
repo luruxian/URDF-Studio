@@ -13,11 +13,6 @@ const CONFIG_ENV_KEYS = [
   'URDF_STUDIO_DEV_HOST',
   'URDF_STUDIO_DEV_ALLOWED_HOSTS',
   'URDF_STUDIO_VITE_CACHE_DIR',
-  'API_KEY',
-  'OPENAI_API_KEY',
-  'GEMINI_API_KEY',
-  'OPENAI_BASE_URL',
-  'OPENAI_MODEL',
 ] as const;
 
 async function loadViteConfigWithDevServerEnv(
@@ -61,12 +56,6 @@ async function loadViteConfigWithDevServerEnv(
       }
     });
   }
-}
-
-function readDefinedString(config: UserConfig, key: string): string {
-  const definedValue = config.define?.[key];
-  assert.equal(typeof definedValue, 'string');
-  return JSON.parse(definedValue as string) as string;
 }
 
 function listen(server: net.Server, port: number): Promise<void> {
@@ -182,22 +171,6 @@ test('dev server accepts a comma-separated preview host allow-list', async () =>
   });
 
   assert.deepEqual(config.server?.allowedHosts, ['preview.example.test', '.tunnel.example.test']);
-});
-
-test('vite config injects AI runtime env into browser process env defines', async () => {
-  const config = await loadViteConfigWithDevServerEnv({
-    API_KEY: 'test-primary-key',
-    OPENAI_API_KEY: 'test-openai-key',
-    GEMINI_API_KEY: 'test-gemini-key',
-    OPENAI_BASE_URL: 'https://example.test/v1',
-    OPENAI_MODEL: 'test-model',
-  });
-
-  assert.equal(readDefinedString(config, 'process.env.API_KEY'), 'test-primary-key');
-  assert.equal(readDefinedString(config, 'process.env.OPENAI_API_KEY'), 'test-openai-key');
-  assert.equal(readDefinedString(config, 'process.env.GEMINI_API_KEY'), 'test-gemini-key');
-  assert.equal(readDefinedString(config, 'process.env.OPENAI_BASE_URL'), 'https://example.test/v1');
-  assert.equal(readDefinedString(config, 'process.env.OPENAI_MODEL'), 'test-model');
 });
 
 test('dev server ignores non-runtime and test-only files during watch', async () => {

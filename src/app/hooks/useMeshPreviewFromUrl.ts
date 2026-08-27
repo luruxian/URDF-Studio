@@ -23,7 +23,10 @@ const MAX_MESH_PREVIEW_BYTES = 512 * 1024 * 1024;
 export type MeshPreviewFailureReason = MeshAuthErrorCode | 'import_failed';
 
 export interface UseMeshPreviewFromUrlOptions {
-  handleImport: (files: readonly File[]) => Promise<HandleImportResult>;
+  handleImport: (
+    files: readonly File[],
+    options?: { forceLoadRobot?: boolean },
+  ) => Promise<HandleImportResult>;
   onImportComplete?: (success: boolean, failureReason?: MeshPreviewFailureReason) => void;
 }
 

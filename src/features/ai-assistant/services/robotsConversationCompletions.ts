@@ -110,6 +110,7 @@ export async function streamRobotsConversationCompletions(
   try {
     const stream = await client.chat.completions.create(
       {
+        model: 'robots-managed',
         messages: [],
         stream: true,
         ...(input.tools ? { tools: input.tools } : {}),
