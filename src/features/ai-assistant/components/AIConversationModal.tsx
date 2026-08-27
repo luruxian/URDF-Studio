@@ -23,13 +23,14 @@ import { Button } from '@/shared/components/ui/Button';
 import { CLOSE_BUTTON_DANGER_TERTIARY_CLASS } from '@/shared/components/ui/closeButtonStyles';
 import { Dialog } from '@/shared/components/ui/Dialog';
 import { useManagedWindowLayer } from '@/store';
+import { useConversationSession } from '@/app/hooks/useConversationSession';
 import {
   sendConversationTurnStream,
   type ConversationHistoryTurn,
 } from '../services/conversationService';
 import { isRobotsAiConversationReady } from '../services/robotsConversationBackend';
+import { deleteConversationSession } from '../services/conversationSessionApi';
 import { ConversationMessageMarkdown } from './ConversationMessageMarkdown';
-import { buildConversationContext } from '../utils/buildConversationContext';
 import { shouldSubmitConversationInput } from '../utils/conversationInput';
 import {
   createConversationMessage,
@@ -125,7 +126,14 @@ export function AIConversationModal({
   toolsConfig,
 }: AIConversationModalProps) {
   const t = translations[lang];
+  const robotsConversationReady = isRobotsAiConversationReady();
   const conversationWindowLayer = useManagedWindowLayer('aiConversation');
+  const { sessionId, syncSnapshot, ensureSynced, resetSession } = useConversationSession({
+    lang,
+    autoCreate: false,
+  });
+  const bffSessionIdRef = useRef<string | null>(null);
+  bffSessionIdRef.current = sessionId;
   const defaultWindowSize = useMemo(() => {
     if (typeof window === 'undefined') {
       return { width: 760, height: 620 };
@@ -196,6 +204,7 @@ export function AIConversationModal({
   const isComposingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const skipNextSessionResetRef = useRef(false);
+  const skipNextBffSessionResetRef = useRef(false);
 
   const isReportFollowup = launchContext?.mode === 'inspection-followup';
   const focusedIssue = isReportFollowup ? (launchContext?.focusedIssue ?? null) : null;
@@ -217,6 +226,24 @@ export function AIConversationModal({
     return '';
   })();
   const showHeaderActionLabels = !isMinimized && !isCompactLayout;
+
+  const conversationContextOptions = useMemo(() => {
+    if (!launchContext) {
+      return null;
+    }
+
+    return {
+      mode: launchContext.mode,
+      robot: launchContext.robotSnapshot,
+      inspectionReport: launchContext.inspectionReportSnapshot,
+      selectedEntity: launchContext.selectedEntity,
+      focusedIssue: isReportFollowup ? focusedIssue : null,
+    };
+  }, [
+    focusedIssue,
+    isReportFollowup,
+    launchContext,
+  ]);
 
   const resetConversationState = useCallback(
     (options?: { preserveMessages?: boolean; startNewConversation?: boolean }) => {
@@ -278,6 +305,42 @@ export function AIConversationModal({
 
     resetConversationState();
   }, [launchContext?.sessionId, resetConversationState]);
+
+  useEffect(() => {
+    if (!isOpen || !launchContext || !robotsConversationReady) {
+      return;
+    }
+
+    if (skipNextBffSessionResetRef.current) {
+      skipNextBffSessionResetRef.current = false;
+      return;
+    }
+
+    void resetSession();
+  }, [isOpen, launchContext?.sessionId, resetSession, robotsConversationReady]);
+
+  useEffect(() => {
+    if (!isOpen || !sessionId || !conversationContextOptions) {
+      return;
+    }
+
+    syncSnapshot(conversationContextOptions);
+  }, [conversationContextOptions, isOpen, sessionId, syncSnapshot]);
+
+  useEffect(() => {
+    if (isOpen) {
+      return;
+    }
+
+    const activeSessionId = bffSessionIdRef.current;
+    if (!activeSessionId || !robotsConversationReady) {
+      return;
+    }
+
+    void deleteConversationSession(activeSessionId).catch((error) => {
+      console.error('Failed to delete conversation session', error);
+    });
+  }, [isOpen, robotsConversationReady]);
 
   useEffect(() => {
     if (!isOpen && isSending) {
@@ -359,15 +422,22 @@ export function AIConversationModal({
 
     if (pendingResetAction === 'new-conversation') {
       skipNextSessionResetRef.current = true;
+      skipNextBffSessionResetRef.current = true;
       resetConversationState({
         preserveMessages: true,
         startNewConversation: true,
       });
+      if (robotsConversationReady) {
+        void resetSession();
+      }
       onStartNewConversation(launchContext);
       return;
     }
 
     resetConversationState();
+    if (robotsConversationReady) {
+      void resetSession();
+    }
   };
 
   const submitConversationTurn = async ({
@@ -422,17 +492,20 @@ export function AIConversationModal({
     setIsSending(true);
 
     try {
+      if (robotsConversationReady) {
+        await ensureSynced();
+        const activeSessionId = bffSessionIdRef.current;
+        if (!activeSessionId) {
+          setRequestError(t.unknownError);
+          setMessages((prev) => removeTrailingAssistantPlaceholder(prev));
+          return;
+        }
+      }
+
+      const activeSessionId = bffSessionIdRef.current ?? '';
       const result = await sendConversationTurnStream({
-        mode: launchContext.mode,
+        sessionId: activeSessionId,
         lang,
-        context: buildConversationContext({
-          mode: launchContext.mode,
-          robot: launchContext.robotSnapshot,
-          inspectionReport: launchContext.inspectionReportSnapshot,
-          selectedEntity: launchContext.selectedEntity,
-          focusedIssue,
-        }),
-        history,
         userMessage: trimmedMessage,
         signal: abortController.signal,
         onReplyDelta: (delta) => {
@@ -880,7 +953,11 @@ export function AIConversationModal({
                       onClick={() => {
                         void handleSend();
                       }}
-                      disabled={isSending || !input.trim()}
+                      disabled={
+                        isSending ||
+                        !input.trim() ||
+                        (robotsConversationReady && !sessionId)
+                      }
                       className="flex h-6 items-center gap-1 rounded-lg bg-system-blue-solid px-2.5 text-[11px] font-semibold text-white transition-colors hover:bg-system-blue-hover disabled:opacity-30"
                     >
                       {isSending ? (

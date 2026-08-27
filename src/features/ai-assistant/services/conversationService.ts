@@ -1,6 +1,5 @@
 import OpenAI from 'openai';
 import { translations, type Language } from '@/shared/i18n';
-import type { ConversationMode } from '../config/prompts';
 import { isAiBackendAuthError } from './aiBackendTransport';
 import { isRobotsAiConversationReady } from './robotsConversationBackend';
 import {
@@ -30,10 +29,8 @@ export interface ConversationHistoryTurn {
 }
 
 export interface SendConversationTurnInput {
-  mode: ConversationMode;
+  sessionId: string;
   lang?: Language;
-  context: string;
-  history?: ConversationHistoryTurn[];
   userMessage: string;
 }
 
@@ -223,10 +220,8 @@ export function __setConversationTurnStreamForTests(
 }
 
 const sendConversationTurnStreamImpl = async ({
-  mode,
+  sessionId,
   lang = 'en',
-  context,
-  history = [],
   userMessage,
   signal,
   onReplyDelta,
@@ -244,6 +239,14 @@ const sendConversationTurnStreamImpl = async ({
     };
   }
 
+  if (!sessionId.trim()) {
+    return {
+      reply: '',
+      error: buildConversationError('request_failed', text.requestFailed()),
+      status: 'error',
+    };
+  }
+
   if (!isRobotsAiConversationReady()) {
     return {
       reply: '',
@@ -252,17 +255,9 @@ const sendConversationTurnStreamImpl = async ({
     };
   }
 
-  const normalizedHistory = (history || [])
-    .map(sanitizeHistoryTurn)
-    .filter((turn): turn is ConversationHistoryTurn => Boolean(turn))
-    .slice(-MAX_HISTORY_TURNS);
-
   try {
     const result = await streamRobotsConversationCompletions({
-      mode,
-      lang,
-      context,
-      history: normalizedHistory,
+      sessionId: sessionId.trim(),
       userMessage: trimmedMessage,
       signal,
       onReplyDelta,

@@ -160,6 +160,8 @@ test('serializeConversationHistory applies the same sanitization contract as mes
   );
 });
 
+const TEST_SESSION_ID = 'sess-test-1';
+
 test('sendConversationTurn returns handoff error when robots API base is not configured', async () => {
   const previousRobotsBase = process.env.VITE_ROBOTS_API_BASE_URL;
   delete process.env.VITE_ROBOTS_API_BASE_URL;
@@ -167,10 +169,8 @@ test('sendConversationTurn returns handoff error when robots API base is not con
 
   try {
     const result = await sendConversationTurn({
-      mode: 'general',
+      sessionId: TEST_SESSION_ID,
       lang: 'en',
-      context: '{"robot":{"name":"demo"}}',
-      history: [],
       userMessage: 'What can this robot do?',
     });
 
@@ -194,10 +194,8 @@ test('sendConversationTurnStream returns localized handoff error when robots ses
 
   try {
     const result = await sendConversationTurnStream({
-      mode: 'general',
+      sessionId: TEST_SESSION_ID,
       lang: 'zh',
-      context: '{"robot":{"name":"demo"}}',
-      history: [],
       userMessage: '这个机器人适合做什么？',
     });
 
@@ -290,10 +288,8 @@ test('sendConversationTurnStream surfaces backend stream failures', async () => 
 
     try {
       const result = await sendConversationTurnStream({
-        mode: 'general',
+        sessionId: TEST_SESSION_ID,
         lang: 'en',
-        context: '{"robot":{"name":"demo"}}',
-        history: [],
         userMessage: 'How should I improve this robot?',
       });
 
@@ -323,13 +319,8 @@ test('sendConversationTurnStream uses robots chat/completions when configured', 
     try {
       const streamedDeltas: string[] = [];
       const result = await sendConversationTurnStream({
-        mode: 'general',
+        sessionId: TEST_SESSION_ID,
         lang: 'zh',
-        context: '{"robot":{"name":"demo"}}',
-        history: [
-          { role: 'user', content: '  之前的问题  ' },
-          { role: 'assistant', content: '' },
-        ],
         userMessage: '  这个机器人怎么样？ ',
         onReplyDelta: (delta) => {
           streamedDeltas.push(delta);
@@ -345,10 +336,12 @@ test('sendConversationTurnStream uses robots chat/completions when configured', 
       assert.equal(requests[0].url, ROBOTS_COMPLETIONS_URL);
       const sentPayload = JSON.parse(String(requests[0].init.body));
       assert.equal(sentPayload.stream, true);
+      assert.equal(sentPayload.studio.session_id, TEST_SESSION_ID);
       assert.equal(sentPayload.studio.user_message, '这个机器人怎么样？');
-      assert.equal(sentPayload.studio.mode, 'general');
-      assert.equal(sentPayload.studio.lang, 'zh');
-      assert.deepEqual(sentPayload.studio.history, [{ role: 'user', content: '之前的问题' }]);
+      assert.equal(sentPayload.studio.mode, undefined);
+      assert.equal(sentPayload.studio.lang, undefined);
+      assert.equal(sentPayload.studio.context, undefined);
+      assert.equal(sentPayload.studio.history, undefined);
     } finally {
       globalThis.fetch = previousFetch;
     }
@@ -370,10 +363,8 @@ test('sendConversationTurnStream accumulates streamed tool_calls and invokes onT
     try {
       const receivedToolCalls: Array<{ function: { name: string; arguments: string } }> = [];
       const result = await sendConversationTurnStream({
-        mode: 'general',
+        sessionId: TEST_SESSION_ID,
         lang: 'en',
-        context: '{}',
-        history: [],
         userMessage: 'Extend the arm by 5cm',
         onToolCalls: (toolCalls) => {
           receivedToolCalls.push(...toolCalls);
@@ -408,10 +399,8 @@ test('sendConversationTurnStream maps robots backend 401 to a login-required err
 
     try {
       const result = await sendConversationTurnStream({
-        mode: 'general',
+        sessionId: TEST_SESSION_ID,
         lang: 'zh',
-        context: '',
-        history: [],
         userMessage: '这个机器人怎么样？',
       });
 

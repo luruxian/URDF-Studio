@@ -1,28 +1,19 @@
 /**
  * Streaming chat/completions transport for robots-managed Studio conversation.
  *
- * POST `{scopedBackend}/v1/chat/completions` with a `studio` wrapper (mode, lang,
- * context, history, user_message). The BFF owns prompts, tool registration, and
+ * POST `{scopedBackend}/v1/chat/completions` with a `studio` wrapper (`session_id`,
+ * `user_message`). The BFF owns prompts, snapshot context, tool registration, and
  * upstream model (`LLM_MODEL`); client `messages` / `tools` / `model` are ignored
  * when `studio` is present.
  */
 
 import OpenAI from 'openai';
 
-import type { Language } from '@/shared/i18n';
-import type { ConversationMode } from '../config/prompts';
 import { createRobotsAgentOpenAIClient } from './robotsAgentLlm';
-import type {
-  ConversationHistoryTurn,
-  ConversationToolCall,
-  ConversationToolDefinition,
-} from './conversationService';
+import type { ConversationToolCall, ConversationToolDefinition } from './conversationService';
 
 export interface RobotsConversationCompletionsInput {
-  mode: ConversationMode;
-  lang: Language;
-  context: string;
-  history: ConversationHistoryTurn[];
+  sessionId: string;
   userMessage: string;
   signal?: AbortSignal;
   onReplyDelta?: (delta: string) => void;
@@ -116,13 +107,7 @@ export async function streamRobotsConversationCompletions(
         ...(input.tools ? { tools: input.tools } : {}),
         // Robots BFF extension; ignored by upstream OpenAI types.
         studio: {
-          mode: input.mode,
-          lang: input.lang,
-          context: input.context,
-          history: input.history.map((turn) => ({
-            role: turn.role,
-            content: turn.content,
-          })),
+          session_id: input.sessionId,
           user_message: input.userMessage,
         },
       } as OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming,

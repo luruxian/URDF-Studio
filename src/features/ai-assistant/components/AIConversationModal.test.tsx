@@ -6,7 +6,8 @@ import { createRoot } from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 
 import { __setConversationTurnStreamForTests } from '../services/conversationService';
-import { setAiBackendBaseUrlResolver } from '@/shared/hostIntegrationState';
+import { setAiBackendBaseUrlResolver, setAiBackendAuthTokenProvider } from '@/shared/hostIntegrationState';
+import { BOOTSTRAP_STORAGE_KEY } from '@/integrations/agile-robot/constants';
 import { DEFAULT_MANAGED_WINDOW_ORDER, useUIStore } from '@/store';
 import { GeometryType, JointType, type RobotState } from '@/types';
 import type { AIConversationLaunchContext } from '../types';
@@ -160,25 +161,73 @@ const clickButton = async (button: HTMLButtonElement) => {
 
 const ROBOTS_API_BASE = 'https://api.example.com/api/v1';
 const ROBOTS_AI_BACKEND = `${ROBOTS_API_BASE}/me/projects/ord-9/studio/ai`;
+const TEST_BFF_SESSION_ID = 'sess-modal-test';
+
+const validBootstrap = {
+  studio_token: 'test-token',
+  studio_expires_at: '2026-08-09T00:00:00Z',
+  order_id: 'ord-9',
+  attachment_id: 'att-456',
+  conversation_id: null,
+  input_image_path: 'orders/ord-9/model_input.png',
+  fallback_input_image_path: 'orders/ord-9/fallback.png',
+  api_base_url: ROBOTS_API_BASE,
+};
 
 interface RobotsConversationEnvSnapshot {
   previousRobotsBase?: string;
+  previousFetch?: typeof fetch;
 }
 
 const setRobotsConversationEnv = (): RobotsConversationEnvSnapshot => {
   const previousRobotsBase = process.env.VITE_ROBOTS_API_BASE_URL;
+  const previousFetch = globalThis.fetch;
   process.env.VITE_ROBOTS_API_BASE_URL = ROBOTS_API_BASE;
   setAiBackendBaseUrlResolver(() => ROBOTS_AI_BACKEND);
-  return { previousRobotsBase };
+  sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(validBootstrap));
+  setAiBackendAuthTokenProvider(() => 'test-token');
+  return { previousRobotsBase, previousFetch };
 };
 
 const restoreRobotsConversationEnv = (snapshot: RobotsConversationEnvSnapshot) => {
   setAiBackendBaseUrlResolver(null);
+  setAiBackendAuthTokenProvider(null);
+  sessionStorage.clear();
+  if (snapshot.previousFetch === undefined) {
+    delete (globalThis as { fetch?: typeof fetch }).fetch;
+  } else {
+    globalThis.fetch = snapshot.previousFetch;
+  }
   if (snapshot.previousRobotsBase === undefined) {
     delete process.env.VITE_ROBOTS_API_BASE_URL;
   } else {
     process.env.VITE_ROBOTS_API_BASE_URL = snapshot.previousRobotsBase;
   }
+};
+
+const mockConversationSessionFetch = () => {
+  globalThis.fetch = (async (url: unknown, init?: RequestInit) => {
+    const requestUrl = String(url);
+    if (requestUrl.includes('/ai/conversation-sessions') && init?.method === 'POST') {
+      return new Response(
+        JSON.stringify({
+          session_id: TEST_BFF_SESSION_ID,
+          expires_at: '2026-08-27T10:00:00Z',
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }
+    if (requestUrl.includes('/ai/conversation-sessions/') && init?.method === 'PUT') {
+      return new Response(JSON.stringify({ snapshot_revision: 1 }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (requestUrl.includes('/ai/conversation-sessions/') && init?.method === 'DELETE') {
+      return new Response(null, { status: 204 });
+    }
+    throw new Error(`Unexpected fetch in AIConversationModal test: ${requestUrl}`);
+  }) as typeof fetch;
 };
 
 const findSendButton = (scope: ParentNode): HTMLButtonElement => {
@@ -642,8 +691,9 @@ test('header actions expose hover and focus border highlight styles', async () =
 });
 
 test('toolsConfig path surfaces ToolConfirmBanner when the model returns tool_calls', async () => {
-  const robotsEnv = setRobotsConversationEnv();
   const dom = installDom();
+  const robotsEnv = setRobotsConversationEnv();
+  mockConversationSessionFetch();
   const container = dom.window.document.getElementById('root');
   assert.ok(container, 'root container should exist');
 
@@ -707,6 +757,7 @@ test('toolsConfig path surfaces ToolConfirmBanner when the model returns tool_ca
       );
     });
     await flush();
+    await flush();
 
     await typeAndSend(container, '把手臂加长 5cm');
     await flush();
@@ -716,10 +767,12 @@ test('toolsConfig path surfaces ToolConfirmBanner when the model returns tool_ca
     assert.equal(findButtonByText(container, '取消').textContent?.includes('取消'), true);
   } finally {
     __setConversationTurnStreamForTests(null);
-    restoreRobotsConversationEnv(robotsEnv);
     await act(async () => {
       root.unmount();
     });
+    await flush();
+    await flush();
+    restoreRobotsConversationEnv(robotsEnv);
     dom.window.close();
   }
 });

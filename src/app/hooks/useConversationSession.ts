@@ -136,6 +136,12 @@ export function useConversationSession({
   }, [clearDebounceTimer, performSync]);
 
   useEffect(() => {
+    return () => {
+      clearDebounceTimer();
+    };
+  }, [clearDebounceTimer]);
+
+  useEffect(() => {
     if (!autoCreate) {
       return undefined;
     }
