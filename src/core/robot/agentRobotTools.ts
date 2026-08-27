@@ -1,14 +1,11 @@
 /**
  * Agent robot edit tools — surgical, in-place transforms on a `RobotData` draft.
  *
- * These pure functions are the tool surface exposed to the AI edit agent (see
- * `src/features/ai-assistant/services/aiAgent.ts`). Each operates on an
- * agent-owned deep clone of the canonical robot and mutates ONLY the fields the
- * tool targets — every other field (inertia, origin, color, sibling links,
- * unrelated joints) is left untouched. This is the core reason the agent
- * supersedes the legacy "regenerate whole robot JSON" path, which was lossy
- * (`normalizeAIRobotResponse` hard-coded inertia/origin) and clobbered fields
- * the user did not ask to change.
+ * Pure functions for in-place robot draft mutations. Each operates on a
+ * caller-owned deep clone and mutates ONLY the fields the tool targets —
+ * every other field (inertia, origin, color, sibling links, unrelated joints)
+ * is left untouched. Kept in core for reuse by future agent or automation
+ * paths; the legacy browser Edit Agent was removed in Phase 1 hardening.
  *
  * Boundary: core layer. Imports only `@/types` and `@/core/robot/*`. No React,
  * no store, no feature code — so the tools are independently unit-testable.

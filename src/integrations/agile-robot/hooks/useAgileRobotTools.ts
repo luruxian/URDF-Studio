@@ -2,7 +2,7 @@
 // useAgileRobotTools — DISABLED
 //
 // Agile Robot 外观改图 / 混元 3D 重生工具已从 AI 对话中停用。
-// AI 对话现统一走 URDF edit agent（resolveModificationProposal）。
+// AI 对话现统一走 robots BFF（sendConversationTurn / conversationService）。
 // 原实现保留在文件末尾块注释中，便于日后恢复。
 // ============================================================
 
