@@ -2,14 +2,17 @@
 
 面向 **Agile Robot / robots 主站与 API 后端** 开发人员。
 
-Studio 侧计划将 AI 生成 / 审阅 / 对话改为 **Mode B（托管后端）**：浏览器只 POST 结构化上下文，**不在 bundle 内携带 LLM Provider 密钥**。主站需在与即梦 / 混元相同的 BFF 层新增 **Studio AI** 路由。
+Studio 侧 AI 生成 / 审阅 / 对话已改为 **Mode B（托管后端）**：浏览器只 POST 结构化上下文，**不在 bundle 内携带 LLM Provider 密钥**；**BYOK（`VITE_OPENAI_*`）已移除**。主站需在与即梦 / 混元相同的 BFF 层提供 **Studio AI** 路由。
 
 - Studio 设计 spec：[../superpowers/specs/2026-08-22-robots-exclusive-studio-mode-b-design.md](../superpowers/specs/2026-08-22-robots-exclusive-studio-mode-b-design.md)
+- 安全加固 spec（BYOK 移除 + BFF 会话快照 + Edit Agent 删除）：robots 仓库 [`docs/superpowers/specs/2026-08-27-studio-ai-security-hardening-design.md`](../../../robots/docs/superpowers/specs/2026-08-27-studio-ai-security-hardening-design.md)
 - 已有 BFF（即梦 / 混元）：[urdf-studio.md](urdf-studio.md) §4
 - Studio 传输层实现（只读参考）：`src/features/ai-assistant/services/aiBackendTransport.ts`
 - 提示词模板 source of truth：`src/features/ai-assistant/config/aiPromptTemplates.md` → 生成 `aiPromptTemplates.generated.ts`
 
-**状态：主站尚未实现。** 本文是主站落地契约；Studio 侧 wiring 见上述 spec / plan。
+**状态：主站尚未实现。** 本文是主站落地契约；Studio 侧 BFF-only wiring 已完成（Phase 1）。
+
+**Phase 1 约束：** `generate`、`inspect`、`conversation` 三者均依赖有效 bootstrap（`order_id` + `studio_token`）；无 bootstrap 时 AI 不可用，3D 预览仍可加载。
 
 ---
 
@@ -124,7 +127,7 @@ Studio 会读取 `message` 字段展示给用户。
 
 Studio 在收到 `data.content` 或 SSE delta 后 **自行 JSON 解析 / Markdown 渲染**；BFF **不要**返回已解析的 `InspectionReport` 等业务对象，除非未来双方显式升级契约。
 
-### 5.1 推荐生成参数（与 Studio BYOK 路径对齐）
+### 5.1 推荐生成参数
 
 | 端点 | 建议 |
 |------|------|
@@ -281,7 +284,7 @@ AI 审阅机器人结构。
 
 1. 用 `conversation.en` / `conversation.zh` 模板构建 system prompt。
 2. 将 `context` 填入 `__CONVERSATION_CONTEXT__`。
-3. `history` + `userMessage` 组装为 chat messages（**不要**在 system 里重复 history，与 Studio BYOK 行为一致）。
+3. `history` + `userMessage` 组装为 chat messages（**不要**在 system 里重复 history）。
 
 ### 8.2 Response：`200` + SSE
 

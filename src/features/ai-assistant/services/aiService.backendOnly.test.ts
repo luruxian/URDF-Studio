@@ -9,9 +9,7 @@ const minimalRobot = createEmptyRobot();
 
 test('generateRobotFromPrompt returns login handoff when backend is disabled', async () => {
   const previousBackendUrl = process.env.AI_BACKEND_URL;
-  const previousApiKey = process.env.API_KEY;
   delete process.env.AI_BACKEND_URL;
-  delete process.env.API_KEY;
   setAiBackendBaseUrlResolver(null);
 
   try {
@@ -26,20 +24,13 @@ test('generateRobotFromPrompt returns login handoff when backend is disabled', a
     } else {
       process.env.AI_BACKEND_URL = previousBackendUrl;
     }
-    if (previousApiKey === undefined) {
-      delete process.env.API_KEY;
-    } else {
-      process.env.API_KEY = previousApiKey;
-    }
     setAiBackendBaseUrlResolver(null);
   }
 });
 
 test('runRobotInspection returns login handoff when backend is disabled', async () => {
   const previousBackendUrl = process.env.AI_BACKEND_URL;
-  const previousApiKey = process.env.API_KEY;
   delete process.env.AI_BACKEND_URL;
-  delete process.env.API_KEY;
   setAiBackendBaseUrlResolver(null);
 
   try {
@@ -53,11 +44,6 @@ test('runRobotInspection returns login handoff when backend is disabled', async 
       delete process.env.AI_BACKEND_URL;
     } else {
       process.env.AI_BACKEND_URL = previousBackendUrl;
-    }
-    if (previousApiKey === undefined) {
-      delete process.env.API_KEY;
-    } else {
-      process.env.API_KEY = previousApiKey;
     }
     setAiBackendBaseUrlResolver(null);
   }
