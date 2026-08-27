@@ -13,6 +13,13 @@ export { AIConversationModal } from './components/AIConversationModal'
 export { generateRobotFromPrompt, runRobotInspection } from './services/aiService'
 export { sendConversationTurn } from './services/conversationService'
 export {
+  createConversationSession,
+  deleteConversationSession,
+  syncConversationSnapshot,
+  isRobotsStudioApiError,
+  RobotsStudioApiError,
+} from './services/conversationSessionApi'
+export {
   isAiBackendEnabled,
   setAiBackendAuthTokenProvider,
 } from './services/aiBackendTransport'
@@ -29,12 +36,20 @@ export {
   cloneAISnapshot,
   resolveCurrentAIRobotSnapshot,
 } from './utils/aiConversationRobotSnapshot'
+export {
+  buildConversationContext,
+} from './utils/buildConversationContext'
+export type { ConversationContextOptions } from './utils/buildConversationContext'
 export type {
   AIInspectableEntityRef,
   AIWorkspaceRobotTarget,
 } from './utils/aiWorkspaceTarget'
 
 // Types
+export type {
+  ConversationSnapshotPut,
+  ConversationSnapshotPayload,
+} from './services/conversationSessionApi'
 export type {
   AIResponse,
   InspectionItem,
