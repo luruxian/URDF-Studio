@@ -79,6 +79,14 @@ export interface ToolResult {
   message: string;
 }
 
+/** Localized labels for ToolConfirmBanner when a tools config supplies custom copy. */
+export interface ToolConfirmBannerTexts {
+  confirm: string;
+  cancel: string;
+  retry: string;
+  executing: string;
+}
+
 // ============================================================
 // AI conversation tool contracts
 // (these mirror OpenAI function-calling shapes)
@@ -103,4 +111,6 @@ export interface AIConversationToolsConfig {
   ) => ParsedToolCall | null;
   /** Execute the confirmed tool call. Returns result for UI feedback. */
   onExecute: (toolCall: ParsedToolCall) => Promise<ToolResult>;
+  /** Optional banner copy; defaults to agileRobotTool* when omitted. */
+  bannerTexts?: ToolConfirmBannerTexts;
 }

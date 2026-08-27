@@ -1098,6 +1098,24 @@ export const es: TranslationKeys = {
     'Ya hay una generación 3D en curso. Espera a que termine.',
   agileRobotToolUnknownTool: 'Herramienta desconocida: {toolName}',
   agileRobotToolUnknownError: 'Error desconocido',
+
+  // Robots Studio URDF+STL mesh regenerate tool confirmation
+  studioMeshToolConfirm: 'Confirmar',
+  studioMeshToolCancel: 'Cancelar',
+  studioMeshToolRetry: 'Reintentar',
+  studioMeshToolExecuting: 'Regenerando URDF+STL…',
+  studioMeshToolRegenerateSummary: 'Regenerar URDF+STL',
+  studioMeshToolSessionExpired:
+    'Sesión expirada. Vuelve al sitio principal y abre la vista previa de nuevo.',
+  studioMeshToolModelUpdated: 'URDF+STL actualizado',
+  studioMeshToolPreviewNotConnected:
+    'URDF+STL generado, pero la actualización de la vista previa no está conectada',
+  studioMeshToolGenerationFailed: 'Error al regenerar URDF+STL',
+  studioMeshToolCancelled: 'Cancelado',
+  studioMeshToolJobInProgress:
+    'Ya hay una regeneración URDF+STL en curso. Espera a que termine.',
+  studioMeshToolUnknownTool: 'Herramienta desconocida: {toolName}',
+  studioMeshToolUnknownError: 'Error desconocido',
   meshPreviewAuthMissing:
     'Faltan credenciales de vista previa. Abra este modelo de nuevo desde Agile Robot.',
   meshPreviewAuthExpired:

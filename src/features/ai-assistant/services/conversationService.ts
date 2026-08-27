@@ -1,11 +1,12 @@
 import OpenAI from 'openai';
 import { translations, type Language } from '@/shared/i18n';
 import type { ConversationMode } from '../config/prompts';
-import { isAiBackendAuthError, streamAiBackendChat } from './aiBackendTransport';
+import { isAiBackendAuthError } from './aiBackendTransport';
+import { isRobotsAiConversationReady } from './robotsConversationBackend';
 import {
-  getRobotsAiConversationBackendUrl,
-  isRobotsAiConversationReady,
-} from './robotsConversationBackend';
+  isRobotsConversationAuthError,
+  streamRobotsConversationCompletions,
+} from './robotsConversationCompletions';
 
 // Provider-agnostic tool-calling types. ConversationToolDefinition mirrors the
 // OpenAI ChatCompletionTool shape so it can be passed through without a cast,
@@ -229,6 +230,8 @@ const sendConversationTurnStreamImpl = async ({
   userMessage,
   signal,
   onReplyDelta,
+  tools,
+  onToolCalls,
 }: SendConversationTurnStreamInput): Promise<ConversationTurnStreamResult> => {
   const text = getConversationTexts(lang);
   const trimmedMessage = userMessage.trim();
@@ -249,30 +252,29 @@ const sendConversationTurnStreamImpl = async ({
     };
   }
 
+  const normalizedHistory = (history || [])
+    .map(sanitizeHistoryTurn)
+    .filter((turn): turn is ConversationHistoryTurn => Boolean(turn))
+    .slice(-MAX_HISTORY_TURNS);
+
   try {
-    const result = await streamAiBackendChat(
-      {
-        mode,
-        lang,
-        context,
-        history: (history || [])
-          .map(sanitizeHistoryTurn)
-          .filter((turn): turn is ConversationHistoryTurn => Boolean(turn))
-          .slice(-MAX_HISTORY_TURNS),
-        userMessage: trimmedMessage,
-      },
-      {
-        signal,
-        onDelta: onReplyDelta,
-        baseUrl: getRobotsAiConversationBackendUrl(),
-      },
-    );
+    const result = await streamRobotsConversationCompletions({
+      mode,
+      lang,
+      context,
+      history: normalizedHistory,
+      userMessage: trimmedMessage,
+      signal,
+      onReplyDelta,
+      tools,
+      onToolCalls,
+    });
 
     const normalizedReply = result.reply.trim();
     if (result.status === 'aborted') {
       return { reply: normalizedReply, error: null, status: 'aborted' };
     }
-    if (!normalizedReply) {
+    if (!normalizedReply && result.toolCalls.length === 0) {
       return {
         reply: '',
         error: buildConversationError('empty_response', text.emptyResponse),
@@ -284,7 +286,7 @@ const sendConversationTurnStreamImpl = async ({
     if (isConversationAbortError(error) || signal?.aborted) {
       return { reply: '', error: null, status: 'aborted' };
     }
-    if (isAiBackendAuthError(error)) {
+    if (isAiBackendAuthError(error) || isRobotsConversationAuthError(error)) {
       return {
         reply: '',
         error: buildConversationError('login_required', text.loginRequired),

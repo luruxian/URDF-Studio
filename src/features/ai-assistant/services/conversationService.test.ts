@@ -16,6 +16,84 @@ import OpenAI from 'openai';
 
 const ROBOTS_API_BASE = 'https://api.example.com/api/v1';
 const ROBOTS_AI_BACKEND = `${ROBOTS_API_BASE}/me/projects/ord-9/studio/ai`;
+const ROBOTS_COMPLETIONS_URL = `${ROBOTS_AI_BACKEND}/v1/chat/completions`;
+
+const openAiContentChunk = (content: string): string =>
+  JSON.stringify({
+    id: 'chatcmpl-test',
+    object: 'chat.completion.chunk',
+    choices: [{ index: 0, delta: { content }, finish_reason: null }],
+  });
+
+const openAiToolCallNameChunk = (name: string, id = 'call_abc'): string =>
+  JSON.stringify({
+    id: 'chatcmpl-tool',
+    object: 'chat.completion.chunk',
+    choices: [
+      {
+        index: 0,
+        delta: {
+          tool_calls: [
+            {
+              index: 0,
+              id,
+              type: 'function',
+              function: { name, arguments: '' },
+            },
+          ],
+        },
+        finish_reason: null,
+      },
+    ],
+  });
+
+const openAiToolCallArgsChunk = (args: string): string =>
+  JSON.stringify({
+    id: 'chatcmpl-tool',
+    object: 'chat.completion.chunk',
+    choices: [
+      {
+        index: 0,
+        delta: {
+          tool_calls: [{ index: 0, function: { arguments: args } }],
+        },
+        finish_reason: 'tool_calls',
+      },
+    ],
+  });
+
+const mockOpenAiStreamResponse = (sseDataChunks: string[]): Response => {
+  const encoder = new TextEncoder();
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const chunk of sseDataChunks) {
+        controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
+      }
+      controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+      controller.close();
+    },
+  });
+  return {
+    ok: true,
+    status: 200,
+    headers: new Headers({ 'content-type': 'text/event-stream' }),
+    body,
+    text: async () => '',
+    json: async () => null,
+  } as Response;
+};
+
+const mockOpenAiErrorResponse = (status: number, payload: unknown): Response => {
+  const text = JSON.stringify(payload);
+  return {
+    ok: false,
+    status,
+    headers: new Headers({ 'content-type': 'application/json' }),
+    body: null,
+    text: async () => text,
+    json: async () => payload,
+  } as Response;
+};
 
 const withRobotsConversationEnv = async (
   run: () => Promise<void>,
@@ -222,29 +300,24 @@ test('sendConversationTurnStream surfaces backend stream failures', async () => 
       assert.equal(result.status, 'error');
       assert.equal(result.reply, '');
       assert.equal(result.error?.code, 'request_failed');
-      assert.match(String(result.error?.message || ''), /connection refused/i);
+      assert.match(String(result.error?.message || ''), /connection/i);
     } finally {
       globalThis.fetch = previousFetch;
     }
   });
 });
 
-test('sendConversationTurnStream uses the robots BFF transport when configured', async () => {
+test('sendConversationTurnStream uses robots chat/completions when configured', async () => {
   await withRobotsConversationEnv(async () => {
     const previousFetch = globalThis.fetch;
     const requests: Array<{ url: string; init: RequestInit }> = [];
 
     globalThis.fetch = (async (url: unknown, init?: RequestInit) => {
       requests.push({ url: String(url), init: init ?? {} });
-      const encoder = new TextEncoder();
-      const body = new ReadableStream<Uint8Array>({
-        start(controller) {
-          controller.enqueue(encoder.encode('data: {"delta":"后端"}\n\n'));
-          controller.enqueue(encoder.encode('data: {"delta":"回复"}\n\ndata: {"done":true}\n\n'));
-          controller.close();
-        },
-      });
-      return { ok: true, status: 200, body, json: async () => null };
+      return mockOpenAiStreamResponse([
+        openAiContentChunk('后端'),
+        openAiContentChunk('回复'),
+      ]);
     }) as typeof fetch;
 
     try {
@@ -269,12 +342,55 @@ test('sendConversationTurnStream uses the robots BFF transport when configured',
       assert.equal(result.error, null);
 
       assert.equal(requests.length, 1);
-      assert.equal(requests[0].url, `${ROBOTS_AI_BACKEND}/chat`);
+      assert.equal(requests[0].url, ROBOTS_COMPLETIONS_URL);
       const sentPayload = JSON.parse(String(requests[0].init.body));
-      assert.equal(sentPayload.userMessage, '这个机器人怎么样？');
-      assert.equal(sentPayload.mode, 'general');
-      assert.equal(sentPayload.lang, 'zh');
-      assert.deepEqual(sentPayload.history, [{ role: 'user', content: '之前的问题' }]);
+      assert.equal(sentPayload.stream, true);
+      assert.equal(sentPayload.studio.user_message, '这个机器人怎么样？');
+      assert.equal(sentPayload.studio.mode, 'general');
+      assert.equal(sentPayload.studio.lang, 'zh');
+      assert.deepEqual(sentPayload.studio.history, [{ role: 'user', content: '之前的问题' }]);
+    } finally {
+      globalThis.fetch = previousFetch;
+    }
+  });
+});
+
+test('sendConversationTurnStream accumulates streamed tool_calls and invokes onToolCalls', async () => {
+  await withRobotsConversationEnv(async () => {
+    const previousFetch = globalThis.fetch;
+
+    globalThis.fetch = (async () =>
+      mockOpenAiStreamResponse([
+        openAiToolCallNameChunk('propose_requirements_revision'),
+        openAiToolCallArgsChunk(
+          '{"change_summary":"arm +5cm","append_markdown":"\\n## v3\\n"}',
+        ),
+      ])) as typeof fetch;
+
+    try {
+      const receivedToolCalls: Array<{ function: { name: string; arguments: string } }> = [];
+      const result = await sendConversationTurnStream({
+        mode: 'general',
+        lang: 'en',
+        context: '{}',
+        history: [],
+        userMessage: 'Extend the arm by 5cm',
+        onToolCalls: (toolCalls) => {
+          receivedToolCalls.push(...toolCalls);
+        },
+      });
+
+      assert.equal(result.status, 'completed');
+      assert.equal(result.reply, '');
+      assert.equal(result.error, null);
+      assert.deepEqual(receivedToolCalls, [
+        {
+          function: {
+            name: 'propose_requirements_revision',
+            arguments: '{"change_summary":"arm +5cm","append_markdown":"\\n## v3\\n"}',
+          },
+        },
+      ]);
     } finally {
       globalThis.fetch = previousFetch;
     }
@@ -285,12 +401,10 @@ test('sendConversationTurnStream maps robots backend 401 to a login-required err
   await withRobotsConversationEnv(async () => {
     const previousFetch = globalThis.fetch;
 
-    globalThis.fetch = (async () => ({
-      ok: false,
-      status: 401,
-      body: null,
-      json: async () => ({ success: false, message: 'JWT Bearer token required' }),
-    })) as unknown as typeof fetch;
+    globalThis.fetch = (async () =>
+      mockOpenAiErrorResponse(401, {
+        error: { message: 'JWT Bearer token required', type: 'invalid_request_error' },
+      })) as unknown as typeof fetch;
 
     try {
       const result = await sendConversationTurnStream({

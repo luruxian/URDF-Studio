@@ -1100,6 +1100,24 @@ export const de: TranslationKeys = {
     'Eine 3D-Generierung läuft bereits. Bitte warten Sie, bis sie abgeschlossen ist.',
   agileRobotToolUnknownTool: 'Unbekanntes Tool: {toolName}',
   agileRobotToolUnknownError: 'Unbekannter Fehler',
+
+  // Robots Studio URDF+STL mesh regenerate tool confirmation
+  studioMeshToolConfirm: 'Bestätigen',
+  studioMeshToolCancel: 'Abbrechen',
+  studioMeshToolRetry: 'Erneut versuchen',
+  studioMeshToolExecuting: 'URDF+STL wird neu generiert…',
+  studioMeshToolRegenerateSummary: 'URDF+STL neu generieren',
+  studioMeshToolSessionExpired:
+    'Sitzung abgelaufen. Kehren Sie zur Hauptseite zurück und öffnen Sie die Vorschau erneut.',
+  studioMeshToolModelUpdated: 'URDF+STL aktualisiert',
+  studioMeshToolPreviewNotConnected:
+    'URDF+STL erstellt, aber die Vorschau-Aktualisierung ist nicht angebunden',
+  studioMeshToolGenerationFailed: 'URDF+STL-Neugenerierung fehlgeschlagen',
+  studioMeshToolCancelled: 'Abgebrochen',
+  studioMeshToolJobInProgress:
+    'Eine URDF+STL-Neugenerierung läuft bereits. Bitte warten Sie, bis sie abgeschlossen ist.',
+  studioMeshToolUnknownTool: 'Unbekanntes Tool: {toolName}',
+  studioMeshToolUnknownError: 'Unbekannter Fehler',
   meshPreviewAuthMissing:
     'Vorschau-Anmeldedaten fehlen. Öffnen Sie dieses Modell erneut über Agile Robot.',
   meshPreviewAuthExpired:

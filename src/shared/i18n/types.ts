@@ -980,6 +980,22 @@ export interface TranslationKeys extends TranslationWorkflowKeys {
   agileRobotToolJobInProgress: string;
   agileRobotToolUnknownTool: string;
   agileRobotToolUnknownError: string;
+
+  // Robots Studio URDF+STL mesh regenerate tool confirmation
+  studioMeshToolConfirm: string;
+  studioMeshToolCancel: string;
+  studioMeshToolRetry: string;
+  studioMeshToolExecuting: string;
+  studioMeshToolRegenerateSummary: string;
+  studioMeshToolSessionExpired: string;
+  studioMeshToolModelUpdated: string;
+  studioMeshToolPreviewNotConnected: string;
+  studioMeshToolGenerationFailed: string;
+  studioMeshToolCancelled: string;
+  studioMeshToolJobInProgress: string;
+  studioMeshToolUnknownTool: string;
+  studioMeshToolUnknownError: string;
+
   meshPreviewAuthMissing: string;
   meshPreviewAuthExpired: string;
   meshPreviewNotFound: string;

@@ -33,6 +33,7 @@ import {
 } from '@/features/file-io';
 import type { ImportPreparationOverlayState } from './hooks/useFileImport';
 import { useAssetImportFromUrl } from './hooks/useAssetImportFromUrl';
+import { createUrdfPackageImportPort } from './hooks/importUrdfPackageFromGrant';
 import { useMeshPreviewFromUrl } from './hooks/useMeshPreviewFromUrl';
 import {
   preloadAIConversationConnector,
@@ -181,6 +182,10 @@ export function AppContent({ extensions, onExposeActions }: AppContentProps = {}
       setIsExportDialogOpen(true);
     },
   });
+  const importUrdfPackage = useMemo(
+    () => createUrdfPackageImportPort(importAssetFromBotWorld),
+    [importAssetFromBotWorld],
+  );
   useMeshPreviewFromUrl({
     handleImport,
     onImportComplete: (success, failureReason) => {
@@ -630,6 +635,7 @@ export function AppContent({ extensions, onExposeActions }: AppContentProps = {}
         handleStartNewAIConversation={handleStartNewAIConversation}
         isAIConversationOpen={isAIConversationOpen}
         onApplyAIUrdfModification={applyAIUrdfModification}
+        importUrdfPackage={importUrdfPackage}
         isAIInspectionOpen={isAIInspectionOpen}
         isDisconnectedWorkspaceUrdfExporting={isDisconnectedWorkspaceUrdfExporting}
         isExportDialogOpen={isExportDialogOpen}

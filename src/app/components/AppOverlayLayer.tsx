@@ -14,6 +14,7 @@ import {
 import type { AppToastState } from '../hooks/useAppShellState';
 import type { ExportTarget } from '../hooks/file-export/types';
 import type { ImportFromUrlProgress, ImportPhase } from '../hooks/useAssetImportFromUrl';
+import type { UrdfPackageImportPort } from '@/integrations/robots-studio';
 import type {
   AIConversationFocusedIssue,
   AIConversationLaunchContext,
@@ -64,6 +65,7 @@ interface AppOverlayLayerProps {
   handleStartNewAIConversation: (currentLaunchContext: AIConversationLaunchContext) => void;
   isAIConversationOpen: boolean;
   onApplyAIUrdfModification: (componentId: string, proposedUrdf: string) => boolean;
+  importUrdfPackage: UrdfPackageImportPort['importUrdfPackage'];
   isAIInspectionOpen: boolean;
   isDisconnectedWorkspaceUrdfExporting: boolean;
   isExportDialogOpen: boolean;
@@ -97,6 +99,7 @@ export function AppOverlayLayer({
   handleStartNewAIConversation,
   isAIConversationOpen,
   onApplyAIUrdfModification,
+  importUrdfPackage,
   isAIInspectionOpen,
   isDisconnectedWorkspaceUrdfExporting,
   isExportDialogOpen,
@@ -144,6 +147,7 @@ export function AppOverlayLayer({
             launchContext={aiConversationLaunchContext}
             onStartNewConversation={handleStartNewAIConversation}
             onApply={onApplyAIUrdfModification}
+            importUrdfPackage={importUrdfPackage}
           />
         </Suspense>
       )}

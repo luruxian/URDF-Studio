@@ -1074,6 +1074,25 @@ export const en: TranslationKeys = {
     'A 3D generation job is already running. Please wait for it to finish.',
   agileRobotToolUnknownTool: 'Unknown tool: {toolName}',
   agileRobotToolUnknownError: 'Unknown error',
+
+  // Robots Studio URDF+STL mesh regenerate tool confirmation
+  studioMeshToolConfirm: 'Confirm',
+  studioMeshToolCancel: 'Cancel',
+  studioMeshToolRetry: 'Retry',
+  studioMeshToolExecuting: 'Regenerating URDF+STL…',
+  studioMeshToolRegenerateSummary: 'Regenerate URDF+STL',
+  studioMeshToolSessionExpired:
+    'Session expired. Return to the main site and open preview again.',
+  studioMeshToolModelUpdated: 'URDF+STL updated',
+  studioMeshToolPreviewNotConnected:
+    'URDF+STL generated, but preview refresh is not connected',
+  studioMeshToolGenerationFailed: 'URDF+STL regeneration failed',
+  studioMeshToolCancelled: 'Cancelled',
+  studioMeshToolJobInProgress:
+    'A URDF+STL regeneration job is already running. Please wait for it to finish.',
+  studioMeshToolUnknownTool: 'Unknown tool: {toolName}',
+  studioMeshToolUnknownError: 'Unknown error',
+
   meshPreviewAuthMissing:
     'Missing preview credentials. Open this model from Agile Robot again.',
   meshPreviewAuthExpired:

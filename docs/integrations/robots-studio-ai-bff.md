@@ -22,8 +22,11 @@ Studio 侧计划将 AI 生成 / 审阅 / 对话改为 **Mode B（托管后端）
 | **Studio AI 生成** | `.../studio/ai/generate` | 同上 | **待实现** |
 | **Studio AI 审阅** | `.../studio/ai/inspect` | 同上 | **待实现** |
 | **Studio AI 对话** | `.../studio/ai/chat` | 同上 | **待实现** |
+| **Studio AI 对话（tool calling）** | `.../studio/ai/v1/chat/completions` | 同上 | **待实现**（见 §14） |
+| **需求确认书修订** | `.../studio/requirements-document` | 同上 | **待实现**（见 §14） |
+| **URDF+STL 再生成** | `.../studio/mesh/regenerate` + `.../mesh/job` + `.../mesh/import-grant` | 同上 | **待实现**（见 §14） |
 
-**不要**让 Studio 调用主站通用 `/agent/chat` 或其它未在本文定义的 Agent 路由。Studio 只认上表三个 `studio/ai/*` 端点。
+**不要**让 Studio 调用主站通用 `/agent/chat` 或其它未在本文定义的 Agent 路由。Studio 对话 Modal 以 §14 的 completions + 确认书修订为准；`/chat` SSE 保留给兼容或弃用路径。
 
 **不要**在 Studio 部署环境配置 LLM Provider AK/SK；密钥只存在于 robots 后端（或 BotPilot 等上游）。
 
@@ -372,18 +375,34 @@ data: {"done":true}
 
 ---
 
-## 11. 不在本契约范围内
+## 11. 对话 Modal：completions + 确认书修订（2026-08-27）
+
+设计 spec：`docs/superpowers/specs/2026-08-27-robots-conversation-requirements-regen-design.md`  
+robots BFF 契约：`robots/docs/integrations/studio-requirements-revision.md`（同 workspace）
+
+| 能力 | 端点 |
+|------|------|
+| 流式对话 + function calling | `POST .../studio/ai/v1/chat/completions` |
+| 读/写需求确认书 | `GET` / `PATCH .../studio/requirements-document` |
+| Team Mesh 再生成 | `POST .../studio/mesh/regenerate`，`GET .../studio/mesh/job` |
+| 重载 import grant | `POST .../studio/mesh/import-grant` → Studio `POST /api/download-asset` |
+
+**范围**：仅 `package_type=urdf_stl` 订单。对话内 **放弃** URDF edit agent 与 BYOK。
+
+---
+
+## 12. 不在本契约范围内
 
 | 项 | 说明 |
 |----|------|
-| Agent 工具循环（`runRobotEditAgent`） | 当前仍直连 OpenAI BYOK；**未**走 `/studio/ai/*`。若未来迁移，需单独开 spec。 |
+| URDF edit agent（`runRobotEditAgent`） | 对话内 **已放弃**；见 §11 |
 | `/agent/chat` | Studio **不会**调用 |
 | URDF+STL `POST /api/download-asset` | 见 [robots-urdf-stl-preview.md](robots-urdf-stl-preview.md) |
 | GLB `?mesh=` 下载 | 见 [urdf-studio.md](urdf-studio.md) §3.1 |
 
 ---
 
-## 12. 主站实现 Checklist
+## 13. 主站实现 Checklist
 
 - [ ] 三个路由挂在现有 `studio` 命名空间下，与 jimeng/hunyuan 同级
 - [ ] 复用 `studio_token` 校验中间件
@@ -398,7 +417,7 @@ data: {"done":true}
 
 ---
 
-## 13. curl 联调示例
+## 14. curl 联调示例
 
 替换 `TOKEN`、`ORDER`、`API_BASE`、`STUDIO_ORIGIN`。
 
@@ -459,10 +478,11 @@ data: {"done":true}
 
 ---
 
-## 14. 变更与版本
+## 15. 变更与版本
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
+| 1.1 | 2026-08-27 | §11：对话 completions + 确认书修订 + mesh regen（见 `docs/superpowers/specs/2026-08-27-robots-conversation-requirements-regen-design.md`） |
 | 1.0 | 2026-08-22 | 初版：对齐 Studio Mode B spec 与 `aiBackendTransport` |
 
 破坏性变更（路径、字段、SSE 事件）需 robots 与 URDF-Studio **同步 bump** 并更新本文档。

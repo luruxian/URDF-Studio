@@ -22,31 +22,31 @@ import { useDraggableWindow } from '@/shared/hooks/useDraggableWindow';
 import { Button } from '@/shared/components/ui/Button';
 import { CLOSE_BUTTON_DANGER_TERTIARY_CLASS } from '@/shared/components/ui/closeButtonStyles';
 import { Dialog } from '@/shared/components/ui/Dialog';
-import { useManagedWindowLayer, useUIStore } from '@/store';
+import { useManagedWindowLayer } from '@/store';
+import {
+  sendConversationTurnStream,
+  type ConversationHistoryTurn,
+} from '../services/conversationService';
+import { isRobotsAiConversationReady } from '../services/robotsConversationBackend';
 import { ConversationMessageMarkdown } from './ConversationMessageMarkdown';
+import { buildConversationContext } from '../utils/buildConversationContext';
 import { shouldSubmitConversationInput } from '../utils/conversationInput';
 import {
   createConversationMessage,
+  getActiveConversationHistory,
   isConversationChatMessage,
   removeTrailingAssistantPlaceholder,
+  replaceActiveConversationTimeline,
   startNewConversationTimeline,
 } from '../utils/conversationTimeline';
+import type { AIConversationLaunchContext, AIConversationMessage } from '../types';
+import { ToolConfirmBanner } from '@/integrations/agile-robot/components/ToolConfirmBanner';
 import type {
-  AIConversationLaunchContext,
-  AIConversationMessage,
-  AIConversationModificationCard,
-} from '../types';
-import type { RobotState } from '@/types';
-import { generateURDF } from '@/core/parsers';
-import { canGenerateUrdf } from '@/core/parsers/urdf/urdfExportSupport';
-import { resolveModificationProposal } from '../utils/resolveModificationProposal';
-import { resolveAIWorkspaceRobotTarget } from '../utils/aiWorkspaceTarget';
-import { useAssetsStore } from '@/store/assetsStore';
-import { useSelectionStore } from '@/store/selectionStore';
-import { useWorkspaceStore } from '@/store/workspaceStore';
-import { ConversationModificationCard } from './ConversationModificationCard';
-import { isRobotsAgentLlmConfigured } from '../services/robotsAgentLlm';
-import { resolveAiRuntimeEnv } from '../services/aiRuntimeEnv';
+  AIConversationToolsConfig,
+  ParsedToolCall,
+  ToolConfirmState,
+  ToolResult,
+} from '@/integrations/agile-robot/types';
 
 interface AIConversationModalProps {
   isOpen: boolean;
@@ -55,13 +55,65 @@ interface AIConversationModalProps {
   launchContext: AIConversationLaunchContext | null;
   onStartNewConversation: (launchContext: AIConversationLaunchContext) => void;
   onApply: (componentId: string, proposedUrdf: string) => boolean;
+  toolsConfig?: AIConversationToolsConfig | null;
 }
 
-interface LastSubmittedTurn {
+interface ConversationSubmissionState {
+  history: ConversationHistoryTurn[];
   userMessage: string;
+  replaceCurrentConversation?: boolean;
 }
 
 type ConversationResetAction = 'new-conversation' | 'clear-history';
+
+function replaceTrailingAssistantMessage(
+  messages: AIConversationMessage[],
+  nextContent: string,
+): AIConversationMessage[] {
+  const nextMessages = [...messages];
+
+  for (let index = nextMessages.length - 1; index >= 0; index -= 1) {
+    const message = nextMessages[index];
+    if (!message || !isConversationChatMessage(message)) {
+      break;
+    }
+    if (message.role !== 'assistant') {
+      continue;
+    }
+
+    nextMessages[index] = createConversationMessage('assistant', nextContent);
+    return nextMessages;
+  }
+
+  nextMessages.push(createConversationMessage('assistant', nextContent));
+  return nextMessages;
+}
+
+function appendTrailingAssistantDelta(
+  messages: AIConversationMessage[],
+  delta: string,
+): AIConversationMessage[] {
+  if (!delta) {
+    return messages;
+  }
+
+  const nextMessages = [...messages];
+  for (let index = nextMessages.length - 1; index >= 0; index -= 1) {
+    const message = nextMessages[index];
+    if (!message || !isConversationChatMessage(message)) {
+      break;
+    }
+    if (message.role !== 'assistant') {
+      continue;
+    }
+
+    nextMessages[index] = createConversationMessage('assistant', `${message.content}${delta}`);
+    return nextMessages;
+  }
+
+  nextMessages.push(createConversationMessage('assistant', delta));
+  return nextMessages;
+}
 
 export function AIConversationModal({
   isOpen,
@@ -69,7 +121,8 @@ export function AIConversationModal({
   lang,
   launchContext,
   onStartNewConversation,
-  onApply,
+  onApply: _onApply,
+  toolsConfig,
 }: AIConversationModalProps) {
   const t = translations[lang];
   const conversationWindowLayer = useManagedWindowLayer('aiConversation');
@@ -123,22 +176,27 @@ export function AIConversationModal({
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [copiedMessageKey, setCopiedMessageKey] = useState<string | null>(null);
-  const [lastSubmittedTurn, setLastSubmittedTurn] = useState<LastSubmittedTurn | null>(null);
+  const [lastSubmittedTurn, setLastSubmittedTurn] = useState<ConversationSubmissionState | null>(
+    null,
+  );
   const [pendingResetAction, setPendingResetAction] = useState<ConversationResetAction | null>(
     null,
   );
   const [requestError, setRequestError] = useState<string | null>(null);
+  const [toolConfirmState, setToolConfirmState] = useState<ToolConfirmState>('idle');
+  const [pendingToolCall, setPendingToolCall] = useState<ParsedToolCall | null>(null);
+  const [toolResult, setToolResult] = useState<ToolResult | null>(null);
 
   const isMountedRef = useRef(false);
   const requestIdRef = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const doneTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isComposingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const skipNextSessionResetRef = useRef(false);
 
-  const aiAutoApply = useUIStore((s) => s.aiAutoApplyEdits);
   const isReportFollowup = launchContext?.mode === 'inspection-followup';
   const focusedIssue = isReportFollowup ? (launchContext?.focusedIssue ?? null) : null;
   const headerTitle = isReportFollowup ? t.discussReportWithAI : t.aiConversation;
@@ -164,6 +222,10 @@ export function AIConversationModal({
     (options?: { preserveMessages?: boolean; startNewConversation?: boolean }) => {
       abortControllerRef.current?.abort();
       abortControllerRef.current = null;
+      if (doneTimeoutRef.current) {
+        clearTimeout(doneTimeoutRef.current);
+        doneTimeoutRef.current = null;
+      }
       requestIdRef.current += 1;
       setMessages((currentMessages) => {
         if (!options?.preserveMessages) {
@@ -182,6 +244,9 @@ export function AIConversationModal({
       setLastSubmittedTurn(null);
       setPendingResetAction(null);
       setRequestError(null);
+      setToolConfirmState('idle');
+      setPendingToolCall(null);
+      setToolResult(null);
       isComposingRef.current = false;
     },
     [],
@@ -197,6 +262,10 @@ export function AIConversationModal({
       if (copiedTimerRef.current) {
         clearTimeout(copiedTimerRef.current);
         copiedTimerRef.current = null;
+      }
+      if (doneTimeoutRef.current) {
+        clearTimeout(doneTimeoutRef.current);
+        doneTimeoutRef.current = null;
       }
     };
   }, []);
@@ -301,58 +370,20 @@ export function AIConversationModal({
     resetConversationState();
   };
 
-  const handleSend = async () => {
-    const trimmedInput = input.trim();
-    if (!trimmedInput) {
-      return;
-    }
-
-    setInput('');
-    await submitModificationTurn(trimmedInput);
-  };
-
-  const handleRetry = async () => {
-    if (!lastSubmittedTurn || isSending) {
-      return;
-    }
-
-    await submitModificationTurn(lastSubmittedTurn.userMessage);
-  };
-
-  const submitModificationTurn = async (userMessage: string) => {
+  const submitConversationTurn = async ({
+    history,
+    userMessage,
+    replaceCurrentConversation = false,
+    withTools = false,
+  }: ConversationSubmissionState & { withTools?: boolean }) => {
     if (!launchContext || !userMessage.trim() || isSending) {
+      return;
+    }
+    if (withTools && !toolsConfig) {
       return;
     }
 
     const trimmedMessage = userMessage.trim();
-    const robotsLlmReady = isRobotsAgentLlmConfigured();
-    const byokReady = Boolean(resolveAiRuntimeEnv().apiKey);
-    if (!robotsLlmReady && !byokReady) {
-      setRequestError(null);
-      setInput('');
-      setMessages((prev) => [
-        ...removeTrailingAssistantPlaceholder(prev),
-        createConversationMessage('user', trimmedMessage),
-        createConversationMessage(
-          'assistant',
-          lang === 'zh'
-            ? '未配置 AI：请设置 VITE_ROBOTS_API_BASE_URL（托管模式），或配置 BYOK 的 VITE_OPENAI_API_KEY。'
-            : 'AI is not configured: set VITE_ROBOTS_API_BASE_URL (managed mode) or BYOK VITE_OPENAI_API_KEY.',
-        ),
-      ]);
-      setLastSubmittedTurn({ userMessage: trimmedMessage });
-      return;
-    }
-
-    setRequestError(null);
-    setInput('');
-    setMessages((prev) => [
-      ...removeTrailingAssistantPlaceholder(prev),
-      createConversationMessage('user', trimmedMessage),
-      createConversationMessage('assistant', ''),
-    ]);
-    setIsSending(true);
-
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
     const abortController = new AbortController();
@@ -361,137 +392,100 @@ export function AIConversationModal({
       isMountedRef.current &&
       requestIdRef.current === requestId &&
       abortControllerRef.current === abortController;
-    setLastSubmittedTurn({ userMessage: trimmedMessage });
+
+    if (doneTimeoutRef.current) {
+      clearTimeout(doneTimeoutRef.current);
+      doneTimeoutRef.current = null;
+    }
+    setToolConfirmState('idle');
+    setPendingToolCall(null);
+    setToolResult(null);
+    setRequestError(null);
+    setLastSubmittedTurn({
+      history: history.map((message) => ({ ...message })),
+      userMessage: trimmedMessage,
+    });
+
+    const nextTurnMessages = [
+      createConversationMessage('user', trimmedMessage),
+      createConversationMessage('assistant', ''),
+    ];
+    setMessages((prev) => {
+      if (replaceCurrentConversation) {
+        return replaceActiveConversationTimeline(prev, [
+          ...history.map((message) => createConversationMessage(message.role, message.content)),
+          ...nextTurnMessages,
+        ]);
+      }
+      return [...removeTrailingAssistantPlaceholder(prev), ...nextTurnMessages];
+    });
+    setIsSending(true);
 
     try {
-      const workspace = useWorkspaceStore.getState().workspace;
-      const selection = useSelectionStore.getState().selection;
-      const target = resolveAIWorkspaceRobotTarget(workspace, selection);
-      const componentId = target.componentId;
-      if (!componentId) {
-        setMessages((prev) => [
-          ...removeTrailingAssistantPlaceholder(prev),
-          createConversationMessage('assistant', t.aiModificationNoComponent),
-        ]);
-        return;
-      }
-
-      const currentRobot: RobotState = {
-        ...target.robotData,
-        selection: { type: null, id: null },
-      };
-      const motorLibrary = useAssetsStore.getState().motorLibrary;
-
-      const proposal = await resolveModificationProposal({
-        message: trimmedMessage,
-        currentRobot,
-        robotData: target.robotData,
-        motorLibrary,
+      const result = await sendConversationTurnStream({
+        mode: launchContext.mode,
         lang,
+        context: buildConversationContext({
+          mode: launchContext.mode,
+          robot: launchContext.robotSnapshot,
+          inspectionReport: launchContext.inspectionReportSnapshot,
+          selectedEntity: launchContext.selectedEntity,
+          focusedIssue,
+        }),
+        history,
+        userMessage: trimmedMessage,
         signal: abortController.signal,
-        onToolCall: (step) => {
-          setMessages((prev) => {
-            const last = prev[prev.length - 1];
-            if (!last || !isConversationChatMessage(last) || last.role !== 'assistant') {
-              return prev;
-            }
-            const updated = [...prev];
-            const current = last.content || '';
-            updated[updated.length - 1] = {
-              ...last,
-              content: current ? `${current}\n${step}` : step,
-            };
-            return updated;
-          });
+        onReplyDelta: (delta) => {
+          if (isRequestActive()) {
+            setMessages((prev) => appendTrailingAssistantDelta(prev, delta));
+          }
         },
+        ...(withTools && toolsConfig
+          ? {
+              tools: toolsConfig.tools,
+              onToolCalls: (rawToolCalls: Array<{ function: { name: string; arguments: string } }>) => {
+                if (!isRequestActive()) {
+                  return;
+                }
+                const parsed = toolsConfig.parseToolCalls(rawToolCalls);
+                if (parsed) {
+                  setPendingToolCall(parsed);
+                  setToolConfirmState('parsed');
+                  setToolResult(null);
+                }
+              },
+            }
+          : {}),
       });
 
-      if (proposal.kind === 'aborted') {
+      if (!isRequestActive()) {
         return;
       }
-      if (proposal.kind === 'no-change') {
-        setMessages((prev) => [
-          ...removeTrailingAssistantPlaceholder(prev),
-          createConversationMessage(
-            'assistant',
-            proposal.explanation || t.aiModificationNoChange,
-          ),
-        ]);
+      if (result.status === 'aborted') {
+        setRequestError(null);
+        setMessages((prev) =>
+          result.reply
+            ? replaceTrailingAssistantMessage(prev, result.reply)
+            : removeTrailingAssistantPlaceholder(prev),
+        );
         return;
       }
-
-      const proposedRobotState: RobotState = {
-        name: proposal.robot.name ?? currentRobot.name,
-        links: proposal.robot.links ?? currentRobot.links,
-        joints: proposal.robot.joints ?? currentRobot.joints,
-        rootLinkId: proposal.robot.rootLinkId ?? currentRobot.rootLinkId,
-        selection: { type: null, id: null },
-      };
-
-      if (!canGenerateUrdf(proposedRobotState)) {
-        setMessages((prev) => [
-          ...removeTrailingAssistantPlaceholder(prev),
-          createConversationMessage('assistant', t.aiModificationUnsupportedJoint),
-        ]);
+      if (result.status === 'error') {
+        setRequestError(result.error?.message ?? t.unknownError);
+        setMessages((prev) =>
+          result.reply
+            ? replaceTrailingAssistantMessage(prev, result.reply)
+            : removeTrailingAssistantPlaceholder(prev),
+        );
         return;
       }
 
-      const proposedUrdf = generateURDF(proposedRobotState, { preserveMeshPaths: true });
-      const currentDraft = useAssetsStore.getState().componentSourceDrafts[componentId];
-      const currentUrdf =
-        currentDraft?.format === 'urdf'
-          ? currentDraft.content
-          : generateURDF(currentRobot, { preserveMeshPaths: true });
-
-      if (proposedUrdf === currentUrdf) {
-        setMessages((prev) => [
-          ...removeTrailingAssistantPlaceholder(prev),
-          createConversationMessage(
-            'assistant',
-            proposal.explanation
-              ? `${proposal.explanation}\n\n⚠️ 修改后与当前内容一致，未产生实际变更。`
-              : t.aiModificationNoChange,
-          ),
-        ]);
-        return;
-      }
-
-      if (aiAutoApply) {
-        // Highest permission: apply immediately, surface a summary. Undoable
-        // via workspace history (Ctrl+Z), same as the card's Apply path.
-        const applied = onApply(componentId, proposedUrdf);
-        const summary = applied
-          ? t.aiAutoAppliedSummary.replace(
-              '{explanation}',
-              proposal.explanation || t.aiModificationApplied,
-            )
-          : t.aiModificationFailed;
-        setMessages((prev) => [
-          ...removeTrailingAssistantPlaceholder(prev),
-          createConversationMessage('assistant', summary),
-        ]);
-        return;
-      }
-
-      const cardMessage: AIConversationModificationCard = {
-        kind: 'modification-card',
-        role: 'assistant',
-        explanation: proposal.explanation,
-        proposedUrdf,
-        currentUrdf,
-        componentId,
-        status: 'pending',
-      };
-      setMessages((prev) => [...removeTrailingAssistantPlaceholder(prev), cardMessage]);
-    } catch (error) {
-      if (abortController.signal.aborted) {
-        return;
-      }
-      console.error('AI modification turn failed', error);
-      setMessages((prev) => [
-        ...removeTrailingAssistantPlaceholder(prev),
-        createConversationMessage('assistant', t.aiModificationFailed),
-      ]);
+      setRequestError(null);
+      setMessages((prev) =>
+        result.reply
+          ? replaceTrailingAssistantMessage(prev, result.reply)
+          : removeTrailingAssistantPlaceholder(prev),
+      );
     } finally {
       if (isRequestActive()) {
         abortControllerRef.current = null;
@@ -500,32 +494,114 @@ export function AIConversationModal({
     }
   };
 
-  const handleApplyModification = useCallback(
-    (componentId: string, proposedUrdf: string): boolean => {
-      const ok = onApply(componentId, proposedUrdf);
-      if (ok) {
-        setMessages((prev) =>
-          prev.map((message) =>
-            message.kind === 'modification-card' && message.proposedUrdf === proposedUrdf
-              ? { ...message, status: 'applied' as const }
-              : message,
-          ),
-        );
-      }
-      return ok;
-    },
-    [onApply],
-  );
+  const submitToolConversationTurn = async (submission: ConversationSubmissionState) => {
+    await submitConversationTurn({ ...submission, withTools: true });
+  };
 
-  const handleDismissModification = useCallback((proposedUrdf: string) => {
-    setMessages((prev) =>
-      prev.map((message) =>
-        message.kind === 'modification-card' && message.proposedUrdf === proposedUrdf
-          ? { ...message, status: 'dismissed' as const }
-          : message,
-      ),
-    );
+  const handleSend = async () => {
+    const trimmedInput = input.trim();
+    if (!trimmedInput) {
+      return;
+    }
+
+    setInput('');
+    await submitModificationTurn(trimmedInput, {
+      history: getActiveConversationHistory(messages),
+    });
+  };
+
+  const handleRetry = async () => {
+    if (!lastSubmittedTurn || isSending) {
+      return;
+    }
+
+    await submitModificationTurn(lastSubmittedTurn.userMessage, {
+      history: lastSubmittedTurn.history,
+      replaceCurrentConversation: Boolean(toolsConfig),
+    });
+  };
+
+  const submitModificationTurn = async (
+    userMessage: string,
+    turnOptions?: Pick<ConversationSubmissionState, 'history' | 'replaceCurrentConversation'>,
+  ) => {
+    if (!launchContext || !userMessage.trim() || isSending) {
+      return;
+    }
+
+    if (toolsConfig) {
+      await submitToolConversationTurn({
+        history: turnOptions?.history ?? [],
+        userMessage,
+        replaceCurrentConversation: turnOptions?.replaceCurrentConversation,
+      });
+      return;
+    }
+
+    const trimmedMessage = userMessage.trim();
+    if (!isRobotsAiConversationReady()) {
+      if (doneTimeoutRef.current) {
+        clearTimeout(doneTimeoutRef.current);
+        doneTimeoutRef.current = null;
+      }
+      setToolConfirmState('idle');
+      setPendingToolCall(null);
+      setToolResult(null);
+      setRequestError(t.aiConversationRobotsHandoffRequired);
+      setInput('');
+      setMessages((prev) => [
+        ...removeTrailingAssistantPlaceholder(prev),
+        createConversationMessage('user', trimmedMessage),
+        createConversationMessage('assistant', t.aiConversationRobotsHandoffRequired),
+      ]);
+      setLastSubmittedTurn({
+        history: turnOptions?.history ?? [],
+        userMessage: trimmedMessage,
+      });
+      return;
+    }
+
+    await submitConversationTurn({
+      history: turnOptions?.history ?? [],
+      userMessage,
+      replaceCurrentConversation: turnOptions?.replaceCurrentConversation,
+      withTools: false,
+    });
+  };
+
+  const handleToolConfirm = useCallback(async () => {
+    if (!pendingToolCall || !toolsConfig) {
+      return;
+    }
+
+    setToolConfirmState('executing');
+    const result = await toolsConfig.onExecute(pendingToolCall);
+    setToolResult(result);
+    setToolConfirmState(result.success ? 'done' : 'error');
+    if (!result.success) {
+      return;
+    }
+
+    if (doneTimeoutRef.current) {
+      clearTimeout(doneTimeoutRef.current);
+    }
+    doneTimeoutRef.current = setTimeout(() => {
+      setToolConfirmState((current) => (current === 'done' ? 'idle' : current));
+      setPendingToolCall((current) => (current === pendingToolCall ? null : current));
+      setToolResult((current) => (current === result ? null : current));
+    }, 3000);
+  }, [pendingToolCall, toolsConfig]);
+
+  const handleToolCancel = useCallback(() => {
+    setToolConfirmState('cancelled');
+    setPendingToolCall(null);
+    setToolResult(null);
+    setMessages((prev) => [...prev, createConversationMessage('assistant', '已取消')]);
   }, []);
+
+  const handleToolRetry = useCallback(() => {
+    void handleToolConfirm();
+  }, [handleToolConfirm]);
 
   if (!isOpen || !launchContext) {
     return null;
@@ -623,24 +699,6 @@ export function AIConversationModal({
               {messages.length > 0 ? (
                 <div className="space-y-2.5">
                   {messages.map((message, index) => {
-                    if (message.kind === 'modification-card') {
-                      return (
-                        <div
-                          key={`modification-${index}`}
-                          className="flex justify-start py-1"
-                        >
-                          <div className="w-full max-w-[95%]">
-                            <ConversationModificationCard
-                              card={message}
-                              t={t}
-                              onApply={handleApplyModification}
-                              onDismiss={handleDismissModification}
-                            />
-                          </div>
-                        </div>
-                      );
-                    }
-
                     if (!isConversationChatMessage(message)) {
                       return (
                         <div key={`divider-${index}`} className="flex items-center gap-2 py-2">
@@ -671,7 +729,7 @@ export function AIConversationModal({
                                 : 'rounded-tl-[4px] border border-border-black bg-panel-bg text-text-secondary dark:bg-element-bg'
                             }`}
                           >
-{isStreamingAssistant && !message.content ? (
+                            {isStreamingAssistant && !message.content ? (
                               <div className="flex items-center gap-2 text-sm text-text-tertiary">
                                 <Loader2 className="w-4 h-4 animate-spin text-system-blue" />
                                 <span>{t.aiAnalyzing}</span>
@@ -728,6 +786,23 @@ export function AIConversationModal({
                 </div>
               ) : null}
             </div>
+
+            {toolsConfig && pendingToolCall && (
+              <div className="shrink-0 border-t border-border-black bg-element-bg px-4 py-3">
+                <ToolConfirmBanner
+                  lang={lang}
+                  state={toolConfirmState}
+                  toolCall={pendingToolCall}
+                  result={toolResult ?? undefined}
+                  bannerTexts={toolsConfig.bannerTexts}
+                  onConfirm={() => {
+                    void handleToolConfirm();
+                  }}
+                  onCancel={handleToolCancel}
+                  onRetry={toolConfirmState === 'error' ? handleToolRetry : undefined}
+                />
+              </div>
+            )}
 
             <div
               className={`shrink-0 border-t border-border-black bg-element-bg ${

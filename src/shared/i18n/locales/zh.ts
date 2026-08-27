@@ -1030,6 +1030,22 @@ export const zh: TranslationKeys = {
   agileRobotToolJobInProgress: '3D 生成任务正在进行中，请等待完成',
   agileRobotToolUnknownTool: '未知工具: {toolName}',
   agileRobotToolUnknownError: '未知错误',
+
+  // Robots Studio URDF+STL mesh regenerate tool confirmation
+  studioMeshToolConfirm: '确认',
+  studioMeshToolCancel: '取消',
+  studioMeshToolRetry: '重试',
+  studioMeshToolExecuting: '正在重新生成 URDF+STL…',
+  studioMeshToolRegenerateSummary: '重新生成 URDF+STL',
+  studioMeshToolSessionExpired: '会话已过期，请回到主站重新点击预览',
+  studioMeshToolModelUpdated: 'URDF+STL 已更新',
+  studioMeshToolPreviewNotConnected: 'URDF+STL 已生成，但预览刷新未接入',
+  studioMeshToolGenerationFailed: 'URDF+STL 再生成失败',
+  studioMeshToolCancelled: '已取消',
+  studioMeshToolJobInProgress: 'URDF+STL 再生成任务正在进行中，请等待完成',
+  studioMeshToolUnknownTool: '未知工具: {toolName}',
+  studioMeshToolUnknownError: '未知错误',
+
   meshPreviewAuthMissing: '缺少预览凭证，请从 Agile Robot 主站打开',
   meshPreviewAuthExpired: '预览凭证无效或已过期，请回主站重新点预览',
   meshPreviewNotFound: '模型文件不存在',

@@ -5,12 +5,12 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 
-import { createSingleComponentWorkspace } from '@/core/robot';
-import { __setAgentOpenAIClientFactoryForTests } from '../services/aiAgent';
+import { __setConversationTurnStreamForTests } from '../services/conversationService';
 import { setAiBackendBaseUrlResolver } from '@/shared/hostIntegrationState';
-import { DEFAULT_MANAGED_WINDOW_ORDER, useSelectionStore, useUIStore, useWorkspaceStore } from '@/store';
+import { DEFAULT_MANAGED_WINDOW_ORDER, useUIStore } from '@/store';
 import { GeometryType, JointType, type RobotState } from '@/types';
 import type { AIConversationLaunchContext } from '../types';
+import type { AIConversationToolsConfig } from '@/integrations/agile-robot/types';
 
 const TEST_CONVERSATION_MESSAGE = '请帮我检查这个机器人结构是否合理';
 
@@ -501,11 +501,9 @@ test('clear history requires confirmation and removes prior messages after reset
   }
 });
 
-test('missing AI config surfaces a configuration hint instead of a handoff banner', async () => {
+test('missing robots handoff surfaces handoff-required message', async () => {
   const previousRobotsBase = process.env.VITE_ROBOTS_API_BASE_URL;
-  const previousApiKey = process.env.API_KEY;
   delete process.env.VITE_ROBOTS_API_BASE_URL;
-  delete process.env.API_KEY;
   setAiBackendBaseUrlResolver(null);
   const dom = installDom();
   const container = dom.window.document.getElementById('root');
@@ -533,8 +531,8 @@ test('missing AI config surfaces a configuration hint instead of a handoff banne
     await flush();
 
     assert.equal(container.textContent?.includes(TEST_CONVERSATION_MESSAGE), true);
-    assert.match(container.textContent || '', /未配置 AI|VITE_ROBOTS_API_BASE_URL/);
-    assert.equal(container.textContent?.includes('对话服务错误：'), false);
+    assert.match(container.textContent || '', /Agile Robot 主站|Studio/);
+    assert.equal(container.textContent?.includes('未配置 AI'), false);
     assert.equal(getCopyButtons(container).length, 2);
     assert.equal(findButtonByText(container, '重新生成').textContent?.includes('重新生成'), true);
   } finally {
@@ -543,11 +541,6 @@ test('missing AI config surfaces a configuration hint instead of a handoff banne
       delete process.env.VITE_ROBOTS_API_BASE_URL;
     } else {
       process.env.VITE_ROBOTS_API_BASE_URL = previousRobotsBase;
-    }
-    if (previousApiKey === undefined) {
-      delete process.env.API_KEY;
-    } else {
-      process.env.API_KEY = previousApiKey;
     }
 
     await act(async () => {
@@ -648,252 +641,82 @@ test('header actions expose hover and focus border highlight styles', async () =
   }
 });
 
-test('agent receives the live (post-launch) robot context', async () => {
-  const previousApiKey = process.env.API_KEY;
-  process.env.API_KEY = 'test-key';
+test('toolsConfig path surfaces ToolConfirmBanner when the model returns tool_calls', async () => {
   const robotsEnv = setRobotsConversationEnv();
-
-  const capturedSystemPrompts: string[] = [];
-  const mockOpenAiClient = {
-    chat: {
-      completions: {
-        create: async (params: { messages: Array<{ role: string; content: string }> }) => {
-          capturedSystemPrompts.push(params.messages[0]?.content ?? '');
-          return {
-            choices: [
-              {
-                message: { role: 'assistant', content: 'No changes needed.', tool_calls: null },
-                finish_reason: 'stop',
-              },
-            ],
-          };
-        },
-      },
-    },
-  };
-  __setAgentOpenAIClientFactoryForTests(() => mockOpenAiClient as never);
-
   const dom = installDom();
   const container = dom.window.document.getElementById('root');
   assert.ok(container, 'root container should exist');
 
-  const initialRobot = createRobotFixture();
-  const { selection: _initialSelection, ...initialRobotData } = initialRobot;
-  // The fixture assumes an implicit 'world' root link; the workspace validator
-  // rejects dangling parent references, so add it here.
-  initialRobotData.links['world'] = {
-    ...structuredClone(initialRobotData.links['base_link']),
-    id: 'world',
-    name: 'world',
+  const toolsConfig: AIConversationToolsConfig = {
+    tools: [
+      {
+        type: 'function',
+        function: {
+          name: 'propose_requirements_revision',
+          description: 'Propose revision',
+          parameters: { type: 'object', properties: {} },
+        },
+      },
+    ],
+    parseToolCalls: (rawToolCalls) => {
+      const first = rawToolCalls[0];
+      if (!first?.function?.name) return null;
+      return {
+        toolName: first.function.name,
+        args: JSON.parse(first.function.arguments) as Record<string, unknown>,
+        summary: '手臂加长 5cm',
+      };
+    },
+    onExecute: async () => ({ success: true, message: '模型已更新' }),
   };
-  initialRobotData.rootLinkId = 'world';
-  useWorkspaceStore.setState({
-    workspace: createSingleComponentWorkspace(initialRobotData, { componentId: 'arm' }),
-    activeComponentId: 'arm',
-  });
-  useSelectionStore.getState().setSelection(null);
 
-  const launchContext = createLaunchContext();
+  __setConversationTurnStreamForTests(async (input) => {
+    input.onToolCalls?.([
+      {
+        function: {
+          name: 'propose_requirements_revision',
+          arguments: JSON.stringify({
+            change_summary: 'arm +5cm',
+            append_markdown: '\n## v3\n',
+          }),
+        },
+      },
+    ]);
+    return {
+      status: 'completed',
+      reply: '已生成修订建议，请确认。',
+      error: null,
+    };
+  });
+
   const { AIConversationModal } = await import('./AIConversationModal.tsx');
   const root = createRoot(container);
-  const initialUiState = useUIStore.getState();
-  const initialWorkspaceState = useWorkspaceStore.getState();
-  const initialSelectionState = useSelectionStore.getState();
 
   try {
-    useUIStore.setState({ managedWindowOrder: [...DEFAULT_MANAGED_WINDOW_ORDER] });
     await act(async () => {
       root.render(
         <AIConversationModal
           isOpen
           onClose={() => {}}
-          lang="en"
-          launchContext={launchContext}
-          onStartNewConversation={() => {}}
-          onApply={() => true}
-        />,
-      );
-    });
-    await flush();
-
-    // Simulate a post-launch workspace edit: add tool_link + tool_joint.
-    const armComponent = useWorkspaceStore.getState().workspace.components['arm'];
-    armComponent.robot.links['tool_link'] = {
-      ...structuredClone(initialRobot.links['base_link']),
-      id: 'tool_link',
-      name: 'tool_link',
-    };
-    armComponent.robot.joints['tool_joint'] = {
-      ...structuredClone(initialRobot.joints['hip_joint']),
-      id: 'tool_joint',
-      name: 'tool_joint',
-      parentLinkId: 'base_link',
-      childLinkId: 'tool_link',
-    };
-
-    await typeAndSend(container, 'List the current links');
-    await flush();
-
-    // The agent re-resolves the live workspace robot at submit time, so its
-    // system prompt must list the link/joint added AFTER the chat was opened.
-    assert.equal(capturedSystemPrompts.length, 1, 'agent must run exactly one turn');
-    const systemPrompt = capturedSystemPrompts[0];
-    assert.ok(
-      systemPrompt.includes('tool_link'),
-      'agent system prompt must include the link added after launch',
-    );
-    assert.ok(
-      systemPrompt.includes('tool_joint'),
-      'agent system prompt must include the joint added after launch',
-    );
-    assert.ok(
-      systemPrompt.includes('base_link -> tool_link'),
-      'agent system prompt must show the joint parent/child wiring',
-    );
-
-    // The launch-time snapshot stays frozen so header lookups remain stable.
-    assert.equal(launchContext.robotSnapshot.links['tool_link'], undefined);
-  } finally {
-    useUIStore.setState(initialUiState);
-    useWorkspaceStore.setState(initialWorkspaceState);
-    useSelectionStore.setState(initialSelectionState);
-    __setAgentOpenAIClientFactoryForTests(null);
-    restoreRobotsConversationEnv(robotsEnv);
-    if (previousApiKey === undefined) {
-      delete process.env.API_KEY;
-    } else {
-      process.env.API_KEY = previousApiKey;
-    }
-    await act(async () => {
-      root.unmount();
-    });
-    dom.window.close();
-  }
-});
-
-test('Auto-apply permission applies the agent edit directly without a confirmation card', async () => {
-  const previousApiKey = process.env.API_KEY;
-  process.env.API_KEY = 'test-key';
-  const robotsEnv = setRobotsConversationEnv();
-
-  let callIndex = 0;
-  const mockOpenAiClient = {
-    chat: {
-      completions: {
-        create: async () => {
-          callIndex += 1;
-          if (callIndex === 1) {
-            return {
-              choices: [
-                {
-                  message: {
-                    role: 'assistant',
-                    content: null,
-                    tool_calls: [
-                      {
-                        id: 'c1',
-                        type: 'function',
-                        function: {
-                          name: 'update_link_geometry',
-                          arguments: JSON.stringify({
-                            linkId: 'base_link',
-                            geometryType: 'cylinder',
-                            radius: 0.3,
-                          }),
-                        },
-                      },
-                    ],
-                  },
-                  finish_reason: 'tool_calls',
-                },
-              ],
-            };
-          }
-          return {
-            choices: [
-              { message: { role: 'assistant', content: 'Updated base_link radius to 0.3.', tool_calls: null }, finish_reason: 'stop' },
-            ],
-          };
-        },
-      },
-    },
-  };
-  __setAgentOpenAIClientFactoryForTests(() => mockOpenAiClient as never);
-
-  const dom = installDom();
-  const container = dom.window.document.getElementById('root');
-  assert.ok(container, 'root container should exist');
-
-  const initialRobot = createRobotFixture();
-  const { selection: _initialSelection, ...initialRobotData } = initialRobot;
-  initialRobotData.links['world'] = {
-    ...structuredClone(initialRobotData.links['base_link']),
-    id: 'world',
-    name: 'world',
-  };
-  initialRobotData.rootLinkId = 'world';
-  useWorkspaceStore.setState({
-    workspace: createSingleComponentWorkspace(initialRobotData, { componentId: 'arm' }),
-    activeComponentId: 'arm',
-  });
-  useSelectionStore.getState().setSelection(null);
-
-  const { AIConversationModal } = await import('./AIConversationModal.tsx');
-  const root = createRoot(container);
-  const initialUiState = useUIStore.getState();
-  const initialWorkspaceState = useWorkspaceStore.getState();
-  const initialSelectionState = useSelectionStore.getState();
-  const onApplyCalls: Array<{ componentId: string; urdf: string }> = [];
-
-  try {
-    useUIStore.setState({
-      managedWindowOrder: [...DEFAULT_MANAGED_WINDOW_ORDER],
-      aiAutoApplyEdits: true,
-    });
-    await act(async () => {
-      root.render(
-        <AIConversationModal
-          isOpen
-          onClose={() => {}}
-          lang="en"
+          lang="zh"
           launchContext={createLaunchContext()}
           onStartNewConversation={() => {}}
-          onApply={(componentId, proposedUrdf) => {
-            onApplyCalls.push({ componentId, urdf: proposedUrdf });
-            return true;
-          }}
+          onApply={() => true}
+          toolsConfig={toolsConfig}
         />,
       );
     });
     await flush();
 
-    await typeAndSend(container, 'List the current links');
+    await typeAndSend(container, '把手臂加长 5cm');
     await flush();
 
-    assert.equal(onApplyCalls.length, 1, 'Auto mode must call onApply directly');
-    assert.ok(
-      onApplyCalls[0].urdf.includes('radius="0.3"'),
-      'applied URDF must contain the new radius',
-    );
-    assert.equal(onApplyCalls[0].componentId, 'arm');
-    // No confirmation card in Auto mode.
-    assert.equal(container.textContent?.includes('AI modification'), false,
-      'Auto mode must not render a confirmation card');
-    assert.ok(
-      container.textContent?.includes('Updated base_link radius to 0.3.'),
-      'Auto mode must surface the agent summary',
-    );
+    assert.match(container.textContent || '', /手臂加长 5cm/);
+    assert.equal(findButtonByText(container, '确认').textContent?.includes('确认'), true);
+    assert.equal(findButtonByText(container, '取消').textContent?.includes('取消'), true);
   } finally {
-    useUIStore.setState(initialUiState);
-    useWorkspaceStore.setState(initialWorkspaceState);
-    useSelectionStore.setState(initialSelectionState);
-    __setAgentOpenAIClientFactoryForTests(null);
+    __setConversationTurnStreamForTests(null);
     restoreRobotsConversationEnv(robotsEnv);
-    if (previousApiKey === undefined) {
-      delete process.env.API_KEY;
-    } else {
-      process.env.API_KEY = previousApiKey;
-    }
     await act(async () => {
       root.unmount();
     });

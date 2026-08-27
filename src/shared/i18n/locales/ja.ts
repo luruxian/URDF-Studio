@@ -1085,6 +1085,24 @@ export const ja: TranslationKeys = {
     '3D 生成タスクが実行中です。完了までお待ちください。',
   agileRobotToolUnknownTool: '不明なツール: {toolName}',
   agileRobotToolUnknownError: '不明なエラー',
+
+  // Robots Studio URDF+STL mesh regenerate tool confirmation
+  studioMeshToolConfirm: '確認',
+  studioMeshToolCancel: 'キャンセル',
+  studioMeshToolRetry: '再試行',
+  studioMeshToolExecuting: 'URDF+STL を再生成しています…',
+  studioMeshToolRegenerateSummary: 'URDF+STL を再生成',
+  studioMeshToolSessionExpired:
+    'セッションの有効期限が切れました。メインサイトに戻り、プレビューを再度開いてください。',
+  studioMeshToolModelUpdated: 'URDF+STL を更新しました',
+  studioMeshToolPreviewNotConnected:
+    'URDF+STL は生成されましたが、プレビューの更新が接続されていません',
+  studioMeshToolGenerationFailed: 'URDF+STL の再生成に失敗しました',
+  studioMeshToolCancelled: 'キャンセルしました',
+  studioMeshToolJobInProgress:
+    'URDF+STL の再生成タスクが実行中です。完了までお待ちください。',
+  studioMeshToolUnknownTool: '不明なツール: {toolName}',
+  studioMeshToolUnknownError: '不明なエラー',
   meshPreviewAuthMissing: 'プレビュー認証情報がありません。Agile Robot から再度開いてください。',
   meshPreviewAuthExpired: 'プレビューの有効期限が切れました。Agile Robot に戻って再度プレビューを開いてください。',
   meshPreviewNotFound: 'モデルファイルが見つかりません。',

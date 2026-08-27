@@ -36,6 +36,7 @@ export function createRobotsAgentOpenAIClient(): OpenAI {
     apiKey: token || 'robots-managed',
     baseURL,
     dangerouslyAllowBrowser: true,
+    fetch: globalThis.fetch,
     ...(token ? {} : { defaultHeaders: {} }),
   });
 }
