@@ -25,8 +25,9 @@ Studio 侧 AI 生成 / 审阅 / 对话已改为 **Mode B（托管后端）**：�
 | **Studio AI 生成** | `.../studio/ai/generate` | 同上 | **待实现** |
 | **Studio AI 审阅** | `.../studio/ai/inspect` | 同上 | **待实现** |
 | **Studio AI 对话** | `.../studio/ai/chat` | 同上 | **待实现** |
-| **Studio AI 对话（tool calling）** | `.../studio/ai/v1/chat/completions` | 同上 | **待实现**（见 §14） |
-| **需求确认书修订** | `.../studio/requirements-document` | 同上 | **待实现**（见 §14） |
+| **Studio AI 对话（tool calling）** | `.../studio/ai/v1/chat/completions` | 同上 | **待实现**（见 §11、§15） |
+| **Studio AI 对话会话** | `POST/PUT/DELETE .../studio/ai/conversation-sessions` | 同上 | **待实现**（见 §11） |
+| **需求确认书修订** | `.../studio/requirements-document` | 同上 | **待实现**（见 §11） |
 | **URDF+STL 再生成** | `.../studio/mesh/regenerate` + `.../mesh/job` + `.../mesh/import-grant` | 同上 | **待实现**（见 §14） |
 
 **不要**让 Studio 调用主站通用 `/agent/chat` 或其它未在本文定义的 Agent 路由。Studio 对话 Modal 以 §14 的 completions + 确认书修订为准；`/chat` SSE 保留给兼容或弃用路径。
@@ -378,19 +379,138 @@ data: {"done":true}
 
 ---
 
-## 11. 对话 Modal：completions + 确认书修订（2026-08-27）
+## 11. 对话 Modal：会话快照 + completions + 确认书修订（2026-08-27）
 
-设计 spec：`docs/superpowers/specs/2026-08-27-robots-conversation-requirements-regen-design.md`  
-robots BFF 契约：`robots/docs/integrations/studio-requirements-revision.md`（同 workspace）
+设计 spec：
+
+- 确认书 / mesh：`docs/superpowers/specs/2026-08-27-robots-conversation-requirements-regen-design.md`
+- 安全加固（BFF 会话快照）：robots 仓库 [`docs/superpowers/specs/2026-08-27-studio-ai-security-hardening-design.md`](../../../robots/docs/superpowers/specs/2026-08-27-studio-ai-security-hardening-design.md)
+
+robots BFF 实现细节：`robots/docs/integrations/studio-requirements-revision.md`（同 workspace）
 
 | 能力 | 端点 |
 |------|------|
+| 创建 / 同步 / 删除对话会话 | `POST` / `PUT` / `DELETE .../studio/ai/conversation-sessions` |
 | 流式对话 + function calling | `POST .../studio/ai/v1/chat/completions` |
 | 读/写需求确认书 | `GET` / `PATCH .../studio/requirements-document` |
 | Team Mesh 再生成 | `POST .../studio/mesh/regenerate`，`GET .../studio/mesh/job` |
 | 重载 import grant | `POST .../studio/mesh/import-grant` → Studio `POST /api/download-asset` |
 
 **范围**：仅 `package_type=urdf_stl` 订单。对话内 **放弃** URDF edit agent 与 BYOK。
+
+**Phase 2 约束（2026-08-27 安全加固）：** 浏览器 **不再** 向 completions 发送 `context` / `history` / `mode` / `lang`。Studio 在打开 Modal 时 `POST` 会话，在机器人/审阅上下文变化时 debounced `PUT` 快照，发送前 `ensureSynced()`；completions 的 `studio` wrapper 仅含 `session_id` + `user_message`。BFF 从 PostgreSQL `studio_conversation_sessions` 读取 snapshot 与 history（最多 8 轮），流式完成后 append assistant 回复。
+
+### 11.1 `POST .../studio/ai/conversation-sessions`
+
+创建空会话（无 request body）。
+
+**Response 201**
+
+```json
+{
+  "session_id": "550e8400-e29b-41d4-a716-446655440000",
+  "expires_at": "2026-08-27T10:00:00Z"
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `session_id` | UUID；后续 PUT / completions / DELETE 使用 |
+| `expires_at` | ISO 8601；TTL 与 `STUDIO_SESSION_TOKEN_EXPIRE_MINUTES` 对齐（默认 120 分钟） |
+
+### 11.2 `PUT .../studio/ai/conversation-sessions/{session_id}`
+
+上传机器人快照。Studio `buildConversationContext()` 输出经 `conversationSessionApi.ts` 序列化。
+
+**Request body**
+
+```json
+{
+  "mode": "general",
+  "lang": "zh",
+  "snapshot_revision": 1,
+  "snapshot": {
+    "robot": {
+      "name": "demo",
+      "rootLinkId": "base",
+      "linkCount": 1,
+      "jointCount": 0,
+      "links": [
+        {
+          "id": "base",
+          "name": "base_link",
+          "visualType": "box",
+          "collisionType": "box",
+          "mass": 1.0
+        }
+      ],
+      "joints": []
+    },
+    "inspectionReport": null,
+    "selectedEntity": null,
+    "focusedIssue": null
+  }
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `mode` | `"general"` \| `"inspection-followup"` |
+| `lang` | UI 语言 |
+| `snapshot_revision` | 单调递增；旧 revision → **409** `stale_snapshot_revision` |
+| `snapshot` | 严格 schema（字段白名单；见 BFF `conversation_session_schemas.py`） |
+
+**Response 200**
+
+```json
+{
+  "snapshot_revision": 1
+}
+```
+
+| HTTP | 含义 |
+|------|------|
+| **404** | `session_not_found`（不存在或 `order_id` 不匹配） |
+| **409** | `stale_snapshot_revision`（客户端 bump revision 后重试 PUT） |
+
+成功 PUT 会续期 `expires_at`。
+
+### 11.3 `DELETE .../studio/ai/conversation-sessions/{session_id}`
+
+可选清理（Modal 关闭时）。**Response 204**，无 body。
+
+### 11.4 `POST .../studio/ai/v1/chat/completions`（session 契约）
+
+OpenAI Chat Completions 兼容路径；`stream: true` **必填**。
+
+**Request body（当前 Studio 客户端）**
+
+```json
+{
+  "stream": true,
+  "studio": {
+    "session_id": "550e8400-e29b-41d4-a716-446655440000",
+    "user_message": "这个关节限位合理吗？"
+  }
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `stream` | 必须为 `true` |
+| `studio.session_id` | 有效且未过期的会话 UUID |
+| `studio.user_message` | 当前用户输入（非空 trim） |
+
+**BFF 处理**
+
+1. 加载 session；校验 `order_id` + 未过期。
+2. 用 DB 中 `snapshot` 构建 system prompt；`history` 从 DB 读取（max 8 turns）。
+3. 流式 LLM + tool calling（与 §11 确认书 / mesh 流程相同）。
+4. 完成后 append user + assistant 到 DB history。
+
+**Breaking change：** 若请求含 legacy `studio.context` / `studio.history` / `studio.mode` / `studio.lang` 且无 `session_id`，BFF 返回 **400** `session_required`。URDF-Studio 与 robots **须同版本部署**。
+
+**Response：** 标准 OpenAI SSE（`chat.completion.chunk`），以 `data: [DONE]` 结束。Legacy `POST .../studio/ai/chat`（§8）仍保留自定义 `{ "delta" }` / `{ "done": true }` SSE，但 Studio 对话 Modal 已改用 completions + session。
 
 ---
 
@@ -422,7 +542,7 @@ robots BFF 契约：`robots/docs/integrations/studio-requirements-revision.md`�
 
 ## 14. curl 联调示例
 
-替换 `TOKEN`、`ORDER`、`API_BASE`、`STUDIO_ORIGIN`。
+替换 `TOKEN`、`ORDER`、`API_BASE`、`STUDIO_ORIGIN`、`SESSION_ID`。
 
 ### generate
 
@@ -479,12 +599,67 @@ data: {"delta":"你好"}
 data: {"done":true}
 ```
 
+### conversation session + completions（Phase 2）
+
+```bash
+# 1. Create session
+curl -sS -X POST \
+  "${API_BASE}/me/projects/${ORDER}/studio/ai/conversation-sessions" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Origin: ${STUDIO_ORIGIN}"
+# → {"session_id":"...","expires_at":"..."}
+
+SESSION_ID="<session_id from above>"
+
+# 2. Sync snapshot (before or after edits)
+curl -sS -X PUT \
+  "${API_BASE}/me/projects/${ORDER}/studio/ai/conversation-sessions/${SESSION_ID}" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "general",
+    "lang": "zh",
+    "snapshot_revision": 1,
+    "snapshot": {
+      "robot": {
+        "name": "test",
+        "rootLinkId": "base",
+        "linkCount": 1,
+        "jointCount": 0,
+        "links": [{ "id": "base", "name": "base", "visualType": "box", "collisionType": "box" }],
+        "joints": []
+      }
+    }
+  }'
+
+# 3. Stream completions (session_id + user_message only)
+curl -N -X POST \
+  "${API_BASE}/me/projects/${ORDER}/studio/ai/v1/chat/completions" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"stream\": true,
+    \"studio\": {
+      \"session_id\": \"${SESSION_ID}\",
+      \"user_message\": \"这个机器人有几条连杆？\"
+    }
+  }"
+
+# 4. Optional cleanup
+curl -sS -X DELETE \
+  "${API_BASE}/me/projects/${ORDER}/studio/ai/conversation-sessions/${SESSION_ID}" \
+  -H "Authorization: Bearer ${TOKEN}"
+```
+
+期望 completions 输出含 OpenAI `chat.completion.chunk` 与 `data: [DONE]`。
+
 ---
 
 ## 15. 变更与版本
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
+| 1.2 | 2026-08-27 | §11：BFF 会话快照 API；completions `studio` 仅 `session_id` + `user_message`（见 security hardening spec） |
 | 1.1 | 2026-08-27 | §11：对话 completions + 确认书修订 + mesh regen（见 `docs/superpowers/specs/2026-08-27-robots-conversation-requirements-regen-design.md`） |
 | 1.0 | 2026-08-22 | 初版：对齐 Studio Mode B spec 与 `aiBackendTransport` |
 
