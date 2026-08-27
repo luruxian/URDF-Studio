@@ -11,7 +11,6 @@ import {
   __setPdfCanvasFactoryForTests,
   __setPdfGenerationDepsLoaderForTests,
 } from '@/features/file-io/utils/generatePdfFromHtml';
-import { __setInspectionOpenAIClientFactoryForTests } from '../services/aiService';
 import { INSPECTION_PROFILE_DEFINITIONS } from '../config/inspectionProfiles';
 import { buildNormalInspectionPlan } from '../utils/inspectionNormalPlan';
 import { GeometryType, JointType, type RobotState } from '@/types';
@@ -931,7 +930,8 @@ test('running inspection can be stopped and returns to setup without producing a
 
   const { AIInspectionModal } = await import('./AIInspectionModal.tsx');
   const root = createRoot(container);
-  const previousApiKey = process.env.API_KEY;
+  const previousBackendUrl = process.env.AI_BACKEND_URL;
+  const previousFetch = globalThis.fetch;
   let requestWasAborted = false;
 
   const getButtonByText = (label: string) =>
@@ -940,30 +940,21 @@ test('running inspection can be stopped and returns to setup without producing a
     ) ?? null;
 
   try {
-    process.env.API_KEY = 'test-key';
-    __setInspectionOpenAIClientFactoryForTests(
-      () =>
-        ({
-          chat: {
-            completions: {
-              create: async (_body: unknown, options?: { signal?: AbortSignal }) => {
-                const signal = options?.signal;
-                if (signal?.aborted) {
-                  requestWasAborted = true;
-                  throw new dom.window.DOMException('Aborted', 'AbortError');
-                }
+    process.env.AI_BACKEND_URL = 'https://backend.test/api/ai/urdf-studio';
+    globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+      const signal = init?.signal;
+      if (signal?.aborted) {
+        requestWasAborted = true;
+        throw new dom.window.DOMException('Aborted', 'AbortError');
+      }
 
-                return new Promise((_resolve, reject) => {
-                  signal?.addEventListener('abort', () => {
-                    requestWasAborted = true;
-                    reject(new dom.window.DOMException('Aborted', 'AbortError'));
-                  });
-                });
-              },
-            },
-          },
-        }) as never,
-    );
+      return new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () => {
+          requestWasAborted = true;
+          reject(new dom.window.DOMException('Aborted', 'AbortError'));
+        });
+      });
+    }) as typeof fetch;
 
     await act(async () => {
       root.render(
@@ -1054,12 +1045,12 @@ test('running inspection can be stopped and returns to setup without producing a
       'expected dismissing the cancellation notice to remove it from setup',
     );
   } finally {
-    if (previousApiKey === undefined) {
-      delete process.env.API_KEY;
+    if (previousBackendUrl === undefined) {
+      delete process.env.AI_BACKEND_URL;
     } else {
-      process.env.API_KEY = previousApiKey;
+      process.env.AI_BACKEND_URL = previousBackendUrl;
     }
-    __setInspectionOpenAIClientFactoryForTests(null);
+    globalThis.fetch = previousFetch;
     await act(async () => {
       root.unmount();
     });

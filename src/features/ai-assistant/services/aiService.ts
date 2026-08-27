@@ -2,7 +2,6 @@
  * AI Service for robot generation, modification, and inspection
  */
 
-import OpenAI from 'openai'
 import type { RobotState, MotorSpec, InspectionReport } from '@/types'
 import { translations, type Language } from '@/shared/i18n'
 import { logRegressionError } from '@/shared/debug/consoleDiagnostics'
@@ -12,7 +11,6 @@ import {
   INSPECTION_PROFILE_DEFINITIONS,
   getInspectionProfileLayerName,
 } from '../config/inspectionProfiles'
-import { getGenerationSystemPrompt, getInspectionSystemPrompt } from '../config/prompts'
 import { buildInspectionPromptNotes } from '../utils/buildInspectionPromptNotes'
 import { buildInspectionRobotContext } from '../utils/buildInspectionRobotContext'
 import {
@@ -27,11 +25,6 @@ import {
   isAiBackendEnabled,
   requestAiBackendContent,
 } from './aiBackendTransport'
-import { resolveAiRuntimeEnv, resolveOpenAiClientBaseUrl } from './aiRuntimeEnv'
-import {
-  resolveOpenAiChatExtraBody,
-  stripModelThinkingContent,
-} from './openAiRequestOptions'
 
 export type RobotInspectionStage =
   | 'preparing-context'
@@ -80,36 +73,7 @@ const getAiServiceTexts = (lang: Language) => {
   }
 }
 
-/**
- * Create OpenAI client instance
- */
-let openAIClientFactoryForTests: (() => OpenAI) | null = null
-
-const createOpenAIClient = (): OpenAI => {
-  if (openAIClientFactoryForTests) {
-    return openAIClientFactoryForTests()
-  }
-
-  return new OpenAI({
-    apiKey: resolveAiRuntimeEnv().apiKey,
-    baseURL: resolveOpenAiClientBaseUrl(resolveAiRuntimeEnv().baseUrl),
-    dangerouslyAllowBrowser: true,
-  })
-}
-
-export function __setInspectionOpenAIClientFactoryForTests(factory: (() => OpenAI) | null): void {
-  openAIClientFactoryForTests = factory
-}
-
-/**
- * Get model name from environment
- */
-const getModelName = (): string => {
-  return resolveAiRuntimeEnv().model
-}
-
 interface GenerationContentRequest {
-  useBackend: boolean
   prompt: string
   robot: unknown
   motorLibrary: unknown
@@ -117,43 +81,19 @@ interface GenerationContentRequest {
 }
 
 /**
- * Fetch the raw generation reply — backend proxy in managed mode, direct
- * OpenAI-compatible call in BYOK mode. Parsing stays with the caller so both
- * modes share one pipeline.
+ * Fetch the raw generation reply from the managed AI backend. Parsing stays
+ * with the caller.
  */
 const requestGenerationContent = async ({
-  useBackend,
   prompt,
   robot,
   motorLibrary,
   lang,
 }: GenerationContentRequest): Promise<string | null | undefined> => {
-  if (useBackend) {
-    return requestAiBackendContent('/generate', { prompt, robot, motorLibrary, lang })
-  }
-
-  const openai = createOpenAIClient()
-  const modelName = getModelName()
-  const extraBody = resolveOpenAiChatExtraBody(modelName)
-  const systemPrompt = getGenerationSystemPrompt({ robot, motorLibrary })
-  const response = await openai.chat.completions.create({
-    model: modelName,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: prompt }
-    ],
-    response_format: {
-      type: 'json_object'
-    },
-    temperature: 0.7,
-    ...(extraBody ? { extra_body: extraBody } : {}),
-  })
-  const content = response.choices[0]?.message?.content
-  return typeof content === 'string' ? stripModelThinkingContent(content) : content
+  return requestAiBackendContent('/generate', { prompt, robot, motorLibrary, lang })
 }
 
 interface InspectionContentRequest {
-  useBackend: boolean
   robot: unknown
   criteriaDescription: string
   inspectionNotes: string
@@ -163,44 +103,17 @@ interface InspectionContentRequest {
 
 /** Inspection counterpart of requestGenerationContent. */
 const requestInspectionContent = async ({
-  useBackend,
   robot,
   criteriaDescription,
   inspectionNotes,
   lang,
   signal,
 }: InspectionContentRequest): Promise<string | null | undefined> => {
-  if (useBackend) {
-    return requestAiBackendContent(
-      '/inspect',
-      { robot, criteriaDescription, inspectionNotes, lang },
-      { signal },
-    )
-  }
-
-  const openai = createOpenAIClient()
-  const modelName = getModelName()
-  const extraBody = resolveOpenAiChatExtraBody(modelName)
-  const systemPrompt = getInspectionSystemPrompt(lang, { criteriaDescription, inspectionNotes })
-  const response = await openai.chat.completions.create(
-    {
-      model: modelName,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Inspect this robot structure:\n${JSON.stringify(robot)}` }
-      ],
-      response_format: {
-        type: 'json_object'
-      },
-      temperature: 0.7,
-      ...(extraBody ? { extra_body: extraBody } : {}),
-    },
-    {
-      signal,
-    },
+  return requestAiBackendContent(
+    '/inspect',
+    { robot, criteriaDescription, inspectionNotes, lang },
+    { signal },
   )
-  const content = response.choices[0]?.message?.content
-  return typeof content === 'string' ? stripModelThinkingContent(content) : content
 }
 
 /**
@@ -334,18 +247,10 @@ export const generateRobotFromPrompt = async (
     return easterEggResponse
   }
 
-  const useBackend = isAiBackendEnabled()
-  const aiRuntimeEnv = resolveAiRuntimeEnv()
-  if (!useBackend && !aiRuntimeEnv.apiKey) {
-    logRegressionError('API Key missing')
-    logRegressionError('Available env vars:', {
-      API_KEY: 'missing',
-      OPENAI_BASE_URL: aiRuntimeEnv.baseUrl,
-      OPENAI_MODEL: aiRuntimeEnv.model
-    })
+  if (!isAiBackendEnabled()) {
     return {
-      explanation: text.apiKeyMissing,
-      actionType: 'advice'
+      explanation: text.loginRequired,
+      actionType: 'advice',
     }
   }
 
@@ -383,7 +288,6 @@ export const generateRobotFromPrompt = async (
 
   try {
     const content = await requestGenerationContent({
-      useBackend,
       prompt,
       robot: contextRobot,
       motorLibrary: contextLibrary,
@@ -468,7 +372,7 @@ const mapGenerationFailure = (
   }
 
   const error = e as { message?: string; status?: number; code?: string; response?: unknown }
-  logRegressionError('OpenAI API call failed', e)
+  logRegressionError('AI backend call failed', e)
   logRegressionError('Error details:', {
     message: error?.message,
     status: error?.status,
@@ -492,16 +396,14 @@ export const runRobotInspection = async (
   options: RunRobotInspectionOptions = {},
 ): Promise<InspectionReport | null> => {
   const text = getAiServiceTexts(lang)
-  const useBackend = isAiBackendEnabled()
-  if (!useBackend && !resolveAiRuntimeEnv().apiKey) {
-    logRegressionError('API Key missing')
+  if (!isAiBackendEnabled()) {
     return {
-      summary: text.apiKeyMissing,
+      summary: text.loginRequired,
       issues: [
         {
           type: 'error',
           title: text.configurationError,
-          description: text.apiKeyMissing,
+          description: text.loginRequired,
           profileId: 'unmapped',
           itemId: 'unmapped',
           score: 0,
@@ -520,7 +422,6 @@ export const runRobotInspection = async (
   try {
     options.onStageChange?.('requesting-model')
     const content = await requestInspectionContent({
-      useBackend,
       robot: contextRobot,
       criteriaDescription,
       inspectionNotes,
@@ -579,11 +480,7 @@ const mapInspectionFailure = (
   signal: AbortSignal | undefined,
   text: ReturnType<typeof getAiServiceTexts>,
 ): InspectionReport | null => {
-  if (
-    signal?.aborted ||
-    e instanceof OpenAI.APIUserAbortError ||
-    (e instanceof Error && e.name === 'AbortError')
-  ) {
+  if (signal?.aborted || (e instanceof Error && e.name === 'AbortError')) {
     return null
   }
 
