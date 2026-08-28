@@ -1106,6 +1106,7 @@ export const fr: TranslationKeys = {
   studioMeshToolCancel: 'Annuler',
   studioMeshToolRetry: 'Réessayer',
   studioMeshToolExecuting: 'Régénération URDF+STL en cours…',
+  studioMeshToolProposeSummary: 'Soumettre une révision du document d’exigences',
   studioMeshToolRegenerateSummary: 'Régénérer URDF+STL',
   studioMeshToolSessionExpired:
     'Session expirée. Retournez sur le site principal et rouvrez l’aperçu.',

@@ -6,6 +6,7 @@ export type StudioMeshToolTexts = Pick<
   | 'studioMeshToolCancel'
   | 'studioMeshToolRetry'
   | 'studioMeshToolExecuting'
+  | 'studioMeshToolProposeSummary'
   | 'studioMeshToolRegenerateSummary'
   | 'studioMeshToolSessionExpired'
   | 'studioMeshToolModelUpdated'
@@ -32,6 +33,7 @@ export function getStudioMeshToolTexts(lang: Language): StudioMeshToolTexts {
     studioMeshToolCancel: t.studioMeshToolCancel,
     studioMeshToolRetry: t.studioMeshToolRetry,
     studioMeshToolExecuting: t.studioMeshToolExecuting,
+    studioMeshToolProposeSummary: t.studioMeshToolProposeSummary,
     studioMeshToolRegenerateSummary: t.studioMeshToolRegenerateSummary,
     studioMeshToolSessionExpired: t.studioMeshToolSessionExpired,
     studioMeshToolModelUpdated: t.studioMeshToolModelUpdated,

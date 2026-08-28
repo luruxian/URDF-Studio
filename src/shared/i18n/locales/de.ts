@@ -1106,6 +1106,7 @@ export const de: TranslationKeys = {
   studioMeshToolCancel: 'Abbrechen',
   studioMeshToolRetry: 'Erneut versuchen',
   studioMeshToolExecuting: 'URDF+STL wird neu generiert…',
+  studioMeshToolProposeSummary: 'Anforderungsdokument-Revision einreichen',
   studioMeshToolRegenerateSummary: 'URDF+STL neu generieren',
   studioMeshToolSessionExpired:
     'Sitzung abgelaufen. Kehren Sie zur Hauptseite zurück und öffnen Sie die Vorschau erneut.',

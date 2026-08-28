@@ -986,6 +986,7 @@ export interface TranslationKeys extends TranslationWorkflowKeys {
   studioMeshToolCancel: string;
   studioMeshToolRetry: string;
   studioMeshToolExecuting: string;
+  studioMeshToolProposeSummary: string;
   studioMeshToolRegenerateSummary: string;
   studioMeshToolSessionExpired: string;
   studioMeshToolModelUpdated: string;

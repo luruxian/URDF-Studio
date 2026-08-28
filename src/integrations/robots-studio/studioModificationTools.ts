@@ -82,7 +82,7 @@ const TOOL_DEFS: AIConversationToolDef[] = [
     function: {
       name: 'regenerate_robot_model',
       description:
-        'Trigger Team Mesh regeneration for urdf_stl orders after the ' +
+        'Trigger URDF regeneration for urdf_stl orders after the ' +
         'requirements document revision is saved.',
       parameters: {
         type: 'object',
@@ -137,7 +137,9 @@ function buildSummary(
   if (toolName === 'propose_requirements_revision') {
     const summary =
       typeof args.change_summary === 'string' ? args.change_summary.trim() : '';
-    return summary ? truncateSummary(summary) : toolName;
+    return summary
+      ? truncateSummary(summary)
+      : getStudioMeshToolTexts(lang).studioMeshToolProposeSummary;
   }
   if (toolName === 'regenerate_robot_model') {
     const revision = args.revision;
