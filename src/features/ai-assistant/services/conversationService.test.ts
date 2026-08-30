@@ -356,7 +356,7 @@ test('sendConversationTurnStream accumulates streamed tool_calls and invokes onT
       mockOpenAiStreamResponse([
         openAiToolCallNameChunk('propose_requirements_revision'),
         openAiToolCallArgsChunk(
-          '{"change_summary":"arm +5cm","append_markdown":"\\n## v3\\n"}',
+          '{"change_summary":"arm +5cm","section_updates":{"性能参数":"臂展 +5cm"},"history_bullets":["臂展 +5cm"]}',
         ),
       ])) as typeof fetch;
 
@@ -378,7 +378,7 @@ test('sendConversationTurnStream accumulates streamed tool_calls and invokes onT
         {
           function: {
             name: 'propose_requirements_revision',
-            arguments: '{"change_summary":"arm +5cm","append_markdown":"\\n## v3\\n"}',
+            arguments: '{"change_summary":"arm +5cm","section_updates":{"性能参数":"臂展 +5cm"},"history_bullets":["臂展 +5cm"]}',
           },
         },
       ]);

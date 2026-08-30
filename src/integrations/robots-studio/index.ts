@@ -47,5 +47,6 @@ export type {
   RequirementsDocumentPatchResponse,
   RequirementsDocumentResponse,
   RequirementsRevisionConflictErrorCode,
+  RequirementsSectionId,
   StudioPackageType,
 } from './types';

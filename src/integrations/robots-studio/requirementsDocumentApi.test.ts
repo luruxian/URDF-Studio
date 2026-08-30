@@ -234,7 +234,11 @@ test('patchRequirementsDocument PATCHes revision payload', async () => {
   const result = await patchRequirementsDocument({
     base_revision: 3,
     change_summary: '手臂长度增加 5cm',
-    append_markdown: '## Studio 修订（v4）\n- 手臂长度 +5cm\n',
+    section_updates: {
+      性能参数: '臂展 +5cm',
+    },
+    history_bullets: ['臂展 +5cm'],
+    client_mutation_id: '550e8400-e29b-41d4-a716-446655440000',
   });
 
   assert.equal(result.revision, 4);
@@ -249,7 +253,11 @@ test('patchRequirementsDocument PATCHes revision payload', async () => {
   assert.deepEqual(JSON.parse(String(init?.body)), {
     base_revision: 3,
     change_summary: '手臂长度增加 5cm',
-    append_markdown: '## Studio 修订（v4）\n- 手臂长度 +5cm\n',
+    section_updates: {
+      性能参数: '臂展 +5cm',
+    },
+    history_bullets: ['臂展 +5cm'],
+    client_mutation_id: '550e8400-e29b-41d4-a716-446655440000',
   });
 });
 
@@ -264,7 +272,8 @@ test('patchRequirementsDocument surfaces revision_conflict on 409', async () => 
       patchRequirementsDocument({
         base_revision: 2,
         change_summary: 'x',
-        append_markdown: 'y',
+        section_updates: { 背景: 'y' },
+        history_bullets: ['y'],
       }),
     (error: unknown) => {
       if (!isRobotsStudioApiError(error, 409)) return false;

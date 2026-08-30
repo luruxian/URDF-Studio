@@ -727,7 +727,8 @@ test('toolsConfig path surfaces ToolConfirmBanner when the model returns tool_ca
           name: 'propose_requirements_revision',
           arguments: JSON.stringify({
             change_summary: 'arm +5cm',
-            append_markdown: '\n## v3\n',
+            section_updates: { 性能参数: '臂展 +5cm' },
+            history_bullets: ['臂展 +5cm'],
           }),
         },
       },

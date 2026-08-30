@@ -332,6 +332,7 @@ Legacy `POST .../studio/ai/chat` 已移除。对话统一走：
 设计 spec：
 
 - 确认书 / mesh：`docs/superpowers/specs/2026-08-27-robots-conversation-requirements-regen-design.md`
+- **章节替换 PATCH v2（Breaking）**：robots 仓库 [`docs/superpowers/specs/2026-08-30-studio-requirements-section-patch-design.md`](../../../robots/docs/superpowers/specs/2026-08-30-studio-requirements-section-patch-design.md)
 - 安全加固（BFF 会话快照）：robots 仓库 [`docs/superpowers/specs/2026-08-27-studio-ai-security-hardening-design.md`](../../../robots/docs/superpowers/specs/2026-08-27-studio-ai-security-hardening-design.md)
 
 robots BFF 实现细节：`robots/docs/integrations/studio-requirements-revision.md`（同 workspace）
@@ -460,6 +461,52 @@ OpenAI Chat Completions 兼容路径；`stream: true` **必填**。
 
 **Response：** 标准 OpenAI SSE（`chat.completion.chunk`），以 `data: [DONE]` 结束。
 
+### 11.5 `GET` / `PATCH .../studio/requirements-document`（章节替换 v2，2026-08-30 Breaking）
+
+**Breaking：** PATCH 不再接受 `append_markdown`。必须使用 `section_updates` + `history_bullets`；仅含 legacy `append_markdown` → **400** `patch_format_required`。Studio 客户端与 robots BFF **须同版本部署**。
+
+设计 spec：robots [`docs/superpowers/specs/2026-08-30-studio-requirements-section-patch-design.md`](../../../robots/docs/superpowers/specs/2026-08-30-studio-requirements-section-patch-design.md)
+
+**GET Response 200**（增字段）
+
+| 字段 | 说明 |
+|------|------|
+| `sections` | 解析后的四章正文 `{ 背景, 机型, 性能参数, 其他约束 }`（可选） |
+| `changelog` | 变更履历 Markdown（可选） |
+| `parse_error` | 解析失败原因（可选） |
+
+**PATCH Request body**
+
+```json
+{
+  "base_revision": 3,
+  "change_summary": "手臂加长 5cm",
+  "section_updates": {
+    "性能参数": "臂展 +5cm"
+  },
+  "history_bullets": ["臂展 +5cm"],
+  "client_mutation_id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `base_revision` | 乐观锁；过期 → **409** `revision_conflict` |
+| `section_updates` | 至少 1 项；key ∈ `{背景, 机型, 性能参数, 其他约束}`；value 为章内正文（不含 `##`） |
+| `history_bullets` | 1–8 条 delta 履历 bullet |
+| `client_mutation_id` | 可选 UUID；同 `(order_id, client_mutation_id)` 重放返回同一 revision（幂等） |
+
+**PATCH 错误码（409）**
+
+| code | 含义 |
+|------|------|
+| `revision_conflict` | `base_revision` 过期 |
+| `duplicate_content` | 防重复校验失败 |
+| `invalid_section` | section key 非法 |
+| `invalid_document_schema` | 无法解析四章 |
+
+Studio 客户端 Phase A（PATCH）与 Phase B（mesh regenerate → import）分离；mesh 失败重试时复用 Phase A 缓存，**不再重复 PATCH**。
+
 ---
 
 ## 12. 不在本契约范围内
@@ -583,6 +630,7 @@ curl -sS -X DELETE \
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
+| 1.3 | 2026-08-30 | §11.5：需求确认书 PATCH v2（`section_updates` + `history_bullets` + `client_mutation_id`）；Breaking 与 robots 同版本部署 |
 | 1.2 | 2026-08-27 | §11：BFF 会话快照 API；completions `studio` 仅 `session_id` + `user_message`（见 security hardening spec） |
 | 1.1 | 2026-08-27 | §11：对话 completions + 确认书修订 + mesh regen（见 `docs/superpowers/specs/2026-08-27-robots-conversation-requirements-regen-design.md`） |
 | 1.0 | 2026-08-22 | 初版：对齐 Studio Mode B spec 与 `aiBackendTransport` |
