@@ -239,6 +239,16 @@ function stripSectionHeadingPrefix(text: string): string {
   return text.replace(/^##\s*/, '').trim();
 }
 
+/** Models often write `\\n` in tool-call JSON; after JSON.parse that is the two characters `\` + `n`. */
+function unescapeLiteralEscapes(text: string): string {
+  if (!text.includes('\\')) return text;
+  return text
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\n')
+    .replace(/\\t/g, '\t');
+}
+
 export function normalizeSectionUpdates(
   raw: unknown,
 ): Partial<Record<RequirementsSectionId, string>> | null {
@@ -253,7 +263,9 @@ export function normalizeSectionUpdates(
     if (!REQUIREMENTS_SECTION_IDS.includes(sectionKey as RequirementsSectionId)) {
       continue;
     }
-    normalized[sectionKey as RequirementsSectionId] = stripSectionHeadingPrefix(rawValue);
+    normalized[sectionKey as RequirementsSectionId] = unescapeLiteralEscapes(
+      stripSectionHeadingPrefix(rawValue),
+    );
   }
 
   return Object.keys(normalized).length > 0 ? normalized : null;
@@ -261,7 +273,9 @@ export function normalizeSectionUpdates(
 
 function parseHistoryBullets(raw: unknown): string[] | null {
   if (!Array.isArray(raw) || raw.length === 0) return null;
-  const bullets = raw.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  const bullets = raw
+    .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    .map((item) => unescapeLiteralEscapes(item.trim()));
   return bullets.length > 0 ? bullets : null;
 }
 
@@ -273,7 +287,9 @@ function parseProposeToolArgs(
   historyBullets: string[];
 } | null {
   const changeSummary =
-    typeof args.change_summary === 'string' ? args.change_summary.trim() : '';
+    typeof args.change_summary === 'string'
+      ? unescapeLiteralEscapes(args.change_summary.trim())
+      : '';
   const sectionUpdates = normalizeSectionUpdates(args.section_updates);
   const historyBullets = parseHistoryBullets(args.history_bullets);
 
@@ -335,7 +351,13 @@ export function createParseToolCalls(lang: Language) {
     if (!tc.function.name) return null;
 
     if (tc.function.name === 'propose_requirements_revision') {
-      if (!parseProposeToolArgs(args)) return null;
+      const parsed = parseProposeToolArgs(args);
+      if (!parsed) return null;
+      args = {
+        change_summary: parsed.changeSummary,
+        section_updates: parsed.sectionUpdates,
+        history_bullets: parsed.historyBullets,
+      };
     }
 
     return {

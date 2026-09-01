@@ -205,6 +205,41 @@ test('normalizeSectionUpdates strips ## prefixes and ignores unknown keys', () =
   );
 });
 
+test('normalizeSectionUpdates turns over-escaped newlines into real line breaks', () => {
+  const overEscaped = '- 负载 5kg\\n- 臂展 1.2m\\n\\n底座更紧凑';
+  assert.equal(overEscaped.includes('\n'), false);
+
+  assert.deepEqual(normalizeSectionUpdates({ 性能参数: overEscaped }), {
+    性能参数: '- 负载 5kg\n- 臂展 1.2m\n\n底座更紧凑',
+  });
+});
+
+test('normalizeSectionUpdates leaves already-real newlines unchanged', () => {
+  assert.deepEqual(
+    normalizeSectionUpdates({ 性能参数: '- 负载 5kg\n- 臂展 1.2m' }),
+    { 性能参数: '- 负载 5kg\n- 臂展 1.2m' },
+  );
+});
+
+test('createParseToolCalls unescapes literal newlines in propose tool arguments', () => {
+  const parseToolCalls = createParseToolCalls('zh');
+  const parsed = parseToolCalls([
+    {
+      function: {
+        name: 'propose_requirements_revision',
+        arguments:
+          '{"change_summary":"arm +5cm","section_updates":{"性能参数":"- 负载 5kg\\\\n- 臂展 1.2m"},"history_bullets":["负载 +2kg\\\\n臂展 +5cm"]}',
+      },
+    },
+  ]);
+
+  assert.ok(parsed);
+  assert.deepEqual(parsed.args.section_updates, {
+    性能参数: '- 负载 5kg\n- 臂展 1.2m',
+  });
+  assert.deepEqual(parsed.args.history_bullets, ['负载 +2kg\n臂展 +5cm']);
+});
+
 // ============================================================
 // parseToolCalls
 // ============================================================
