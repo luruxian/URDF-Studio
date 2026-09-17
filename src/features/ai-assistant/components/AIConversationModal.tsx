@@ -41,7 +41,12 @@ import {
   startNewConversationTimeline,
 } from '../utils/conversationTimeline';
 import type { AIConversationLaunchContext, AIConversationMessage } from '../types';
+import { getBootstrap } from '@/integrations/agile-robot/bootstrap';
 import { ToolConfirmBanner } from '@/integrations/agile-robot/components/ToolConfirmBanner';
+import {
+  buildStudioInquireOrdersUrl,
+  canShowStudioInquireButton,
+} from '@/integrations/agile-robot/inquireHandoff';
 import type {
   AIConversationToolsConfig,
   ParsedToolCall,
@@ -126,6 +131,8 @@ export function AIConversationModal({
   toolsConfig,
 }: AIConversationModalProps) {
   const t = translations[lang];
+  const bootstrap = getBootstrap();
+  const showInquireButton = canShowStudioInquireButton(bootstrap);
   const robotsConversationReady = isRobotsAiConversationReady();
   const conversationWindowLayer = useManagedWindowLayer('aiConversation');
   const { sessionId, syncSnapshot, ensureSynced, resetSession } = useConversationSession({
@@ -676,6 +683,20 @@ export function AIConversationModal({
     void handleToolConfirm();
   }, [handleToolConfirm]);
 
+  const handleInquireClick = useCallback(() => {
+    if (!bootstrap) {
+      return;
+    }
+    const url = buildStudioInquireOrdersUrl({
+      mainSiteOrigin: bootstrap.main_site_origin!,
+      lang,
+      orderId: bootstrap.order_id,
+    });
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  }, [bootstrap, lang]);
+
   if (!isOpen || !launchContext) {
     return null;
   }
@@ -926,6 +947,15 @@ export function AIConversationModal({
                     {t.sendOnEnterHint}
                   </span>
                   <div className="flex items-center gap-2">
+                    {showInquireButton ? (
+                      <button
+                        type="button"
+                        onClick={handleInquireClick}
+                        className="flex h-6 items-center gap-1 rounded-lg border border-border-black bg-panel-bg px-2 text-[11px] font-semibold text-text-secondary transition-colors hover:bg-element-hover"
+                      >
+                        {t.inquireContactSupport}
+                      </button>
+                    ) : null}
                     {lastSubmittedTurn && !isSending && (
                       <button
                         type="button"

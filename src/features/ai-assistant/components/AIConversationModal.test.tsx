@@ -163,6 +163,8 @@ const ROBOTS_API_BASE = 'https://api.example.com/api/v1';
 const ROBOTS_AI_BACKEND = `${ROBOTS_API_BASE}/me/projects/ord-9/studio/ai`;
 const TEST_BFF_SESSION_ID = 'sess-modal-test';
 
+const INQUIRE_ORDER_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+
 const validBootstrap = {
   studio_token: 'test-token',
   studio_expires_at: '2026-08-09T00:00:00Z',
@@ -172,6 +174,13 @@ const validBootstrap = {
   input_image_path: 'orders/ord-9/model_input.png',
   fallback_input_image_path: 'orders/ord-9/fallback.png',
   api_base_url: ROBOTS_API_BASE,
+};
+
+const inquireBootstrap = {
+  ...validBootstrap,
+  order_id: INQUIRE_ORDER_ID,
+  can_inquire: true,
+  main_site_origin: 'https://robots.test',
 };
 
 interface RobotsConversationEnvSnapshot {
@@ -686,6 +695,101 @@ test('header actions expose hover and focus border highlight styles', async () =
     await act(async () => {
       root.unmount();
     });
+    dom.window.close();
+  }
+});
+
+test('shows inquire button when bootstrap can_inquire and opens orders deep link', async () => {
+  const dom = installDom();
+  const robotsEnv = setRobotsConversationEnv();
+  sessionStorage.setItem(BOOTSTRAP_STORAGE_KEY, JSON.stringify(inquireBootstrap));
+  mockConversationSessionFetch();
+  const container = dom.window.document.getElementById('root');
+  assert.ok(container, 'root container should exist');
+
+  const openCalls: Array<[string, string, string]> = [];
+  const previousOpen = dom.window.open;
+  dom.window.open = ((url: string, target?: string, features?: string) => {
+    openCalls.push([url, target ?? '', features ?? '']);
+    return null;
+  }) as typeof dom.window.open;
+
+  const { AIConversationModal } = await import('./AIConversationModal.tsx');
+  const root = createRoot(container);
+
+  try {
+    await act(async () => {
+      root.render(
+        <AIConversationModal
+          isOpen
+          onClose={() => {}}
+          lang="zh"
+          launchContext={createLaunchContext()}
+          onStartNewConversation={() => {}}
+          onApply={() => true}
+        />,
+      );
+    });
+    await flush();
+
+    const inquireButton = findButtonByText(container, '与客服联系并询价');
+    assert.equal(inquireButton.textContent?.includes('与客服联系并询价'), true);
+
+    await clickButton(inquireButton);
+    await flush();
+
+    assert.equal(openCalls.length, 1);
+    assert.match(openCalls[0]?.[0] ?? '', /action=inquire/);
+    assert.equal(openCalls[0]?.[1], '_blank');
+    assert.equal(openCalls[0]?.[2], 'noopener,noreferrer');
+    assert.equal(
+      openCalls[0]?.[0],
+      `https://robots.test/zh-CN/orders?order=${INQUIRE_ORDER_ID}&action=inquire`,
+    );
+  } finally {
+    dom.window.open = previousOpen;
+    await act(async () => {
+      root.unmount();
+    });
+    restoreRobotsConversationEnv(robotsEnv);
+    dom.window.close();
+  }
+});
+
+test('hides inquire button when bootstrap lacks can_inquire', async () => {
+  const dom = installDom();
+  const robotsEnv = setRobotsConversationEnv();
+  mockConversationSessionFetch();
+  const container = dom.window.document.getElementById('root');
+  assert.ok(container, 'root container should exist');
+
+  const { AIConversationModal } = await import('./AIConversationModal.tsx');
+  const root = createRoot(container);
+
+  try {
+    await act(async () => {
+      root.render(
+        <AIConversationModal
+          isOpen
+          onClose={() => {}}
+          lang="zh"
+          launchContext={createLaunchContext()}
+          onStartNewConversation={() => {}}
+          onApply={() => true}
+        />,
+      );
+    });
+    await flush();
+
+    const inquireButton = Array.from(container.querySelectorAll('button')).find((button) =>
+      button.textContent?.trim().includes('与客服联系并询价'),
+    );
+    assert.equal(inquireButton, undefined);
+  } finally {
+    await act(async () => {
+      root.unmount();
+    });
+    restoreRobotsConversationEnv(robotsEnv);
     dom.window.close();
   }
 });
