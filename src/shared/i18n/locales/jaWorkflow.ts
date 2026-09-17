@@ -206,6 +206,7 @@ export const jaWorkflow: TranslationWorkflowKeys = {
   apiKeyMissing: 'API Key が設定されていません。環境設定を確認してください。',
   aiConversationRobotsHandoffRequired:
     'AI チャットを利用するには、Agile Robot 本サイトから Studio を開いてください。',
+  inquireContactSupport: 'サポートに連絡して見積依頼',
   aiLoginRequired: 'AI アシスタントを利用するには、先にログインしてください。',
   apiReturnedEmptyContent: 'API から空の応答が返されました。もう一度お試しください。',
   rawResponse: '生の応答',

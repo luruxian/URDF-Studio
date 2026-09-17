@@ -11,6 +11,8 @@ export interface RobotsStudioBootstrap {
   input_image_path: string;
   fallback_input_image_path: string;
   api_base_url: string; // 含 /api/v1，无尾斜杠
+  can_inquire?: boolean;
+  main_site_origin?: string;
 }
 
 // ============================================================

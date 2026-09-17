@@ -106,9 +106,23 @@ type RobotsStudioBootstrapMessage = {
     input_image_path: string
     fallback_input_image_path: string
     api_base_url: string // 含 /api/v1，无尾斜杠，例如 https://api.example.com/api/v1
+    can_inquire?: boolean // 订单是否允许询价；为 true 时 Studio 可展示「联系客服询价」入口
+    main_site_origin?: string // 主站 origin（无尾斜杠），用于拼主站 `/orders?order=…&action=inquire` 深链
   }
 }
 ```
+
+| 字段 | Studio 用途 |
+|------|-------------|
+| `studio_token` | BFF 请求 `Authorization: Bearer` |
+| `studio_expires_at` | token 过期时间（ISO 8601） |
+| `order_id` | 订单 UUID；BFF 路径与询价深链 |
+| `attachment_id` | 当前预览附件 |
+| `conversation_id` | 主站会话 ID；无则 `null` |
+| `input_image_path` / `fallback_input_image_path` | 即梦改图默认图源 |
+| `api_base_url` | API 根（含 `/api/v1`，无尾斜杠） |
+| `can_inquire` | 可选；`true` 且存在 `main_site_origin` 时 Studio 展示询价 handoff 按钮 |
+| `main_site_origin` | 可选；主站 origin，用于 `buildStudioInquireOrdersUrl` |
 
 **消息类型常量（固定）**：`robots:studio-bootstrap`
 

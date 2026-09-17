@@ -215,6 +215,7 @@ export const deWorkflow: TranslationWorkflowKeys = {
   apiKeyMissing: 'Der API-Key fehlt. Bitte konfigurieren Sie die Umgebung.',
   aiConversationRobotsHandoffRequired:
     'Öffnen Sie Studio über die Agile-Robot-Hauptseite, um den KI-Chat zu nutzen.',
+  inquireContactSupport: 'Support kontaktieren und Angebot anfragen',
   aiLoginRequired: 'Bitte melden Sie sich zuerst an, um den KI-Assistenten zu nutzen.',
   apiReturnedEmptyContent: 'Die API hat leeren Inhalt zurückgegeben. Bitte erneut versuchen.',
   rawResponse: 'Rohantwort',

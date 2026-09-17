@@ -216,6 +216,7 @@ export const esWorkflow: TranslationWorkflowKeys = {
   apiKeyMissing: 'Falta la API Key. Configura el entorno.',
   aiConversationRobotsHandoffRequired:
     'Abre Studio desde el sitio principal de Agile Robot para usar el chat de IA.',
+  inquireContactSupport: 'Contactar soporte y solicitar presupuesto',
   aiLoginRequired: 'Inicia sesión para usar el asistente de IA.',
   apiReturnedEmptyContent: 'La API devolvió contenido vacío. Inténtalo de nuevo.',
   rawResponse: 'Respuesta sin procesar',

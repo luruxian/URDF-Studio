@@ -196,6 +196,7 @@ export const zhWorkflow: TranslationWorkflowKeys = {
   apiKeyMissing: 'API Key 缺失，请先完成环境配置。',
   aiConversationRobotsHandoffRequired:
     '请从 Agile Robot 主站打开 Studio 后再使用 AI 对话。',
+  inquireContactSupport: '与客服联系并询价',
   aiLoginRequired: '请先登录后再使用 AI 助手。',
   apiReturnedEmptyContent: 'API 返回了空内容，请重试。',
   rawResponse: '原始响应',

@@ -208,6 +208,7 @@ export const enWorkflow: TranslationWorkflowKeys = {
   apiKeyMissing: 'API Key is missing. Please configure the environment.',
   aiConversationRobotsHandoffRequired:
     'Open Studio from the Agile Robot main site to use AI conversation.',
+  inquireContactSupport: 'Contact support and request a quote',
   aiLoginRequired: 'Please log in first to use the AI assistant.',
   apiReturnedEmptyContent: 'The API returned empty content. Please try again.',
   rawResponse: 'Raw response',

@@ -179,6 +179,7 @@ export interface TranslationFeatureConvergenceKeys {
   reportChatSendError: string;
   apiKeyMissing: string;
   aiConversationRobotsHandoffRequired: string;
+  inquireContactSupport: string;
   aiLoginRequired: string;
   apiReturnedEmptyContent: string;
   rawResponse: string;
