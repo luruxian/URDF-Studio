@@ -375,7 +375,7 @@ test('bridge create modal defaults to a compact geometry-pick workflow with adva
           onClose: () => {},
           onCreate: () => {},
           workspace: createAssemblyState(),
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -442,7 +442,7 @@ test('bridge create modal link-list mode uses one flattened selector per endpoin
           onClose: () => {},
           onCreate: () => {},
           workspace: createAssemblyState(),
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -516,7 +516,7 @@ test('bridge create modal advances geometry endpoints and clears snap frames acr
           onClose: () => {},
           onCreate: () => {},
           workspace: createAssemblyState(),
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -625,7 +625,7 @@ test('bridge create modal auto-fills parent and child from direct link picks', a
           onCreate: () => {},
           onPreviewChange: () => {},
           workspace: createAssemblyState(),
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -671,7 +671,7 @@ test('bridge create modal opens as a compact single-page editor with stacked XYZ
           onCreate: () => {},
           onPreviewChange: () => {},
           workspace: createAssemblyState(),
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -746,7 +746,7 @@ test('bridge create modal keeps the compact grouped layout and removes legacy hi
           onCreate: () => {},
           onPreviewChange: () => {},
           workspace: createAssemblyState(),
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -918,7 +918,7 @@ test('bridge create modal keeps joint type compact and omits extra explanation c
           onCreate: () => {},
           onPreviewChange: () => {},
           workspace: createAssemblyState(),
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -980,7 +980,7 @@ test('bridge create modal keeps zh hardware interface labels Chinese-only and pr
           onCreate: () => {},
           onPreviewChange: () => {},
           workspace: createAssemblyState(),
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -1065,7 +1065,7 @@ test('bridge create modal lets users switch back to the parent side and repick i
           onCreate: () => {},
           onPreviewChange: () => {},
           workspace: createAssemblyState(),
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -1127,7 +1127,7 @@ test('bridge create modal adds compact +/-90 degree rotation shortcuts for each 
             previewUpdates.push(bridge?.joint.origin?.rpy.r);
           },
           workspace: createAssemblyState(),
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -1207,7 +1207,7 @@ test('bridge create modal maps X/Y/Z keyboard shortcuts to Euler flip steps', as
             previewUpdates.push(bridge ? bridge.joint.origin.rpy : null);
           },
           workspace: createAssemblyState(),
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -1299,7 +1299,7 @@ test('bridge create modal clears stale state but accepts the first click on that
           onCreate: () => {},
           onPreviewChange: () => {},
           workspace: createAssemblyState(),
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -1371,7 +1371,7 @@ test('bridge create modal link-list endpoints emit an immediate visual-contact p
             );
           },
           workspace: createAssemblyState(),
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -1445,7 +1445,7 @@ test('bridge create modal keeps the joint-pick origin instead of overwriting it 
             if (bridge) previewOriginXs.push(bridge.joint.origin.xyz.x);
           },
           workspace: createAssemblyState(),
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -1505,7 +1505,7 @@ test('bridge create modal suggests a default bridge name and auto-uses it on con
           },
           onPreviewChange: () => {},
           workspace: createAssemblyState(),
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -1572,7 +1572,7 @@ test('bridge create modal keeps the editable default name in sync until customiz
           onCreate: () => {},
           onPreviewChange: () => {},
           workspace,
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -1670,7 +1670,7 @@ test('bridge create modal closes before committing a bridge so heavy assemblies 
             }
           },
           workspace: createAssemblyState(),
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -1760,7 +1760,7 @@ test('bridge create modal increments the generated bridge name when the default 
           onCreate: () => {},
           onPreviewChange: () => {},
           workspace: assemblyState,
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -1817,7 +1817,7 @@ test('bridge create modal updates the preview immediately when origin steppers c
             previewUpdates.push(bridge?.joint.origin?.xyz.x);
           },
           workspace: createAssemblyState(),
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -1884,7 +1884,7 @@ test('bridge create modal keeps incrementing origin steppers while the + button 
             previewUpdates.push(bridge?.joint.origin?.xyz.x);
           },
           workspace: createAssemblyState(),
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -1958,7 +1958,7 @@ test('bridge create modal wires press-and-hold handlers onto the quick +90 rotat
           onCreate: () => {},
           onPreviewChange: () => {},
           workspace: createAssemblyState(),
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -2030,7 +2030,7 @@ test('bridge create modal submits configurable limits for non-fixed joints', asy
           },
           onPreviewChange: () => {},
           workspace: createAssemblyState(),
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -2130,7 +2130,7 @@ test('bridge create modal disables confirm when the lower limit exceeds the uppe
           onCreate: () => {},
           onPreviewChange: () => {},
           workspace: createAssemblyState(),
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();
@@ -2225,7 +2225,7 @@ test('bridge create modal disables confirm for a non-fixed bridge that would clo
           onCreate: () => {},
           onPreviewChange: () => {},
           workspace: assemblyState,
-          lang: 'zh',
+          lang: 'zh-Hant',
         }),
       );
       await Promise.resolve();

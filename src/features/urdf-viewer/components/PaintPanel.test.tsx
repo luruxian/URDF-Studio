@@ -28,7 +28,7 @@ test('PaintPanel hides routine success feedback and keeps errors visible', async
   assert.ok(container);
   const root = createRoot(container);
   const baseProps: React.ComponentProps<typeof PaintPanel> = {
-    lang: 'zh',
+    lang: 'zh-Hant',
     toolMode: 'paint',
     paintColor: '#c8865b82',
     onPaintColorChange: () => {},
@@ -83,7 +83,7 @@ test('PaintPanel explains restore-original mode and disables irrelevant color co
         value={{ beginHoverBlock: () => {}, endHoverBlock: () => {}, clearHover: () => {} }}
       >
         <PaintPanel
-          lang="zh"
+          lang="zh-Hant"
           toolMode="paint"
           paintColor="#c8865b82"
           onPaintColorChange={() => {}}

@@ -31,7 +31,7 @@ async function main() {
         storeLang: window.__URDF_STUDIO_DEBUG__?.__uiStore__?.getState?.()?.lang,
       };
     });
-    assert(suite, currentLang.storeLang === 'en' || currentLang.storeLang === 'zh',
+    assert(suite, currentLang.storeLang === 'en' || currentLang.storeLang === 'zh-Hant',
       'current language readable from ui store');
 
     // ── 2. Switch language via store ──
@@ -39,7 +39,7 @@ async function main() {
       const store = window.__URDF_STUDIO_DEBUG__?.__uiStore__?.getState?.();
       if (!store?.setLang) return { ok: false };
       const current = store.lang;
-      const next = current === 'en' ? 'zh' : 'en';
+      const next = current === 'en' ? 'zh-Hant' : 'en';
       store.setLang(next);
       return { ok: true, from: current, to: next };
     });
@@ -67,7 +67,7 @@ async function main() {
       )[0];
       if (!componentId) return { ok: false, componentId: null };
 
-      api?.__uiStore__?.getState?.()?.setLang?.('zh');
+      api?.__uiStore__?.getState?.()?.setLang?.('zh-Hant');
       api?.__selectionStore__?.getState?.()?.setSelection?.({
         entity: { type: 'component', componentId },
       });
@@ -79,8 +79,8 @@ async function main() {
 
     const componentPropertyText = await page.evaluate(() =>
       document.querySelector('[data-testid="property-editor-sidebar-content"]')?.innerText ?? '');
-    assert(suite, componentPropertyText.includes('组件'), 'component kind localized to Chinese');
-    assert(suite, componentPropertyText.includes('变换'), 'component transform localized to Chinese');
+    assert(suite, componentPropertyText.includes('組件'), 'component kind localized to Traditional Chinese');
+    assert(suite, componentPropertyText.includes('變換'), 'component transform localized to Traditional Chinese');
     assert(suite, componentPropertyText.includes('位置'), 'component position localized to Chinese');
     assert(suite, componentPropertyText.includes('旋转'), 'component rotation localized to Chinese');
     assert(suite, !/\bcomponent\b/i.test(componentPropertyText), 'raw component kind is not exposed');

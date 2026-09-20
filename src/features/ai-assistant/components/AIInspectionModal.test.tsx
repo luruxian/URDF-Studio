@@ -217,7 +217,7 @@ test('transparent AI inspection backdrop does not intercept pointer events', asy
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -261,7 +261,7 @@ test('AIInspectionModal can be resized below the viewport', async () => {
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -488,7 +488,7 @@ test('inspection report footer renders save and regenerate actions', async () =>
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -592,7 +592,7 @@ test('saving the report from the report footer keeps the inspection result visib
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -670,7 +670,7 @@ test('confirming regenerate returns to setup and preserves the prior mode and se
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -781,7 +781,7 @@ test('inspection setup keeps selected checks in sync with updated recommended pr
           isOpen
           onClose={() => {}}
           robot={genericRobot}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -794,7 +794,7 @@ test('inspection setup keeps selected checks in sync with updated recommended pr
           isOpen
           onClose={() => {}}
           robot={humanoidMeshRobot}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -1085,7 +1085,7 @@ test('professional setup preserves manual selected checks across selection-only 
           isOpen
           onClose={() => {}}
           robot={robot}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -1121,7 +1121,7 @@ test('professional setup preserves manual selected checks across selection-only 
           isOpen
           onClose={() => {}}
           robot={updatedRobot}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -1168,7 +1168,7 @@ test('inspection setup starts in normal mode and keeps selection in sync with pr
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -1323,7 +1323,7 @@ test('professional setup sidebar is collapsed by default during selection', asyn
           isOpen
           onClose={() => {}}
           robot={robot}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -1382,7 +1382,7 @@ test('professional setup edits the current plan through a draft plan editor', as
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -1537,7 +1537,7 @@ test('professional mode status badge toggles the inspection item selection', asy
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -1666,7 +1666,7 @@ test('inspection setup normal mode shows the footer selection summary without bu
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -1715,7 +1715,7 @@ test('inspection setup normal mode adjustment keeps the generated plan runnable'
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -1782,7 +1782,7 @@ test('inspection setup normal mode renders only the recognition panel without di
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -1850,7 +1850,7 @@ test('inspection selection is edited in professional mode and persists across mo
           isOpen
           onClose={() => {}}
           robot={robot}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -1956,7 +1956,7 @@ test('inspection setup normal mode replaces the old adjustment action with direc
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -2001,7 +2001,7 @@ test('inspection setup normal mode footer uses a compact aligned count treatment
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -2065,7 +2065,7 @@ test('inspection setup mode switcher uses the professional mode label', async ()
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -2104,7 +2104,7 @@ test('inspection setup opens without an animated operation hint', async () => {
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -2161,7 +2161,7 @@ test('inspection setup does not restore or persist the selected mode across remo
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -2210,7 +2210,7 @@ test('inspection setup does not restore or persist the selected mode across remo
             isOpen
             onClose={() => {}}
             robot={createRobotFixture()}
-            lang="zh"
+            lang="zh-Hant"
             onSelectItem={() => {}}
             onOpenConversationWithReport={() => {}}
           />,
@@ -2258,7 +2258,7 @@ test('inspection setup defaults to normal mode when no saved mode exists', async
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -2302,7 +2302,7 @@ test('inspection setup keeps the mode switcher visually centered in the header',
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -2352,7 +2352,7 @@ test('compact professional setup exposes one vertical scroll viewport', async ()
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -2408,7 +2408,7 @@ test('wide short professional setup keeps one vertical scroll viewport', async (
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -2463,7 +2463,7 @@ test('inspection setup header uses the toolbox AI inspection logo', async () => 
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -2524,7 +2524,7 @@ test('inspection setup header omits maximize and restore controls', async () => 
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,
@@ -2564,7 +2564,7 @@ test('professional setup summary chip uses content-based width instead of stretc
           isOpen
           onClose={() => {}}
           robot={createRobotFixture()}
-          lang="zh"
+          lang="zh-Hant"
           onSelectItem={() => {}}
           onOpenConversationWithReport={() => {}}
         />,

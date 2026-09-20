@@ -1,7 +1,7 @@
 import { Check, ChevronDown, Edit3, RotateCcw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { RobotState } from '@/types';
-import type { Language, TranslationKeys } from '@/shared/i18n';
+import { isChineseLanguage, type Language, type TranslationKeys } from '@/shared/i18n';
 import { Dialog } from '@/shared/components/ui/Dialog';
 import {
   INSPECTION_PROFILE_DEFINITIONS,
@@ -293,7 +293,7 @@ function InspectionPlanEditorDialog({
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0">
                                   <div className="truncate text-[12px] font-semibold">
-                                    {lang === 'zh' ? item.nameZh : item.name}
+                                    {isChineseLanguage(lang) ? item.nameZh : item.name}
                                   </div>
                                   <div className="mt-1 text-[10px] font-medium text-text-tertiary">
                                     {relationLabel}
@@ -565,9 +565,9 @@ export function InspectionSetupView({
                                   <div className="grid gap-3 lg:grid-cols-2">
                                     {profile.items.map((item) => {
                                       const isSelected = selectedItems.has(item.id);
-                                      const itemName = lang === 'zh' ? item.nameZh : item.name;
+                                      const itemName = isChineseLanguage(lang) ? item.nameZh : item.name;
                                       const itemDescription =
-                                        lang === 'zh' ? item.descriptionZh : item.description;
+                                        isChineseLanguage(lang) ? item.descriptionZh : item.description;
 
                                       return (
                                         <button

@@ -1,5 +1,5 @@
 import type { InspectionReport, RobotState } from '@/types'
-import type { Language } from '@/shared/i18n'
+import { isChineseLanguage, type Language } from '@/shared/i18n'
 import { hasFiniteJointLimitBounds } from '@/core/robot'
 import {
   createProfileScoreMetrics,
@@ -226,7 +226,7 @@ export function formatInspectionEvidenceForPrompt(
     return ''
   }
 
-  if (lang === 'zh') {
+  if (isChineseLanguage(lang)) {
     return [
       '**本地确定性证据:**',
       ...failedEntries.map(
@@ -280,10 +280,10 @@ export function mergeInspectionEvidenceIntoReport(
       {
         type: 'error' as const,
         title:
-          lang === 'zh'
+          isChineseLanguage(lang)
             ? `本地证据：${entry.id}`
             : `Local evidence: ${entry.id}`,
-        description: lang === 'zh' ? entry.summaryZh : entry.summary,
+        description: isChineseLanguage(lang) ? entry.summaryZh : entry.summary,
         profileId: primaryProfileItem.profileId,
         itemId: primaryProfileItem.itemId,
         evidenceLevel: entry.level,

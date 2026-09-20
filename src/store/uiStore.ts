@@ -660,13 +660,14 @@ export const useUIStore = create<UIState>()(
     }),
     {
       name: 'urdf-studio-ui',
-      version: 25,
+      version: 26,
       migrate: (persistedState: unknown, persistedVersion) => {
         if (!persistedState || typeof persistedState !== 'object') {
           return persistedState;
         }
 
         const state = persistedState as {
+          lang?: unknown;
           panelLayout?: Partial<PanelLayoutState>;
           viewOptions?: Partial<ViewOptions>;
           sidebar?: Partial<SidebarState>;
@@ -678,6 +679,9 @@ export const useUIStore = create<UIState>()(
           massInertiaChangeBehavior?: unknown;
           navigationSensitivity?: unknown;
         };
+        const migratedLang = normalizeLanguage(
+          typeof state.lang === 'string' ? state.lang : undefined,
+        );
         const persistedPanelLayout = state.panelLayout ?? {};
         const hasLegacyCustomTreeHeights =
           Number.isFinite(persistedPanelLayout.treeFileBrowserHeight) &&
@@ -744,6 +748,7 @@ export const useUIStore = create<UIState>()(
 
         return {
           ...state,
+          ...(migratedLang ? { lang: migratedLang } : {}),
           sidebar: migratedSidebar,
           viewOptions: migratedViewOptions,
           panelLayout: {

@@ -389,9 +389,9 @@ test('legacy and malformed render quality preferences migrate to the high defaul
 test('setLang does not expose SEO language paths in the user URL', async () => {
   const { dom, useUIStore } = await loadUIStore();
 
-  useUIStore.getState().setLang('zh');
+  useUIStore.getState().setLang('zh-Hant');
 
-  assert.equal(useUIStore.getState().lang, 'zh');
+  assert.equal(useUIStore.getState().lang, 'zh-Hant');
   assert.equal(dom.window.location.pathname, '/');
 
   dom.window.close();

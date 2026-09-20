@@ -126,7 +126,7 @@ afterEach(() => {
 
 test('createStudioModificationTools returns null without bootstrap', async () => {
   const config = await createStudioModificationTools({
-    lang: 'zh',
+    lang: 'zh-Hant',
     packageType: 'urdf_stl',
     importUrdfPackage: async () => {},
   });
@@ -136,7 +136,7 @@ test('createStudioModificationTools returns null without bootstrap', async () =>
 test('createStudioModificationTools returns null for non-urdf_stl packageType', async () => {
   storeBootstrapAndAuth();
   const config = await createStudioModificationTools({
-    lang: 'zh',
+    lang: 'zh-Hant',
     packageType: 'glb',
     importUrdfPackage: async () => {},
   });
@@ -168,7 +168,7 @@ test('createStudioModificationTools GETs package_type when not provided', async 
 test('createStudioModificationTools returns config for urdf_stl bootstrap order', async () => {
   storeBootstrapAndAuth();
   const config = await createStudioModificationTools({
-    lang: 'zh',
+    lang: 'zh-Hant',
     packageType: 'urdf_stl',
     importUrdfPackage: async () => {},
   });
@@ -222,7 +222,7 @@ test('normalizeSectionUpdates leaves already-real newlines unchanged', () => {
 });
 
 test('createParseToolCalls unescapes literal newlines in propose tool arguments', () => {
-  const parseToolCalls = createParseToolCalls('zh');
+  const parseToolCalls = createParseToolCalls('zh-Hant');
   const parsed = parseToolCalls([
     {
       function: {
@@ -281,7 +281,7 @@ test('createParseToolCalls returns null when only get_requirements_document is p
 });
 
 test('createParseToolCalls parses propose_requirements_revision with section names in summary', () => {
-  const parseToolCalls = createParseToolCalls('zh');
+  const parseToolCalls = createParseToolCalls('zh-Hant');
   const parsed = parseToolCalls([
     {
       function: {
@@ -321,7 +321,7 @@ test('createParseToolCalls returns null when section_updates is empty', () => {
 });
 
 test('createParseToolCalls parses regenerate_robot_model with revision label', () => {
-  const parseToolCalls = createParseToolCalls('zh');
+  const parseToolCalls = createParseToolCalls('zh-Hant');
   const parsed = parseToolCalls([
     {
       function: {
@@ -393,7 +393,7 @@ test('onExecute for propose_requirements_revision runs PATCH → regenerate → 
   ]);
 
   const config = await createStudioModificationTools({
-    lang: 'zh',
+    lang: 'zh-Hant',
     packageType: 'urdf_stl',
     importUrdfPackage: async (params) => {
       importCalls.push(params);
@@ -591,7 +591,7 @@ test('onExecute maps revision_conflict 409 to a refresh message', async () => {
   ]);
 
   const config = await createStudioModificationTools({
-    lang: 'zh',
+    lang: 'zh-Hant',
     packageType: 'urdf_stl',
     importUrdfPackage: async () => {},
   });
@@ -625,7 +625,7 @@ test('onExecute maps duplicate_content 409 to a localized message', async () => 
   ]);
 
   const config = await createStudioModificationTools({
-    lang: 'zh',
+    lang: 'zh-Hant',
     packageType: 'urdf_stl',
     importUrdfPackage: async () => {},
   });

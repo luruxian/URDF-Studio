@@ -13,7 +13,7 @@ test('buildInspectionIssueProfileLabel returns localized profile names', () => {
         profileId: 'base.physical_plausibility',
         itemId: 'mass_positive',
       },
-      'zh',
+      'zh-Hant',
     ),
     '通用物理合理性检查',
   )

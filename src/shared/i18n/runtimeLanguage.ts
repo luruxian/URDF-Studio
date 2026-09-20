@@ -8,8 +8,11 @@ export function normalizeLanguage(value: unknown): Language | null {
   }
 
   const normalized = value.trim().toLowerCase();
-  if (normalized === 'zh' || normalized === 'zh-cn' || normalized.startsWith('zh-')) {
-    return 'zh';
+  if (normalized === 'zh-hant') {
+    return 'zh-Hant';
+  }
+  if (normalized === 'zh' || normalized === 'zh-cn' || normalized === 'zh-hans' || normalized.startsWith('zh-')) {
+    return 'zh-Hant';
   }
   if (normalized === 'en' || normalized === 'en-us' || normalized.startsWith('en-')) {
     return 'en';

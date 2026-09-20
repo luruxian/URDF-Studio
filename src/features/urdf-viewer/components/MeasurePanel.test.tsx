@@ -107,7 +107,7 @@ async function renderPanel(
         setShowMeasureDecomposition: () => {},
         measurePoseRepresentation: 'matrix',
         setMeasurePoseRepresentation: () => {},
-        lang: 'zh',
+        lang: 'zh-Hant',
       }),
     );
   });

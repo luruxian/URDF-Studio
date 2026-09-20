@@ -392,7 +392,7 @@ test('compact conversation layout fits the viewport and keeps content scrollable
         <AIConversationModal
           isOpen
           onClose={() => {}}
-          lang="zh"
+          lang="zh-Hant"
           launchContext={createLaunchContext()}
           onStartNewConversation={() => {}}
           onApply={() => true}
@@ -447,7 +447,7 @@ test('new conversation requires confirmation, preserves history, and inserts a d
         <AIConversationModal
           isOpen
           onClose={() => {}}
-          lang="zh"
+          lang="zh-Hant"
           launchContext={launchContext}
           onStartNewConversation={(context) => {
             onStartNewConversationCalls.push(context);
@@ -512,7 +512,7 @@ test('clear history requires confirmation and removes prior messages after reset
         <AIConversationModal
           isOpen
           onClose={() => {}}
-          lang="zh"
+          lang="zh-Hant"
           launchContext={launchContext}
           onStartNewConversation={() => {
             startNewConversationCount += 1;
@@ -576,7 +576,7 @@ test('missing robots handoff surfaces handoff-required message', async () => {
         <AIConversationModal
           isOpen
           onClose={() => {}}
-          lang="zh"
+          lang="zh-Hant"
           launchContext={createLaunchContext()}
           onStartNewConversation={() => {}}
           onApply={() => true}
@@ -622,7 +622,7 @@ test('transparent AI conversation backdrop does not intercept pointer events', a
         <AIConversationModal
           isOpen
           onClose={() => {}}
-          lang="zh"
+          lang="zh-Hant"
           launchContext={createLaunchContext()}
           onStartNewConversation={() => {}}
           onApply={() => true}
@@ -660,7 +660,7 @@ test('header actions expose hover and focus border highlight styles', async () =
         <AIConversationModal
           isOpen
           onClose={() => {}}
-          lang="zh"
+          lang="zh-Hant"
           launchContext={createLaunchContext()}
           onStartNewConversation={() => {}}
           onApply={() => true}
@@ -723,7 +723,7 @@ test('shows inquire button when bootstrap can_inquire and opens orders deep link
         <AIConversationModal
           isOpen
           onClose={() => {}}
-          lang="zh"
+          lang="zh-Hant"
           launchContext={createLaunchContext()}
           onStartNewConversation={() => {}}
           onApply={() => true}
@@ -772,7 +772,7 @@ test('hides inquire button when bootstrap lacks can_inquire', async () => {
         <AIConversationModal
           isOpen
           onClose={() => {}}
-          lang="zh"
+          lang="zh-Hant"
           launchContext={createLaunchContext()}
           onStartNewConversation={() => {}}
           onApply={() => true}
@@ -853,7 +853,7 @@ test('toolsConfig path surfaces ToolConfirmBanner when the model returns tool_ca
         <AIConversationModal
           isOpen
           onClose={() => {}}
-          lang="zh"
+          lang="zh-Hant"
           launchContext={createLaunchContext()}
           onStartNewConversation={() => {}}
           onApply={() => true}

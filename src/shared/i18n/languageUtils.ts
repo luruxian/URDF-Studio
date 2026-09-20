@@ -2,7 +2,7 @@ import type { Language } from './types';
 
 export const LANGUAGE_OPTIONS = [
   { value: 'en' as const, label: 'English', shortLabel: 'EN' },
-  { value: 'zh' as const, label: '中文', shortLabel: '中' },
+  { value: 'zh-Hant' as const, label: '繁體中文', shortLabel: '繁' },
   { value: 'ja' as const, label: '日本語', shortLabel: '日' },
   { value: 'fr' as const, label: 'Français', shortLabel: 'FR' },
   { value: 'de' as const, label: 'Deutsch', shortLabel: 'DE' },
@@ -25,8 +25,8 @@ export function getLanguageShortLabel(lang: Language): string {
 
 export function resolveDocumentLocale(lang: Language): string {
   switch (lang) {
-    case 'zh':
-      return 'zh-CN';
+    case 'zh-Hant':
+      return 'zh-Hant';
     case 'ja':
       return 'ja';
     case 'fr':
@@ -42,8 +42,8 @@ export function resolveDocumentLocale(lang: Language): string {
 
 export function resolveDateLocale(lang: Language): string {
   switch (lang) {
-    case 'zh':
-      return 'zh-CN';
+    case 'zh-Hant':
+      return 'zh-TW';
     case 'ja':
       return 'ja-JP';
     case 'fr':
@@ -58,5 +58,5 @@ export function resolveDateLocale(lang: Language): string {
 }
 
 export function isChineseLanguage(lang: Language): boolean {
-  return lang === 'zh';
+  return lang === 'zh-Hant';
 }

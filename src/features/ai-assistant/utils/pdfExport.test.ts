@@ -219,7 +219,7 @@ test('exportInspectionReportPdf renders the report into a hidden container and e
         maxScore: 100
       },
       robotName: 'my_robot',
-      lang: 'zh'
+      lang: 'zh-Hant'
     })
 
     assert.match(capturedText, /检测到 2 个问题/)

@@ -68,7 +68,7 @@ function renderPanel(
   return act(async () => {
     root.render(
       React.createElement(UnifiedVisualizerOptionsPanel, {
-        lang: 'zh',
+        lang: 'zh-Hant',
         showVisual: true,
         setShowVisual: () => {},
         showOrigin: false,

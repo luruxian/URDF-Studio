@@ -16,7 +16,7 @@ import {
   Target,
 } from 'lucide-react';
 import type { InspectionReport, RobotState } from '@/types';
-import { translations, type Language, type TranslationKeys } from '@/shared/i18n';
+import { isChineseLanguage, translations, type Language, type TranslationKeys } from '@/shared/i18n';
 import { buildInspectionEvidenceSummary } from '@/shared/utils/inspectionEvidenceSummary';
 import {
   INSPECTION_PROFILE_DEFINITIONS,
@@ -229,8 +229,8 @@ function buildInspectionItemGroups(
     itemGroups.push({
       key: item.id,
       itemId: item.id,
-      title: lang === 'zh' ? item.nameZh : item.name,
-      description: lang === 'zh' ? item.descriptionZh : item.description,
+      title: isChineseLanguage(lang) ? item.nameZh : item.name,
+      description: isChineseLanguage(lang) ? item.descriptionZh : item.description,
       issues: orderedIssues,
       hasProblems: nonPassCount > 0,
       nonPassCount,
@@ -251,9 +251,9 @@ function buildInspectionItemGroups(
       itemGroups.push({
         key: itemId,
         itemId,
-        title: profileItem && lang === 'zh' ? profileItem.nameZh : (profileItem?.name ?? itemId),
+        title: profileItem && isChineseLanguage(lang) ? profileItem.nameZh : (profileItem?.name ?? itemId),
         description:
-          profileItem && lang === 'zh'
+          profileItem && isChineseLanguage(lang)
             ? profileItem.descriptionZh
             : (profileItem?.description ?? null),
         issues: orderedIssues,

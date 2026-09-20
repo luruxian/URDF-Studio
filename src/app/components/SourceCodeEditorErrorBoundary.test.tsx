@@ -29,7 +29,7 @@ test('source editor boundary renders a contained English recovery dialog', () =>
 });
 
 test('source editor boundary renders localized Chinese recovery copy', () => {
-  const markup = renderFailure('zh', null);
+  const markup = renderFailure('zh-Hant', null);
 
   assert.match(markup, /源代码编辑器加载失败/);
   assert.match(markup, />重新加载</);

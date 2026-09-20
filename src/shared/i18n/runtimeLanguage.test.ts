@@ -24,8 +24,10 @@ function installDom(html = '<!doctype html><html><body></body></html>') {
 }
 
 test('normalizeLanguage maps regional browser language tags', () => {
-  assert.equal(normalizeLanguage('zh-CN'), 'zh');
-  assert.equal(normalizeLanguage('zh-Hans'), 'zh');
+  assert.equal(normalizeLanguage('zh-CN'), 'zh-Hant');
+  assert.equal(normalizeLanguage('zh-Hans'), 'zh-Hant');
+  assert.equal(normalizeLanguage('zh-Hant'), 'zh-Hant');
+  assert.equal(normalizeLanguage('zh'), 'zh-Hant');
   assert.equal(normalizeLanguage('en-US'), 'en');
   assert.equal(normalizeLanguage('en-GB'), 'en');
   assert.equal(normalizeLanguage('ja-JP'), 'ja');
@@ -43,12 +45,12 @@ test('normalizeLanguage maps regional browser language tags', () => {
 });
 
 test('resolveRuntimeLanguage prefers the active document language marker', () => {
-  const dom = installDom('<!doctype html><html data-lang="zh"><body></body></html>');
+  const dom = installDom('<!doctype html><html data-lang="zh-Hant"><body></body></html>');
 
   try {
     window.localStorage.setItem('language', 'en');
-    assert.equal(resolveRuntimeLanguage(), 'zh');
-    assert.equal(getRuntimeLanguageTranslations().t.appErrorBoundaryTitle, '应用遇到错误');
+    assert.equal(resolveRuntimeLanguage(), 'zh-Hant');
+    assert.equal(getRuntimeLanguageTranslations().t.appErrorBoundaryTitle, '應用遇到錯誤');
   } finally {
     dom.window.close();
   }
@@ -61,7 +63,7 @@ test('resolveRuntimeLanguage uses persisted app language before navigator langua
     document.documentElement.removeAttribute('data-lang');
     document.documentElement.removeAttribute('lang');
     window.localStorage.setItem('language', 'zh-CN');
-    assert.equal(resolveRuntimeLanguage(), 'zh');
+    assert.equal(resolveRuntimeLanguage(), 'zh-Hant');
   } finally {
     dom.window.close();
   }

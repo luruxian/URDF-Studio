@@ -153,7 +153,7 @@ test('getInspectionSystemPrompt injects english profile criteria without changin
 test('getInspectionSystemPrompt injects chinese profile criteria without changing the profile JSON contract', () => {
   const criteriaDescription = 'base.robot_model.reference_integrity';
   const inspectionNotes = '**源格式附加说明:**\n- MJCF 摘要：2 个 site';
-  const prompt = getInspectionSystemPrompt('zh', { criteriaDescription, inspectionNotes });
+  const prompt = getInspectionSystemPrompt('zh-Hant', { criteriaDescription, inspectionNotes });
 
   assert.match(prompt, /base\.robot_model\.reference_integrity/);
   assert.match(prompt, /源格式附加说明/);
@@ -202,7 +202,7 @@ test('getConversationSystemPrompt injects context for general mode', () => {
 });
 
 test('getConversationSystemPrompt injects context for inspection follow-up mode in chinese', () => {
-  const prompt = getConversationSystemPrompt('zh', {
+  const prompt = getConversationSystemPrompt('zh-Hant', {
     mode: 'inspection-followup',
     context: '{"inspectionReport":{"summary":"存在关节限位风险"}}',
     history: '[{"role":"assistant","content":"已发现 2 个 warning"}]',

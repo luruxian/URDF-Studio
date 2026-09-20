@@ -214,7 +214,7 @@ afterEach(() => {
 
 test('useConversationSession creates a session on mount', async () => {
   const mock = createMockApi();
-  const hook = renderHook({ lang: 'zh', api: mock.api });
+  const hook = renderHook({ lang: 'zh-Hant', api: mock.api });
 
   await flushMicrotasks();
 
@@ -224,12 +224,12 @@ test('useConversationSession creates a session on mount', async () => {
 
 test('useConversationSession does not recreate session on rerender', async () => {
   const mock = createMockApi();
-  const hook = renderHook({ lang: 'zh', api: mock.api });
+  const hook = renderHook({ lang: 'zh-Hant', api: mock.api });
 
   await flushMicrotasks();
   assert.equal(mock.createCalls, 1);
 
-  hook.rerender({ lang: 'zh', api: mock.api });
+  hook.rerender({ lang: 'zh-Hant', api: mock.api });
   await flushMicrotasks();
 
   assert.equal(mock.createCalls, 1);
@@ -238,7 +238,7 @@ test('useConversationSession does not recreate session on rerender', async () =>
 test('useConversationSession debounces syncSnapshot and increments snapshot_revision', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const mock = createMockApi();
-  const hook = renderHook({ lang: 'zh', api: mock.api });
+  const hook = renderHook({ lang: 'zh-Hant', api: mock.api });
   await flushMicrotasks();
 
   const robot = createRobotFixture();
@@ -280,7 +280,7 @@ test('useConversationSession debounces syncSnapshot and increments snapshot_revi
 test('useConversationSession ensureSynced flushes pending debounced sync immediately', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const mock = createMockApi();
-  const hook = renderHook({ lang: 'zh', api: mock.api });
+  const hook = renderHook({ lang: 'zh-Hant', api: mock.api });
   await flushMicrotasks();
 
   act(() => {
@@ -299,7 +299,7 @@ test('useConversationSession ensureSynced flushes pending debounced sync immedia
 test('useConversationSession resetSession POSTs a new session and resets revision counter', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const mock = createMockApi();
-  const hook = renderHook({ lang: 'zh', api: mock.api });
+  const hook = renderHook({ lang: 'zh-Hant', api: mock.api });
   await flushMicrotasks();
 
   act(() => {

@@ -195,7 +195,7 @@ test('sendConversationTurnStream returns localized handoff error when robots ses
   try {
     const result = await sendConversationTurnStream({
       sessionId: TEST_SESSION_ID,
-      lang: 'zh',
+      lang: 'zh-Hant',
       userMessage: '这个机器人适合做什么？',
     });
 
@@ -320,7 +320,7 @@ test('sendConversationTurnStream uses robots chat/completions when configured', 
       const streamedDeltas: string[] = [];
       const result = await sendConversationTurnStream({
         sessionId: TEST_SESSION_ID,
-        lang: 'zh',
+        lang: 'zh-Hant',
         userMessage: '  这个机器人怎么样？ ',
         onReplyDelta: (delta) => {
           streamedDeltas.push(delta);
@@ -400,7 +400,7 @@ test('sendConversationTurnStream maps robots backend 401 to a login-required err
     try {
       const result = await sendConversationTurnStream({
         sessionId: TEST_SESSION_ID,
-        lang: 'zh',
+        lang: 'zh-Hant',
         userMessage: '这个机器人怎么样？',
       });
 

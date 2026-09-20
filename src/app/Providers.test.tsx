@@ -91,7 +91,7 @@ test('Providers preserves the canonical URL emitted by the static language page'
     assert.equal(canonical?.getAttribute('href'), 'https://urdf.enkeebot.com/en/');
 
     await act(async () => {
-      useUIStore.getState().setLang('zh');
+      useUIStore.getState().setLang('zh-Hant');
     });
     assert.equal(canonical?.getAttribute('href'), 'https://urdf.enkeebot.com/en/');
   } finally {

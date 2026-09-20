@@ -6,6 +6,8 @@ import { RobotsHandoffGate } from '@/app/components/RobotsHandoffGate';
 import { useUIStore } from '@/store';
 import {
   getInitialLanguageFromUrl,
+  getLanguageFromRobotsHandoffSearch,
+  hideRobotsHandoffLangFromUserUrl,
   hideSeoLanguagePathFromUserUrl,
 } from '@/app/utils/initialLanguage';
 import {
@@ -57,10 +59,15 @@ import.meta.hot?.dispose(() => {
 
 // SEO emits a Chinese static entry at /zh/. Use it as an initial language hint
 // for direct visits, then hide the SEO-only path before the interactive app runs.
+const handoffLanguage = getLanguageFromRobotsHandoffSearch(window.location.search);
 const urlLanguage = getInitialLanguageFromUrl();
 if (urlLanguage !== null) {
   useUIStore.getState().setLang(urlLanguage);
-  hideSeoLanguagePathFromUserUrl();
+  if (handoffLanguage !== null) {
+    hideRobotsHandoffLangFromUserUrl();
+  } else {
+    hideSeoLanguagePathFromUserUrl();
+  }
 }
 
 const rootElement = document.getElementById('root');

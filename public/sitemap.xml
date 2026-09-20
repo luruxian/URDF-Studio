@@ -4,16 +4,16 @@
   <url>
     <loc>https://urdf.enkeebot.com/</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://urdf.enkeebot.com/"/>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://urdf.enkeebot.com/zh/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://urdf.enkeebot.com/zh-Hant/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://urdf.enkeebot.com/"/>
     <lastmod>2026-06-19</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://urdf.enkeebot.com/zh/</loc>
+    <loc>https://urdf.enkeebot.com/zh-Hant/</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://urdf.enkeebot.com/"/>
-    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://urdf.enkeebot.com/zh/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://urdf.enkeebot.com/zh-Hant/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://urdf.enkeebot.com/"/>
     <lastmod>2026-06-19</lastmod>
     <changefreq>weekly</changefreq>

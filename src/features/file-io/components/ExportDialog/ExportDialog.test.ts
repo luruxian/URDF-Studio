@@ -80,7 +80,7 @@ async function renderExportDialog(
       React.createElement(ExportDialog, {
         onClose: () => {},
         onExport,
-        lang: 'zh',
+        lang: 'zh-Hant',
         canExportUsd: true,
         ...props,
       }),

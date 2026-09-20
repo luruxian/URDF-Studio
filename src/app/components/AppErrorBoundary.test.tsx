@@ -41,7 +41,7 @@ test('AppErrorBoundary renders English copy without mixed Chinese UI', () => {
 });
 
 test('AppErrorBoundary renders Chinese copy without mixed English UI', () => {
-  const markup = renderErrorBoundaryForLanguage('zh');
+  const markup = renderErrorBoundaryForLanguage('zh-Hant');
 
   assert.match(markup, /应用遇到错误/);
   assert.match(markup, /页面渲染中断/);

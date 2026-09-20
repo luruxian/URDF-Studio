@@ -27,7 +27,7 @@ test('useAgileRobotTools is disabled and always returns null', async () => {
 
   let current: ReturnType<typeof useAgileRobotTools> | undefined;
   function Probe() {
-    current = useAgileRobotTools({ lang: 'zh' });
+    current = useAgileRobotTools({ lang: 'zh-Hant' });
     return null;
   }
 

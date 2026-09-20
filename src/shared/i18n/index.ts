@@ -5,7 +5,7 @@
 
 export type { Language, TranslationKeys, Translations } from './types';
 export { translations } from './translations';
-export { en, de, es, fr, ja, zh } from './locales';
+export { en, de, es, fr, ja, zhHant } from './locales';
 export {
   getNextLanguage,
   getLanguageShortLabel,

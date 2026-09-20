@@ -3,7 +3,7 @@
  */
 
 import type { RobotState, MotorSpec, InspectionReport } from '@/types'
-import { translations, type Language } from '@/shared/i18n'
+import { isChineseLanguage, translations, type Language } from '@/shared/i18n'
 import { logRegressionError } from '@/shared/debug/consoleDiagnostics'
 import type { AIResponse } from '../types'
 import { getEasterEggResponse } from '../config/easterEggs'
@@ -194,16 +194,16 @@ export const buildInspectionCriteriaDescription = (
     const selectedItemIds = selectedItems?.[profile.id] || []
     if (selectedItemIds.length === 0) return null
 
-    const profileName = lang === 'zh' ? profile.nameZh : profile.name
-    const profileDesc = lang === 'zh' ? profile.descriptionZh : profile.description
+    const profileName = isChineseLanguage(lang) ? profile.nameZh : profile.name
+    const profileDesc = isChineseLanguage(lang) ? profile.descriptionZh : profile.description
     const layerName = getInspectionProfileLayerName(profile.layer, lang)
     const itemsDesc = profile.items
       .filter(item => selectedItemIds.includes(item.id))
       .map(item => {
-        const itemName = lang === 'zh' ? item.nameZh : item.name
-        const itemDesc = lang === 'zh' ? item.descriptionZh : item.description
+        const itemName = isChineseLanguage(lang) ? item.nameZh : item.name
+        const itemDesc = isChineseLanguage(lang) ? item.descriptionZh : item.description
         const severityLabel =
-          lang === 'zh'
+          isChineseLanguage(lang)
             ? item.severityOnFailure === 'error'
               ? '错误'
               : item.severityOnFailure === 'warning'
@@ -211,18 +211,18 @@ export const buildInspectionCriteriaDescription = (
                 : '建议'
             : item.severityOnFailure
         const evidenceLabel = item.evidenceLevelRequired
-          ? lang === 'zh'
+          ? isChineseLanguage(lang)
             ? `，证据等级：${item.evidenceLevelRequired}`
             : `, evidence: ${item.evidenceLevelRequired}`
           : ''
-        return lang === 'zh'
+        return isChineseLanguage(lang)
           ? `    - ${itemName} (${item.id})：${itemDesc} 失败等级：${severityLabel}${evidenceLabel}`
           : `    - ${itemName} (${item.id}): ${itemDesc} Failure severity: ${severityLabel}${evidenceLabel}`
       })
       .join('\n')
 
     if (itemsDesc) {
-      return lang === 'zh'
+      return isChineseLanguage(lang)
         ? `  ${profile.id}（${profileName}，层级：${profile.layer} / ${layerName}）：${profileDesc}\n${itemsDesc}`
         : `  ${profile.id} (${profileName}, layer: ${profile.layer} / ${layerName}): ${profileDesc}\n${itemsDesc}`
     }

@@ -1,7 +1,7 @@
 import { Check, ChevronDown, ChevronRight, FileText, Layers, Minus, Package, Sparkles, Target } from 'lucide-react';
 import { useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import type { Language, TranslationKeys } from '@/shared/i18n';
+import { isChineseLanguage, type Language, type TranslationKeys } from '@/shared/i18n';
 import {
   INSPECTION_PROFILE_DEFINITIONS,
   getInspectionProfileLayerName,
@@ -242,7 +242,7 @@ export function InspectionSidebar({
                   );
                   if (!profile) return null;
 
-                  const profileName = lang === 'zh' ? profile.nameZh : profile.name;
+                  const profileName = isChineseLanguage(lang) ? profile.nameZh : profile.name;
                   const selectedItemIds = selectedProfiles[profile.id] || new Set();
                   const selectedCount = selectedItemIds.size;
                   const allSelected = profile.items.every((item) => selectedItemIds.has(item.id));
@@ -437,7 +437,7 @@ export function InspectionSidebar({
                           <div className="space-y-1">
                             {visibleItems.map((item) => {
                               const isSelected = selectedItemIds.has(item.id);
-                              const itemName = lang === 'zh' ? item.nameZh : item.name;
+                              const itemName = isChineseLanguage(lang) ? item.nameZh : item.name;
 
                               if (readOnly) {
                                 const canNavigateItem = isSelected && Boolean(onNavigateToItem);

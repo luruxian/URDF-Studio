@@ -101,7 +101,7 @@ const TOOL_DEFS: AIConversationToolDef[] = [
             additionalProperties: { type: 'string' },
             description:
               'Map of section name to new body (without ## heading). ' +
-              'Keys: 背景, 机型, 性能参数, 其他约束. Include only sections that change.',
+              'Keys: 背景, 機型, 性能參數, 其他約束. Include only sections that change.',
           },
           history_bullets: {
             type: 'array',
@@ -141,7 +141,7 @@ const TOOL_DEFS: AIConversationToolDef[] = [
 
 const REVISION_CONFLICT_MESSAGES: Record<Language, string> = {
   en: 'Requirements document was updated elsewhere. Refresh and try again.',
-  zh: '需求确认书已在别处更新，请刷新后重试。',
+  'zh-Hant': '需求確認書已在別處更新，請刷新後重試。',
   ja: '要件確認書が別の場所で更新されました。更新してから再試行してください。',
   fr: 'Le document d’exigences a été mis à jour ailleurs. Actualisez et réessayez.',
   de: 'Das Anforderungsdokument wurde anderswo aktualisiert. Bitte aktualisieren und erneut versuchen.',
@@ -150,8 +150,8 @@ const REVISION_CONFLICT_MESSAGES: Record<Language, string> = {
 
 const DUPLICATE_CONTENT_MESSAGES: Record<Language, string> = {
   en: 'This revision duplicates existing requirements content. Rephrase the change and try again.',
-  zh: '本次修订与现有需求内容重复，请改写变更后重试。',
-  ja: 'この改訂は既存の要件内容と重複しています。変更内容を書き直して再試行してください。',
+  'zh-Hant': '本次修訂與現有需求內容重複，請改寫變更後重試。',
+  ja: 'この改訂は既存の要件內容と重複しています。変更內容を書き直して再試行してください。',
   fr: 'Cette révision duplique le contenu existant. Reformulez la modification et réessayez.',
   de: 'Diese Revision wiederholt vorhandene Anforderungsinhalte. Formulieren Sie die Änderung um und versuchen Sie es erneut.',
   es: 'Esta revisión duplica contenido existente. Reformule el cambio e inténtelo de nuevo.',
@@ -159,7 +159,7 @@ const DUPLICATE_CONTENT_MESSAGES: Record<Language, string> = {
 
 const INVALID_SECTION_MESSAGES: Record<Language, string> = {
   en: 'Invalid requirements section in the proposed revision.',
-  zh: '提议的修订包含无效的需求章节。',
+  'zh-Hant': '提議的修訂包含無效的需求章節。',
   ja: '提案された改訂に無効な要件セクションが含まれています。',
   fr: 'Section d’exigences invalide dans la révision proposée.',
   de: 'Ungültiger Anforderungsabschnitt in der vorgeschlagenen Revision.',
@@ -168,7 +168,7 @@ const INVALID_SECTION_MESSAGES: Record<Language, string> = {
 
 const INVALID_DOCUMENT_SCHEMA_MESSAGES: Record<Language, string> = {
   en: 'Requirements document format is invalid. Contact support.',
-  zh: '需求确认书格式无效，请联系运营处理。',
+  'zh-Hant': '需求確認書格式無效，請聯繫運營處理。',
   ja: '要件確認書の形式が無効です。サポートにお問い合わせください。',
   fr: 'Format du document d’exigences invalide. Contactez le support.',
   de: 'Format des Anforderungsdokuments ist ungültig. Bitte Support kontaktieren.',
@@ -177,8 +177,8 @@ const INVALID_DOCUMENT_SCHEMA_MESSAGES: Record<Language, string> = {
 
 function localeFromLang(lang: Language): string {
   switch (lang) {
-    case 'zh':
-      return 'zh-CN';
+    case 'zh-Hant':
+      return 'zh-Hant';
     case 'ja':
       return 'ja-JP';
     case 'de':

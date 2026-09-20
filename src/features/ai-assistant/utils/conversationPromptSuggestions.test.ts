@@ -18,7 +18,7 @@ test('buildConversationPromptSuggestions returns contextual general suggestions'
 
 test('buildConversationPromptSuggestions falls back when no selected entity is available', () => {
   const suggestions = buildConversationPromptSuggestions({
-    lang: 'zh',
+    lang: 'zh-Hant',
     isReportFollowup: false,
     selectedEntityName: null,
   })
@@ -30,7 +30,7 @@ test('buildConversationPromptSuggestions falls back when no selected entity is a
 
 test('buildConversationPromptSuggestions returns report follow-up suggestions', () => {
   const suggestions = buildConversationPromptSuggestions({
-    lang: 'zh',
+    lang: 'zh-Hant',
     isReportFollowup: true,
     selectedEntityName: 'knee_joint',
   })

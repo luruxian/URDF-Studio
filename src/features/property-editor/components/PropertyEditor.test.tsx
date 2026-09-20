@@ -351,15 +351,15 @@ test('component identity fields keep long names and source paths inside a narrow
 test('workspace property targets localize Chinese entity and transform labels', () => {
   const assemblyMarkup = renderPropertyEditor(
     { entity: { type: 'assembly' } },
-    { lang: 'zh' },
+    { lang: 'zh-Hant' },
   );
   const componentMarkup = renderPropertyEditor(
     { entity: { type: 'component', componentId: 'left' } },
-    { lang: 'zh' },
+    { lang: 'zh-Hant' },
   );
   const bridgeMarkup = renderPropertyEditor(
     { entity: { type: 'bridge', bridgeId: 'mount' } },
-    { lang: 'zh' },
+    { lang: 'zh-Hant' },
   );
 
   assert.equal(readPropertyHeaderKind(assemblyMarkup), '装配');

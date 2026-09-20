@@ -3,12 +3,20 @@ import assert from 'node:assert/strict';
 
 import { JSDOM } from 'jsdom';
 
-import { getLanguageFromPath, hideSeoLanguagePathFromUserUrl } from './initialLanguage.ts';
+import {
+  getLanguageFromPath,
+  getLanguageFromRobotsHandoffSearch,
+  hideRobotsHandoffLangFromUserUrl,
+  hideSeoLanguagePathFromUserUrl,
+} from './initialLanguage.ts';
 
 test('getLanguageFromPath recognizes explicit English, Chinese, Japanese, French, German, and Spanish path prefixes', () => {
-  assert.equal(getLanguageFromPath('/zh/'), 'zh');
-  assert.equal(getLanguageFromPath('/zh'), 'zh');
-  assert.equal(getLanguageFromPath('/zh/?from=search'), 'zh');
+  assert.equal(getLanguageFromPath('/zh-Hant/'), 'zh-Hant');
+  assert.equal(getLanguageFromPath('/zh-Hant'), 'zh-Hant');
+  assert.equal(getLanguageFromPath('/zh-Hant/?from=search'), 'zh-Hant');
+  assert.equal(getLanguageFromPath('/zh/'), 'zh-Hant');
+  assert.equal(getLanguageFromPath('/zh'), 'zh-Hant');
+  assert.equal(getLanguageFromPath('/zh/?from=search'), 'zh-Hant');
   assert.equal(getLanguageFromPath('/ja/'), 'ja');
   assert.equal(getLanguageFromPath('/ja'), 'ja');
   assert.equal(getLanguageFromPath('/ja/?from=search'), 'ja');
@@ -31,6 +39,39 @@ test('getLanguageFromPath recognizes explicit English, Chinese, Japanese, French
   assert.equal(getLanguageFromPath('/robots/fr/model'), null);
   assert.equal(getLanguageFromPath('/robots/de/model'), null);
   assert.equal(getLanguageFromPath('/robots/es/model'), null);
+});
+
+test('getLanguageFromRobotsHandoffSearch maps main-site locale query param', () => {
+  assert.equal(getLanguageFromRobotsHandoffSearch('?mesh=x&lang=zh-Hant'), 'zh-Hant');
+  assert.equal(getLanguageFromRobotsHandoffSearch('?lang=en&import=pvw_1'), 'en');
+  assert.equal(getLanguageFromRobotsHandoffSearch('?lang=zh-CN'), 'zh-Hant');
+  assert.equal(getLanguageFromRobotsHandoffSearch('?mesh=x'), null);
+});
+
+test('hideRobotsHandoffLangFromUserUrl strips lang while keeping handoff query params', () => {
+  const dom = new JSDOM('<!doctype html><html><body></body></html>', {
+    url: 'https://urdf.enkeebot.com/?mesh=abc&lang=zh-Hant&from=https%3A%2F%2Frobots.test#robots-bootstrap=1',
+  });
+  const previousWindow = globalThis.window;
+
+  (globalThis as { window?: Window }).window = dom.window as unknown as Window;
+
+  try {
+    hideRobotsHandoffLangFromUserUrl();
+
+    assert.equal(dom.window.location.pathname, '/');
+    assert.match(dom.window.location.search, /\bmesh=abc/);
+    assert.match(dom.window.location.search, /\bfrom=/);
+    assert.doesNotMatch(dom.window.location.search, /\blang=/);
+    assert.equal(dom.window.location.hash, '#robots-bootstrap=1');
+  } finally {
+    if (previousWindow === undefined) {
+      delete (globalThis as { window?: Window }).window;
+    } else {
+      (globalThis as { window?: Window }).window = previousWindow;
+    }
+    dom.window.close();
+  }
 });
 
 test('hideSeoLanguagePathFromUserUrl normalizes direct Chinese SEO-page visits for the app', () => {

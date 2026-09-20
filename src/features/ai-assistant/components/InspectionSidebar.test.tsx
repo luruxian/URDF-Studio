@@ -60,7 +60,7 @@ test('setup inspection sidebar groups selectable profiles by profile layer', asy
     await act(async () => {
       root.render(
         <InspectionSidebar
-          lang="zh"
+          lang="zh-Hant"
           t={translations.zh}
           isGeneratingAI={false}
           readOnly={false}
@@ -114,7 +114,7 @@ test('setup inspection sidebar lets a profile layer collapse and expand', async 
 
     return (
       <InspectionSidebar
-        lang="zh"
+        lang="zh-Hant"
         t={translations.zh}
         isGeneratingAI={false}
         readOnly={false}
@@ -205,7 +205,7 @@ test('setup inspection sidebar item labels navigate without toggling selection',
 
     return (
       <InspectionSidebar
-        lang="zh"
+        lang="zh-Hant"
         t={translations.zh}
         isGeneratingAI={false}
         readOnly={false}
@@ -318,7 +318,7 @@ test('running inspection sidebar keeps scroll container interactive without rend
     await act(async () => {
       root.render(
         <InspectionSidebar
-          lang="zh"
+          lang="zh-Hant"
           t={translations.zh}
           isGeneratingAI
           readOnly

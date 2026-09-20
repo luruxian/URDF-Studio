@@ -15,7 +15,7 @@ const toolCall = {
 };
 
 const defaultBannerProps = {
-  lang: 'zh' as const,
+  lang: 'zh-Hant' as const,
   toolCall,
   onConfirm: () => {},
   onCancel: () => {},

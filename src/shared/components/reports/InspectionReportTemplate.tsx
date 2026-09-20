@@ -4,13 +4,13 @@
  */
 
 import type { InspectionReport, RobotInspectionContext } from '@/types';
-import { translations, resolveDateLocale } from '@/shared/i18n';
+import { translations, resolveDateLocale, type Language } from '@/shared/i18n';
 import { buildInspectionEvidenceSummary } from '@/shared/utils/inspectionEvidenceSummary';
 
 interface ReportTemplateProps {
   inspectionReport: InspectionReport;
   robotName: string;
-  lang: 'zh' | 'en';
+  lang: Language;
   inspectionContext?: RobotInspectionContext;
   profileLabels?: Record<string, string>;
 }

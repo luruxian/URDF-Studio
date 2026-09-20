@@ -20,7 +20,7 @@ import { resolveSuggestedBridgeOriginForVisualContact } from '@/core/robot/assem
 import { wouldBridgeCreateUnsupportedAssemblyCycle } from '@/core/robot/assemblyBridgeTopology';
 import { degToRad, radToDeg } from '@/core/robot/transforms';
 import { DEFAULT_JOINT, JointType, type JointHardwareInterface } from '@/types';
-import { translations } from '@/shared/i18n';
+import { isChineseLanguage, translations } from '@/shared/i18n';
 import { useManagedWindowLayer } from '@/store';
 import { useWorkspaceStore } from '@/store/workspaceStore';
 import { filterSelectableBridgeComponents } from '../../utils/bridgeSelection';
@@ -96,11 +96,11 @@ export const BridgeCreateModal: React.FC<BridgeCreateModalProps> = ({
   const t = translations[lang];
   const bridgeCreateWindowLayer = useManagedWindowLayer('bridgeCreate');
   const sideCardTitle = { parent: t.bridgeBaseLink, child: t.bridgeAttachLink };
-  const compactLabelWidthClassName = lang === 'zh' ? 'w-[30px]' : 'w-[44px]';
+  const compactLabelWidthClassName = isChineseLanguage(lang) ? 'w-[30px]' : 'w-[44px]';
   const fullRowLabelClassName = 'w-auto whitespace-nowrap';
   const axisLabelWidthClassName = 'w-4 justify-center';
-  const compactPositionLimitLabelClassName = lang === 'zh' ? 'w-[52px]' : 'w-[128px]';
-  const compactLimitLabelClassName = lang === 'zh' ? 'w-[34px]' : 'w-[64px]';
+  const compactPositionLimitLabelClassName = isChineseLanguage(lang) ? 'w-[52px]' : 'w-[128px]';
+  const compactLimitLabelClassName = isChineseLanguage(lang) ? 'w-[34px]' : 'w-[64px]';
   const nameInputId = React.useId();
   const jointTypeSelectId = React.useId();
   const defaultWindowSize = useMemo(() => ({ width: 420, height: 480 }), []);
@@ -135,7 +135,7 @@ export const BridgeCreateModal: React.FC<BridgeCreateModalProps> = ({
   const usesCadInspectorLayout = windowState.size.width >= 640;
   const topFieldGridClassName = usesInlineIdentityRow
     ? `grid items-center gap-x-1.5 gap-y-1 ${
-        lang === 'zh'
+        isChineseLanguage(lang)
           ? 'grid-cols-[30px_minmax(0,1fr)_30px_minmax(0,1fr)]'
           : 'grid-cols-[44px_minmax(0,1fr)_44px_minmax(0,1fr)]'
       }`

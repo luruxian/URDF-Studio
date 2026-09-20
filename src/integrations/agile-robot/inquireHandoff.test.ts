@@ -8,20 +8,20 @@ import {
 
 const ORDER_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 
-test('studioLangToOrdersLocale maps zh to zh-CN', () => {
-  assert.equal(studioLangToOrdersLocale('zh'), 'zh-CN');
+test('studioLangToOrdersLocale matches robots public locales', () => {
+  assert.equal(studioLangToOrdersLocale('zh-Hant'), 'zh-Hant');
   assert.equal(studioLangToOrdersLocale('en'), 'en');
 });
 
 test('buildStudioInquireOrdersUrl builds absolute inquire deep link', () => {
   const url = buildStudioInquireOrdersUrl({
     mainSiteOrigin: 'https://robots.test',
-    lang: 'zh',
+    lang: 'zh-Hant',
     orderId: ORDER_ID,
   });
   assert.equal(
     url,
-    `https://robots.test/zh-CN/orders?order=${ORDER_ID}&action=inquire`,
+    `https://robots.test/zh-Hant/orders?order=${ORDER_ID}&action=inquire`,
   );
 });
 

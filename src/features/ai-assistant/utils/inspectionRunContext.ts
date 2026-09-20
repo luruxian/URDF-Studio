@@ -1,5 +1,5 @@
 import type { RobotState } from '@/types'
-import type { Language } from '@/shared/i18n'
+import { isChineseLanguage, type Language } from '@/shared/i18n'
 import {
   buildInspectionEvidenceSummary,
   type InspectionEvidenceSummary,
@@ -70,7 +70,7 @@ export function buildInspectionRunContext(
     selectedCount += count
     profileSummary.push({
       id: profile.id,
-      name: lang === 'zh' ? profile.nameZh : profile.name,
+      name: isChineseLanguage(lang) ? profile.nameZh : profile.name,
       selectedCount: count,
       totalCount: profile.items.length,
     })

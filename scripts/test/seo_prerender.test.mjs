@@ -16,7 +16,7 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 const EXPECTED_HREFS = ENKEEBOT_RELATED_PRODUCTS.map((product) => product.url);
 
 test('SEO prerender keeps EnkeeBot product links crawlable but outside the visible app UI', () => {
-  for (const lang of ['en', 'zh']) {
+  for (const lang of ['en', 'zh-Hant']) {
     const contentDocument = new JSDOM(renderContent(lang)).window.document;
     const seoContainer = contentDocument.querySelector('.boot-seo');
     const anchors = [...contentDocument.querySelectorAll('.boot-seo nav a')];

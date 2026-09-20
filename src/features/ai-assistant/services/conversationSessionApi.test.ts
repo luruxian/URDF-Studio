@@ -32,7 +32,7 @@ const validBootstrap = {
 
 const sampleSnapshotPut = {
   mode: 'general' as const,
-  lang: 'zh',
+  lang: 'zh-Hant',
   snapshot_revision: 1,
   snapshot: {
     robot: {

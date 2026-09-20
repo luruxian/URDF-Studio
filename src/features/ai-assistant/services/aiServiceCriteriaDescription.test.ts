@@ -28,7 +28,7 @@ test('buildInspectionCriteriaDescription emits localized profile-only criteria i
     {
       'base.physical_plausibility': ['mass_positive'],
     },
-    'zh',
+    'zh-Hant',
   )
 
   assert.match(description, /通用物理合理性检查/)

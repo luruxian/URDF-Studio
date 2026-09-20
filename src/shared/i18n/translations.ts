@@ -8,11 +8,11 @@ import { en } from './locales/en';
 import { es } from './locales/es';
 import { fr } from './locales/fr';
 import { ja } from './locales/ja';
-import { zh } from './locales/zh';
+import { zhHant } from './locales/zh-Hant';
 
 export const translations: Translations = {
   en,
-  zh,
+  'zh-Hant': zhHant,
   ja,
   fr,
   de,

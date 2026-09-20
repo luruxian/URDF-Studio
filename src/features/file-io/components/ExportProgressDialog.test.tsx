@@ -59,7 +59,7 @@ test('project export progress dialog keeps the full progress card reachable', as
     await act(async () => {
       root.render(
         React.createElement(ExportProgressDialog, {
-          lang: 'zh',
+          lang: 'zh-Hant',
           progress: {
             stepLabel: '打包压缩文件',
             detail: '正在压缩 assets/link_shoulder_v.obj',

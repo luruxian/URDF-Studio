@@ -5,7 +5,7 @@
  * Instead this runs after `vite build` and turns the built `dist/index.html` into
  * crawlable, per-language static pages without a headless browser:
  *   - rewrites the per-language head region (title/description/canonical/og/twitter/JSON-LD)
- *   - emits localized variants at `dist/zh/index.html` and `dist/ja/index.html`
+ *   - emits localized variants at `dist/zh-Hant/index.html` (and legacy `dist/zh/` alias) and `dist/ja/index.html`
  *   - regenerates `dist/sitemap.xml` with all URLs + hreflang alternates
  *
  * Language-specific regions in `index.html` are delimited by `<!-- SEO:HEAD:* -->` and
@@ -31,7 +31,7 @@ export const ENKEEBOT_RELATED_PRODUCTS = [
     image: `${SITE}/logos/botworld-logo.webp`,
     description: {
       en: 'Discover and download robot models.',
-      zh: '发现并下载机器人模型。',
+      'zh-Hant': '發現並下載機器人模型。',
       ja: 'ロボットモデルを発見してダウンロードします。',
       fr: 'Découvrez et téléchargez des modèles de robots.',
       de: 'Robotermodelle entdecken und herunterladen.',
@@ -44,7 +44,7 @@ export const ENKEEBOT_RELATED_PRODUCTS = [
     image: `${SITE}/logos/motion-studio-logo.webp`,
     description: {
       en: 'Retarget and edit robot motion.',
-      zh: '重定向并编辑机器人动作。',
+      'zh-Hant': '重定向並編輯機器人動作。',
       ja: 'ロボットモーションをリターゲットして編集します。',
       fr: 'Retargetez et modifiez les mouvements des robots.',
       de: 'Roboterbewegungen retargeten und bearbeiten.',
@@ -57,7 +57,7 @@ export const ENKEEBOT_RELATED_PRODUCTS = [
     image: `${SITE}/logos/botlab-logo.webp`,
     description: {
       en: 'Simulate and validate robots in the browser.',
-      zh: '在浏览器中仿真并验证机器人。',
+      'zh-Hant': '在瀏覽器中仿真並驗證機器人。',
       ja: 'ブラウザ上でロボットをシミュレーションし検証します。',
       fr: 'Simulez et validez des robots dans le navigateur.',
       de: 'Roboter im Browser simulieren und validieren.',
@@ -74,7 +74,7 @@ const seoContent = {
       'Free in-browser editor and viewer for robot models: URDF, MJCF, USD, SDF and Xacro. ' +
       'Edit kinematics, optimize collisions, assemble modules and convert formats.',
     url: `${SITE}/`,
-    inLanguage: ['en', 'zh', 'ja', 'fr', 'de', 'es'],
+    inLanguage: ['en', 'zh-Hant', 'ja', 'fr', 'de', 'es'],
     featureList: [
       'URDF / MJCF / SDF / USD / Xacro import and export',
       'Collision geometry optimization',
@@ -93,30 +93,30 @@ const seoContent = {
       noscript: 'URDF Studio needs JavaScript enabled to run the interactive editor.',
     },
   },
-  zh: {
-    ogLocale: 'zh_CN',
-    title: 'URDF Studio - 专业机器人设计与可视化工具',
+  'zh-Hant': {
+    ogLocale: 'zh_TW',
+    title: 'URDF Studio - 專業機器人設計與可視化工具',
     description:
-      '免费的浏览器端机器人模型编辑与可视化工作站，支持 URDF、MJCF、USD、SDF、Xacro 的导入、编辑与转换，' +
-      '提供运动学编辑、碰撞优化、模块组装与 AI 审阅。',
-    url: `${SITE}/zh/`,
-    inLanguage: ['zh', 'en', 'ja', 'fr', 'de', 'es'],
+      '免費的瀏覽器端機器人模型編輯與可視化工作站，支持 URDF、MJCF、USD、SDF、Xacro 的導入、編輯與轉換，' +
+      '提供運動學編輯、碰撞優化、模塊組裝與 AI 審閱。',
+    url: `${SITE}/zh-Hant/`,
+    inLanguage: ['zh-Hant', 'en', 'ja', 'fr', 'de', 'es'],
     featureList: [
-      'URDF / MJCF / SDF / USD / Xacro 导入与导出',
-      '碰撞几何优化',
-      '多机器人模块化组装与桥接关节',
-      '硬件与电机配置',
-      'AI 生成与审阅',
-      'PDF 与 CSV 报告',
+      'URDF / MJCF / SDF / USD / Xacro 導入與導出',
+      '碰撞幾何優化',
+      '多機器人模塊化組裝與橋接關節',
+      '硬件與電機配置',
+      'AI 生成與審閱',
+      'PDF 與 CSV 報告',
     ],
     hero: {
-      tagline: '专业的在线机器人模型编辑与可视化工具',
+      tagline: '專業的在線機器人模型編輯與可視化工具',
       sub:
-        '在浏览器中导入、编辑、可视化与转换 URDF、MJCF、USD、SDF、Xacro 机器人模型，' +
-        '支持碰撞优化、模块组装与 AI 审阅。',
+        '在瀏覽器中導入、編輯、可視化與轉換 URDF、MJCF、USD、SDF、Xacro 機器人模型，' +
+        '支持碰撞優化、模塊組裝與 AI 審閱。',
       formatsLabel: '支持的格式',
-      relatedProductsLabel: 'EnkeeBot 相关产品',
-      noscript: '运行 URDF Studio 交互式编辑器需要启用 JavaScript。',
+      relatedProductsLabel: 'EnkeeBot 相關產品',
+      noscript: '運行 URDF Studio 交互式編輯器需要啟用 JavaScript。',
     },
   },
   ja: {
@@ -124,9 +124,9 @@ const seoContent = {
     title: 'URDF Studio - プロフェッショナルなロボット設計・可視化ツール',
     description:
       'URDF、MJCF、USD、SDF、Xacro に対応した無料のブラウザ型ロボットモデル編集・可視化ワークステーション。' +
-      '運動学編集、衝突最適化、モジュール組立、形式変換に対応。',
+      '運動學編集、衝突最適化、モジュール組立、形式変換に対応。',
     url: `${SITE}/ja/`,
-    inLanguage: ['ja', 'en', 'zh', 'fr', 'de', 'es'],
+    inLanguage: ['ja', 'en', 'zh-Hant', 'fr', 'de', 'es'],
     featureList: [
       'URDF / MJCF / SDF / USD / Xacro のインポートとエクスポート',
       '衝突ジオメトリ最適化',
@@ -152,7 +152,7 @@ const seoContent = {
       'Éditeur et visualiseur gratuit de modèles de robots dans le navigateur : URDF, MJCF, USD, SDF et Xacro. ' +
       'Modifiez la cinématique, optimisez les collisions, assemblez des modules et convertissez les formats.',
     url: `${SITE}/fr/`,
-    inLanguage: ['fr', 'en', 'zh', 'ja', 'de', 'es'],
+    inLanguage: ['fr', 'en', 'zh-Hant', 'ja', 'de', 'es'],
     featureList: [
       'Import et export URDF / MJCF / SDF / USD / Xacro',
       'Optimisation de la géométrie de collision',
@@ -178,7 +178,7 @@ const seoContent = {
       'Kostenloser browserbasierter Editor und Viewer für Robotermodelle: URDF, MJCF, USD, SDF und Xacro. ' +
       'Kinematik bearbeiten, Kollisionen optimieren, Module zusammenbauen und Formate konvertieren.',
     url: `${SITE}/de/`,
-    inLanguage: ['de', 'en', 'zh', 'ja', 'fr', 'es'],
+    inLanguage: ['de', 'en', 'zh-Hant', 'ja', 'fr', 'es'],
     featureList: [
       'Import und Export von URDF / MJCF / SDF / USD / Xacro',
       'Optimierung der Kollisionsgeometrie',
@@ -204,7 +204,7 @@ const seoContent = {
       'Editor y visor gratuito de modelos de robots en el navegador: URDF, MJCF, USD, SDF y Xacro. ' +
       'Edita la cinemática, optimiza colisiones, ensambla módulos y convierte formatos.',
     url: `${SITE}/es/`,
-    inLanguage: ['es', 'en', 'zh', 'ja', 'fr', 'de'],
+    inLanguage: ['es', 'en', 'zh-Hant', 'ja', 'fr', 'de'],
     featureList: [
       'Importación y exportación de URDF / MJCF / SDF / USD / Xacro',
       'Optimización de geometría de colisión',
@@ -240,7 +240,7 @@ export function renderHead(lang) {
     `(function () {`,
     `  var titles = {`,
     `    en: ${JSON.stringify(seoContent.en.title)},`,
-    `    zh: ${JSON.stringify(seoContent.zh.title)},`,
+    `    'zh-Hant': ${JSON.stringify(seoContent['zh-Hant'].title)},`,
     `    ja: ${JSON.stringify(seoContent.ja.title)},`,
     `    fr: ${JSON.stringify(seoContent.fr.title)},`,
     `    de: ${JSON.stringify(seoContent.de.title)},`,
@@ -248,8 +248,8 @@ export function renderHead(lang) {
     `  };`,
     `  var lang = 'en';`,
     `  try {`,
-    `    if (/^\\/zh(?:\\/|$)/.test(window.location.pathname)) {`,
-    `      lang = 'zh';`,
+    `    if (/^\\/zh-Hant(?:\\/|$)/i.test(window.location.pathname) || /^\\/zh(?:\\/|$)/.test(window.location.pathname)) {`,
+    `      lang = 'zh-Hant';`,
     `    } else if (/^\\/ja(?:\\/|$)/.test(window.location.pathname)) {`,
     `      lang = 'ja';`,
     `    } else if (/^\\/fr(?:\\/|$)/.test(window.location.pathname)) {`,
@@ -260,12 +260,12 @@ export function renderHead(lang) {
     `      lang = 'es';`,
     `    } else {`,
     `      var saved = window.localStorage && window.localStorage.getItem('language');`,
-    `      if (saved === 'en' || saved === 'zh' || saved === 'ja' || saved === 'fr' || saved === 'de' || saved === 'es') {`,
-    `        lang = saved;`,
+    `      if (saved === 'en' || saved === 'zh-Hant' || saved === 'zh' || saved === 'ja' || saved === 'fr' || saved === 'de' || saved === 'es') {`,
+    `        lang = saved === 'zh' ? 'zh-Hant' : saved;`,
     `      } else {`,
     `        var browserLang = (window.navigator.language || window.navigator.userLanguage || '').toLowerCase();`,
     `        if (browserLang.indexOf('zh') === 0) {`,
-    `          lang = 'zh';`,
+    `          lang = 'zh-Hant';`,
     `        } else if (browserLang.indexOf('ja') === 0) {`,
     `          lang = 'ja';`,
     `        } else if (browserLang.indexOf('fr') === 0) {`,
@@ -370,7 +370,7 @@ function replaceRegion(html, name, inner) {
 function renderSitemap(lastmod) {
   const alternates = [
     `    <xhtml:link rel="alternate" hreflang="en" href="${SITE}/"/>`,
-    `    <xhtml:link rel="alternate" hreflang="zh-CN" href="${SITE}/zh/"/>`,
+    `    <xhtml:link rel="alternate" hreflang="zh-Hant" href="${SITE}/zh-Hant/"/>`,
     `    <xhtml:link rel="alternate" hreflang="ja" href="${SITE}/ja/"/>`,
     `    <xhtml:link rel="alternate" hreflang="fr" href="${SITE}/fr/"/>`,
     `    <xhtml:link rel="alternate" hreflang="de" href="${SITE}/de/"/>`,
@@ -380,7 +380,7 @@ function renderSitemap(lastmod) {
 
   const entries = [
     { loc: `${SITE}/`, priority: '1.0' },
-    { loc: `${SITE}/zh/`, priority: '0.9' },
+    { loc: `${SITE}/zh-Hant/`, priority: '0.9' },
     { loc: `${SITE}/ja/`, priority: '0.9' },
     { loc: `${SITE}/fr/`, priority: '0.9' },
     { loc: `${SITE}/de/`, priority: '0.9' },
@@ -440,15 +440,17 @@ function main() {
 
   let zhHtml = enHtml.replace(
     '<html lang="en" translate="no">',
-    '<html lang="zh-CN" translate="no">',
+    '<html lang="zh-Hant" translate="no">',
   );
-  if (!zhHtml.includes('lang="zh-CN"')) {
+  if (!zhHtml.includes('lang="zh-Hant"')) {
     throw new Error(
-      '[seo_prerender] failed to set zh-CN lang attribute — did the <html> tag change?',
+      '[seo_prerender] failed to set zh-Hant lang attribute — did the <html> tag change?',
     );
   }
-  zhHtml = replaceRegion(zhHtml, 'SEO:HEAD', renderHead('zh'));
-  zhHtml = replaceRegion(zhHtml, 'SEO:CONTENT', renderContent('zh'));
+  zhHtml = replaceRegion(zhHtml, 'SEO:HEAD', renderHead('zh-Hant'));
+  zhHtml = replaceRegion(zhHtml, 'SEO:CONTENT', renderContent('zh-Hant'));
+  mkdirSync(path.join(distDir, 'zh-Hant'), { recursive: true });
+  writeFileSync(path.join(distDir, 'zh-Hant', 'index.html'), zhHtml);
   mkdirSync(path.join(distDir, 'zh'), { recursive: true });
   writeFileSync(path.join(distDir, 'zh', 'index.html'), zhHtml);
 
@@ -512,7 +514,7 @@ function main() {
   writeFileSync(path.join(distDir, 'sitemap.xml'), renderSitemap(lastmod));
 
   console.log(
-    `[seo_prerender] wrote dist/index.html (en), dist/zh/index.html (zh), dist/ja/index.html (ja), dist/fr/index.html (fr), dist/de/index.html (de), dist/es/index.html (es), dist/sitemap.xml (lastmod ${lastmod})`,
+    `[seo_prerender] wrote dist/index.html (en), dist/zh-Hant/index.html (zh-Hant), dist/zh/index.html (legacy), dist/ja/index.html (ja), dist/fr/index.html (fr), dist/de/index.html (de), dist/es/index.html (es), dist/sitemap.xml (lastmod ${lastmod})`,
   );
 }
 

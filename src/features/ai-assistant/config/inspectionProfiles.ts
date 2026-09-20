@@ -1,4 +1,4 @@
-import type { Language } from '@/shared/i18n'
+import { isChineseLanguage, type Language } from '@/shared/i18n'
 
 export type InspectionProfileLayer = 'base' | 'format' | 'morph' | 'workflow' | 'target'
 
@@ -469,7 +469,7 @@ export function getInspectionProfileName(profileId: string, lang: Language) {
     return profileId
   }
 
-  return lang === 'zh' ? profile.nameZh : profile.name
+  return isChineseLanguage(lang) ? profile.nameZh : profile.name
 }
 
 export function getInspectionProfileLayerName(layer: InspectionProfileLayer, lang: Language) {
@@ -481,7 +481,7 @@ export function getInspectionProfileLayerName(layer: InspectionProfileLayer, lan
     workflow: { en: 'Workflow', zh: '工作流层' },
   }
 
-  return lang === 'zh' ? labels[layer].zh : labels[layer].en
+  return isChineseLanguage(lang) ? labels[layer].zh : labels[layer].en
 }
 
 export function getAllInspectionProfileItemCount() {

@@ -1,8 +1,8 @@
 import { AI_PROMPT_TEMPLATES } from './aiPromptTemplates.generated.ts'
-import type { Language } from '@/shared/i18n'
+import { isChineseLanguage, type Language } from '@/shared/i18n'
 
 function resolvePromptTemplateLanguage(lang: Language): 'en' | 'zh' {
-  return lang === 'zh' ? 'zh' : 'en'
+  return isChineseLanguage(lang) ? 'zh' : 'en'
 }
 
 export const GENERATION_PROMPT_PLACEHOLDERS = {
@@ -65,8 +65,8 @@ export function getInspectionSystemPrompt(
 ): string {
   const templateLanguage = resolvePromptTemplateLanguage(lang)
   const languageInstruction =
-    lang === 'zh'
-      ? '请使用中文生成所有报告内容，包括总结、问题标题和描述。'
+    isChineseLanguage(lang)
+      ? '請使用繁體中文生成所有報告內容，包括總結、問題標題和描述。'
       : lang === 'ja'
         ? 'レポート内容（要約、問題タイトル、説明）はすべて日本語で生成してください。'
         : lang === 'fr'
@@ -90,8 +90,8 @@ export function getConversationSystemPrompt(
 ): string {
   const templateLanguage = resolvePromptTemplateLanguage(lang)
   const languageInstruction =
-    lang === 'zh'
-      ? '请使用中文回复，简洁准确。'
+    isChineseLanguage(lang)
+      ? '請使用繁體中文回覆，簡潔準確。'
       : lang === 'ja'
         ? '日本語で簡潔かつ正確に返答してください。'
         : lang === 'fr'

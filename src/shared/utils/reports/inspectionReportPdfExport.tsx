@@ -70,7 +70,7 @@ export async function exportInspectionReportPdf({
         createElement(InspectionReportTemplate, {
           inspectionReport,
           robotName,
-          lang: lang as 'zh' | 'en',
+          lang,
           inspectionContext,
           profileLabels,
         }),

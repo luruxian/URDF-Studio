@@ -1,5 +1,5 @@
 import type { InspectionReport } from '@/types'
-import { translations, type Language } from '@/shared/i18n'
+import { isChineseLanguage, translations, type Language } from '@/shared/i18n'
 import type { IssueType } from '../types'
 import {
   getInspectionProfileDefinition,
@@ -156,8 +156,8 @@ export function processInspectionResults(
         return
       }
 
-      const itemName = lang === 'zh' ? item.nameZh : item.name
-      const itemDesc = lang === 'zh' ? item.descriptionZh : item.description
+      const itemName = isChineseLanguage(lang) ? item.nameZh : item.name
+      const itemDesc = isChineseLanguage(lang) ? item.descriptionZh : item.description
       allIssues.push({
         type: 'pass',
         title: t.inspectionPassTitle.replace('{itemName}', itemName),

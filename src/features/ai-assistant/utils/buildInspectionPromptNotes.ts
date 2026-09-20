@@ -8,7 +8,7 @@ import type {
   RobotState,
   RobotUrdfInspectionContext,
 } from '@/types';
-import type { Language } from '@/shared/i18n';
+import { isChineseLanguage, type Language } from '@/shared/i18n';
 import { buildInspectionEvidence, formatInspectionEvidenceForPrompt } from './inspectionEvidence';
 import type { SelectedInspectionProfileMap } from './inspectionProfileSelection';
 
@@ -47,7 +47,7 @@ const buildSourceFormatEvidenceNotes = (robot: RobotState, lang: Language) => {
     return '';
   }
 
-  if (lang === 'zh') {
+  if (isChineseLanguage(lang)) {
     if (sourceFormat === 'xacro') {
       return [
         '**源格式附加说明:**',
@@ -152,7 +152,7 @@ const formatImportRecoveryPromptNotes = (
     .slice(0, MAX_SUMMARY_ITEMS)
     .map((diagnostic) => `${diagnostic.code} [${diagnostic.action}]: ${diagnostic.message}`)
     .join('; ');
-  if (lang === 'zh') {
+  if (isChineseLanguage(lang)) {
     return [
       '**导入恢复说明:**',
       `- 导入时安全忽略或降级了 ${recovery.recoveredItemCount} 项源数据问题。`,
@@ -176,7 +176,7 @@ const formatUrdfInspectionPromptNotes = (
   const facts = urdfContext.facts;
   const sourceLabel = sourceFormat?.toUpperCase() ?? 'URDF';
 
-  if (lang === 'zh') {
+  if (isChineseLanguage(lang)) {
     const lines = [
       '**源格式附加说明:**',
       `- 该机器人来自 ${sourceLabel}，已包含本地 URDF 静态诊断供审阅参考。`,
@@ -238,7 +238,7 @@ const formatMjcfInspectionPromptNotes = (
   const bodySiteSummary = formatBodiesWithSites(robot, mjcfContext.bodiesWithSites);
   const tendonSummary = formatTendons(mjcfContext.tendons);
 
-  if (lang === 'zh') {
+  if (isChineseLanguage(lang)) {
     const lines = [
       '**源格式附加说明:**',
       '- 该机器人来自 MJCF。源 MJCF 中的 `<frame>` 会在编译后消失，不要仅因为规范化树里没有独立 frame/link 就判定结构缺失。',
