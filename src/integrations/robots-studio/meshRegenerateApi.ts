@@ -48,7 +48,7 @@ export async function regenerateMesh(
   const context = requireRobotsStudioContext();
   const body: MeshRegenerateRequest = {
     revision: request.revision,
-    locale: request.locale ?? 'zh-CN',
+    locale: request.locale ?? 'zh-Hant',
   };
 
   const response = await fetch(

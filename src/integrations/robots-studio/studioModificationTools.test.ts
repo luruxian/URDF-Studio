@@ -29,7 +29,7 @@ const validBootstrap = {
 
 const proposeV2Args = {
   change_summary: 'Extend arm by 5cm',
-  section_updates: { 性能参数: '臂展 +5cm' },
+  section_updates: { 性能參數: '臂展 +5cm' },
   history_bullets: ['臂展 +5cm'],
 };
 
@@ -186,7 +186,7 @@ test('createStudioModificationTools returns config for urdf_stl bootstrap order'
 test('buildClientMutationId is deterministic for the same payload', async () => {
   const payload = {
     change_summary: 'arm +5cm',
-    section_updates: { 性能参数: '臂展 +5cm' as const },
+    section_updates: { 性能參數: '臂展 +5cm' as const },
     history_bullets: ['臂展 +5cm'],
   };
   const first = await buildClientMutationId(3, payload);
@@ -198,10 +198,10 @@ test('buildClientMutationId is deterministic for the same payload', async () => 
 test('normalizeSectionUpdates strips ## prefixes and ignores unknown keys', () => {
   assert.deepEqual(
     normalizeSectionUpdates({
-      '##性能参数': '## 臂展 +5cm',
+      '##性能參數': '## 臂展 +5cm',
       未知: 'skip',
     }),
-    { 性能参数: '臂展 +5cm' },
+    { 性能參數: '臂展 +5cm' },
   );
 });
 
@@ -209,15 +209,15 @@ test('normalizeSectionUpdates turns over-escaped newlines into real line breaks'
   const overEscaped = '- 负载 5kg\\n- 臂展 1.2m\\n\\n底座更紧凑';
   assert.equal(overEscaped.includes('\n'), false);
 
-  assert.deepEqual(normalizeSectionUpdates({ 性能参数: overEscaped }), {
-    性能参数: '- 负载 5kg\n- 臂展 1.2m\n\n底座更紧凑',
+  assert.deepEqual(normalizeSectionUpdates({ 性能參數: overEscaped }), {
+    性能參數: '- 负载 5kg\n- 臂展 1.2m\n\n底座更紧凑',
   });
 });
 
 test('normalizeSectionUpdates leaves already-real newlines unchanged', () => {
   assert.deepEqual(
-    normalizeSectionUpdates({ 性能参数: '- 负载 5kg\n- 臂展 1.2m' }),
-    { 性能参数: '- 负载 5kg\n- 臂展 1.2m' },
+    normalizeSectionUpdates({ 性能參數: '- 负载 5kg\n- 臂展 1.2m' }),
+    { 性能參數: '- 负载 5kg\n- 臂展 1.2m' },
   );
 });
 
@@ -228,14 +228,14 @@ test('createParseToolCalls unescapes literal newlines in propose tool arguments'
       function: {
         name: 'propose_requirements_revision',
         arguments:
-          '{"change_summary":"arm +5cm","section_updates":{"性能参数":"- 负载 5kg\\\\n- 臂展 1.2m"},"history_bullets":["负载 +2kg\\\\n臂展 +5cm"]}',
+          '{"change_summary":"arm +5cm","section_updates":{"性能參數":"- 负载 5kg\\\\n- 臂展 1.2m"},"history_bullets":["负载 +2kg\\\\n臂展 +5cm"]}',
       },
     },
   ]);
 
   assert.ok(parsed);
   assert.deepEqual(parsed.args.section_updates, {
-    性能参数: '- 负载 5kg\n- 臂展 1.2m',
+    性能參數: '- 负载 5kg\n- 臂展 1.2m',
   });
   assert.deepEqual(parsed.args.history_bullets, ['负载 +2kg\n臂展 +5cm']);
 });
@@ -288,7 +288,7 @@ test('createParseToolCalls parses propose_requirements_revision with section nam
         name: 'propose_requirements_revision',
         arguments: JSON.stringify({
           change_summary: 'Extend arm by 5cm',
-          section_updates: { 性能参数: '臂展 +5cm', 背景: '新背景' },
+          section_updates: { 性能參數: '臂展 +5cm', 背景: '新背景' },
           history_bullets: ['臂展 +5cm'],
         }),
       },
@@ -297,7 +297,7 @@ test('createParseToolCalls parses propose_requirements_revision with section nam
 
   assert.ok(parsed);
   assert.equal(parsed.toolName, 'propose_requirements_revision');
-  assert.match(parsed.summary, /性能参数/);
+  assert.match(parsed.summary, /性能參數/);
   assert.match(parsed.summary, /背景/);
 });
 
@@ -403,7 +403,7 @@ test('onExecute for propose_requirements_revision runs PATCH → regenerate → 
 
   const toolArgs = {
     change_summary: 'arm +5cm',
-    section_updates: { 性能参数: '臂展 +5cm' },
+    section_updates: { 性能參數: '臂展 +5cm' },
     history_bullets: ['臂展 +5cm'],
   };
 
@@ -420,14 +420,14 @@ test('onExecute for propose_requirements_revision runs PATCH → regenerate → 
   const patchBody = JSON.parse(String(spy.calls[1].init?.body)) as Record<string, unknown>;
   assert.equal(patchBody.base_revision, 3);
   assert.equal(patchBody.change_summary, 'arm +5cm');
-  assert.deepEqual(patchBody.section_updates, { 性能参数: '臂展 +5cm' });
+  assert.deepEqual(patchBody.section_updates, { 性能參數: '臂展 +5cm' });
   assert.deepEqual(patchBody.history_bullets, ['臂展 +5cm']);
   assert.equal(typeof patchBody.client_mutation_id, 'string');
   assert.equal(spy.calls[2].init?.method, 'POST');
   assert.ok(spy.calls[2].url.includes('/mesh/regenerate'));
   assert.deepEqual(JSON.parse(String(spy.calls[2].init?.body)), {
     revision: 4,
-    locale: 'zh-CN',
+    locale: 'zh-Hant',
   });
   assert.ok(spy.calls[3].url.includes('/mesh/job'));
   assert.equal(spy.calls[4].init?.method, 'POST');
@@ -509,7 +509,7 @@ test('onExecute retries mesh only after successful PATCH (single PATCH call)', a
     toolName: 'propose_requirements_revision' as const,
     args: {
       change_summary: 'arm +5cm',
-      section_updates: { 性能参数: '臂展 +5cm' },
+      section_updates: { 性能參數: '臂展 +5cm' },
       history_bullets: ['臂展 +5cm'],
     },
     summary: 'arm +5cm',
@@ -642,7 +642,7 @@ test('onExecute maps duplicate_content 409 to a localized message', async () => 
   });
 
   assert.equal(result.success, false);
-  assert.match(result.message, /重复/);
+  assert.match(result.message, /重複/);
 });
 
 test('onExecute surfaces failed mesh jobs', async () => {

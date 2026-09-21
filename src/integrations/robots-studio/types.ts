@@ -6,13 +6,13 @@
 
 export type StudioPackageType = 'urdf_stl' | 'glb' | string;
 
-export type RequirementsSectionId = '背景' | '机型' | '性能参数' | '其他约束';
+export type RequirementsSectionId = '背景' | '機型' | '性能參數' | '其他約束';
 
 export const REQUIREMENTS_SECTION_IDS: readonly RequirementsSectionId[] = [
   '背景',
-  '机型',
-  '性能参数',
-  '其他约束',
+  '機型',
+  '性能參數',
+  '其他約束',
 ];
 
 export interface RequirementsDocumentResponse {

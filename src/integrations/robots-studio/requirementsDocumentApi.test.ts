@@ -235,7 +235,7 @@ test('patchRequirementsDocument PATCHes revision payload', async () => {
     base_revision: 3,
     change_summary: '手臂长度增加 5cm',
     section_updates: {
-      性能参数: '臂展 +5cm',
+      性能參數: '臂展 +5cm',
     },
     history_bullets: ['臂展 +5cm'],
     client_mutation_id: '550e8400-e29b-41d4-a716-446655440000',
@@ -254,7 +254,7 @@ test('patchRequirementsDocument PATCHes revision payload', async () => {
     base_revision: 3,
     change_summary: '手臂长度增加 5cm',
     section_updates: {
-      性能参数: '臂展 +5cm',
+      性能參數: '臂展 +5cm',
     },
     history_bullets: ['臂展 +5cm'],
     client_mutation_id: '550e8400-e29b-41d4-a716-446655440000',
@@ -314,7 +314,7 @@ test('regenerateMesh POSTs revision and default locale', async () => {
   assert.equal(init?.method, 'POST');
   assert.deepEqual(JSON.parse(String(init?.body)), {
     revision: 4,
-    locale: 'zh-CN',
+    locale: 'zh-Hant',
   });
 });
 
