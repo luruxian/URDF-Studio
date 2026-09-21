@@ -7,6 +7,7 @@ export const LANGUAGE_OPTIONS = [
   { value: 'fr' as const, label: 'Français', shortLabel: 'FR' },
   { value: 'de' as const, label: 'Deutsch', shortLabel: 'DE' },
   { value: 'es' as const, label: 'Español', shortLabel: 'ES' },
+  { value: 'ko' as const, label: '한국어', shortLabel: 'KO' },
 ] satisfies ReadonlyArray<{ value: Language; label: string; shortLabel: string }>;
 
 export const SUPPORTED_LANGUAGES: readonly Language[] = LANGUAGE_OPTIONS.map((option) => option.value);
@@ -35,6 +36,8 @@ export function resolveDocumentLocale(lang: Language): string {
       return 'de';
     case 'es':
       return 'es';
+    case 'ko':
+      return 'ko';
     default:
       return 'en';
   }
@@ -52,6 +55,8 @@ export function resolveDateLocale(lang: Language): string {
       return 'de-DE';
     case 'es':
       return 'es-ES';
+    case 'ko':
+      return 'ko-KR';
     default:
       return 'en-US';
   }

@@ -41,6 +41,8 @@ test('normalizeLanguage maps regional browser language tags', () => {
   assert.equal(normalizeLanguage('es-ES'), 'es');
   assert.equal(normalizeLanguage('es'), 'es');
   assert.equal(normalizeLanguage('es-MX'), 'es');
+  assert.equal(normalizeLanguage('ko-KR'), 'ko');
+  assert.equal(normalizeLanguage('ko'), 'ko');
   assert.equal(normalizeLanguage('it-IT'), null);
 });
 

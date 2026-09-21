@@ -29,6 +29,9 @@ export function normalizeLanguage(value: unknown): Language | null {
   if (normalized === 'es' || normalized === 'es-es' || normalized.startsWith('es-')) {
     return 'es';
   }
+  if (normalized === 'ko' || normalized === 'ko-kr' || normalized.startsWith('ko-')) {
+    return 'ko';
+  }
 
   return SUPPORTED_LANGUAGES.includes(normalized as Language) ? (normalized as Language) : null;
 }

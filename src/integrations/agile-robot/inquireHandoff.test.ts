@@ -11,6 +11,7 @@ const ORDER_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 test('studioLangToOrdersLocale matches robots public locales', () => {
   assert.equal(studioLangToOrdersLocale('zh-Hant'), 'zh-Hant');
   assert.equal(studioLangToOrdersLocale('en'), 'en');
+  assert.equal(studioLangToOrdersLocale('ko'), 'ko');
 });
 
 test('buildStudioInquireOrdersUrl builds absolute inquire deep link', () => {
@@ -23,6 +24,15 @@ test('buildStudioInquireOrdersUrl builds absolute inquire deep link', () => {
     url,
     `https://robots.test/zh-Hant/orders?order=${ORDER_ID}&action=inquire`,
   );
+});
+
+test('buildStudioInquireOrdersUrl uses ko path prefix', () => {
+  const url = buildStudioInquireOrdersUrl({
+    mainSiteOrigin: 'https://robots.test',
+    lang: 'ko',
+    orderId: ORDER_ID,
+  });
+  assert.equal(url, `https://robots.test/ko/orders?order=${ORDER_ID}&action=inquire`);
 });
 
 test('buildStudioInquireOrdersUrl returns null for invalid order id', () => {
