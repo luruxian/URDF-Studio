@@ -18,7 +18,7 @@ export function normalizeLanguage(value: unknown): Language | null {
     return 'en';
   }
   if (normalized === 'ja' || normalized === 'ja-jp' || normalized.startsWith('ja-')) {
-    return 'ja';
+    return 'en';
   }
   if (normalized === 'fr' || normalized === 'fr-fr' || normalized.startsWith('fr-')) {
     return 'fr';

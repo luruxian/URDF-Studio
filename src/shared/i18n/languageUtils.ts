@@ -1,9 +1,9 @@
 import type { Language } from './types';
 
+/** TEMPORARY (2026-09-21): ja disabled — re-add Japanese option to re-enable. */
 export const LANGUAGE_OPTIONS = [
   { value: 'en' as const, label: 'English', shortLabel: 'EN' },
   { value: 'zh-Hant' as const, label: '繁體中文', shortLabel: '繁' },
-  { value: 'ja' as const, label: '日本語', shortLabel: '日' },
   { value: 'fr' as const, label: 'Français', shortLabel: 'FR' },
   { value: 'de' as const, label: 'Deutsch', shortLabel: 'DE' },
   { value: 'es' as const, label: 'Español', shortLabel: 'ES' },
