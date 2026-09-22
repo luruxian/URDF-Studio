@@ -28,13 +28,14 @@ import {
   patchRequirementsDocument,
   RobotsStudioApiError,
 } from './requirementsDocumentApi';
+import {
+  formatProposeRevisionSectionSummary,
+  resolveRequirementsSectionId,
+} from './requirementsSectionLabels';
 import { getStudioMeshToolTexts } from './studioMeshToolTexts';
 import type {
   RequirementsSectionId,
   StudioPackageType,
-} from './types';
-import {
-  REQUIREMENTS_SECTION_IDS,
 } from './types';
 
 /** Port injected by the app layer so a regenerated URDF+STL package can be
@@ -260,10 +261,11 @@ export function normalizeSectionUpdates(
   for (const [rawKey, rawValue] of Object.entries(raw)) {
     if (typeof rawValue !== 'string') continue;
     const sectionKey = stripSectionHeadingPrefix(rawKey);
-    if (!REQUIREMENTS_SECTION_IDS.includes(sectionKey as RequirementsSectionId)) {
+    const sectionId = resolveRequirementsSectionId(sectionKey);
+    if (!sectionId) {
       continue;
     }
-    normalized[sectionKey as RequirementsSectionId] = unescapeLiteralEscapes(
+    normalized[sectionId] = unescapeLiteralEscapes(
       stripSectionHeadingPrefix(rawValue),
     );
   }
@@ -307,10 +309,12 @@ function buildSummary(
 ): string {
   if (toolName === 'propose_requirements_revision') {
     const parsed = parseProposeToolArgs(args);
-    const sectionNames = parsed ? Object.keys(parsed.sectionUpdates) : [];
+    const sectionIds = parsed
+      ? (Object.keys(parsed.sectionUpdates) as RequirementsSectionId[])
+      : [];
     const base = getStudioMeshToolTexts(lang).studioMeshToolProposeSummary;
-    if (sectionNames.length > 0) {
-      return `${base}（${sectionNames.join('、')}）`;
+    if (sectionIds.length > 0) {
+      return formatProposeRevisionSectionSummary(base, sectionIds, lang);
     }
     const summary =
       typeof args.change_summary === 'string' ? args.change_summary.trim() : '';

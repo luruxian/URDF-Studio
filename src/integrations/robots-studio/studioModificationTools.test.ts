@@ -301,6 +301,29 @@ test('createParseToolCalls parses propose_requirements_revision with section nam
   assert.match(parsed.summary, /背景/);
 });
 
+test('createParseToolCalls localizes propose summary section labels for English UI', () => {
+  const parseToolCalls = createParseToolCalls('en');
+  const parsed = parseToolCalls([
+    {
+      function: {
+        name: 'propose_requirements_revision',
+        arguments: JSON.stringify({
+          change_summary: 'Extend arm by 5cm',
+          section_updates: { 性能参数: 'Reach +5cm', 背景: 'Updated context' },
+          history_bullets: ['Reach +5cm'],
+        }),
+      },
+    },
+  ]);
+
+  assert.ok(parsed);
+  assert.match(parsed.summary, /^Submit requirements revision \(/);
+  assert.match(parsed.summary, /Background/);
+  assert.match(parsed.summary, /Performance parameters/);
+  assert.doesNotMatch(parsed.summary, /背景/);
+  assert.doesNotMatch(parsed.summary, /性能参数/);
+});
+
 test('createParseToolCalls returns null when section_updates is empty', () => {
   const parseToolCalls = createParseToolCalls('en');
   assert.equal(
