@@ -22,7 +22,7 @@ export interface ToolConfirmBannerProps {
  * - parsed -> shows the tool summary with confirm/cancel actions
  * - executing -> spinner while the tool action runs
  * - done -> success message
- * - error -> failure message with retry/cancel actions
+ * - error -> failure message with retry/cancel actions (mesh poll timeout uses warning styling)
  *
  * The caller owns the state transitions; this component only renders the
  * current state and forwards the user's confirm/cancel/retry decisions back.
@@ -46,6 +46,8 @@ export function ToolConfirmBanner({
   if (state === 'idle' || state === 'cancelled') {
     return null;
   }
+
+  const isMeshPollTimeout = state === 'error' && result?.meshRetry !== undefined;
 
   return (
     <div className="flex items-center gap-3 rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-3">
@@ -90,14 +92,26 @@ export function ToolConfirmBanner({
 
       {state === 'error' && result && (
         <>
-          <AlertCircle className="h-5 w-5 text-red-500" />
-          <span className="flex-1 text-sm text-red-600 dark:text-red-400">
+          <AlertCircle
+            className={`h-5 w-5 ${isMeshPollTimeout ? 'text-warning' : 'text-red-500'}`}
+          />
+          <span
+            className={`flex-1 text-sm ${
+              isMeshPollTimeout
+                ? 'text-warning'
+                : 'text-red-600 dark:text-red-400'
+            }`}
+          >
             {result.message}
           </span>
           {onRetry && (
             <button
               onClick={onRetry}
-              className="rounded-md bg-red-100 px-3 py-1 text-sm font-medium text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400"
+              className={
+                isMeshPollTimeout
+                  ? 'rounded-md border border-warning-border bg-warning-soft px-3 py-1 text-sm font-medium text-warning hover:bg-warning/15'
+                  : 'rounded-md bg-red-100 px-3 py-1 text-sm font-medium text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400'
+              }
             >
               {retryLabel}
             </button>

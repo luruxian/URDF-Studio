@@ -244,6 +244,29 @@ test('renders the done success message', async () => {
   }
 });
 
+test('uses warning styling for mesh poll timeout instead of error red', async () => {
+  const dom = installDom();
+  try {
+    const rendered = await renderBanner(dom.dom, {
+      ...defaultBannerProps,
+      state: 'error',
+      result: {
+        success: false,
+        message: '生成仍在进行，可继续等待或稍后重试',
+        meshRetry: 'continue_poll',
+        meshRevision: 42,
+      },
+      onRetry: () => {},
+    });
+    const message = rendered.root?.querySelector('span.flex-1');
+    assert.ok(message?.className.includes('text-warning'), 'expected timeout message to use text-warning');
+    assert.ok(!message?.className.includes('text-red'), 'timeout message should not use red text');
+    await rendered.unmount();
+  } finally {
+    dom.restore();
+  }
+});
+
 test('renders the error message and calls onRetry when retry is clicked', async () => {
   const dom = installDom();
   try {
