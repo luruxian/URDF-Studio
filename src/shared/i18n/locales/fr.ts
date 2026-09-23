@@ -1117,6 +1117,10 @@ export const fr: TranslationKeys = {
   studioMeshToolCancelled: 'Annulé',
   studioMeshToolJobInProgress:
     'Une régénération URDF+STL est déjà en cours. Veuillez attendre la fin.',
+  studioMeshToolPollTimeout:
+    'La génération URDF+STL prend plus de temps que prévu (la tâche peut encore être en file d’attente). Vous pouvez vérifier l’avancement sans relancer une demande.',
+  studioMeshToolResumePollFailed:
+    'Impossible de reprendre la vérification de l’avancement. Veuillez réessayer.',
   studioMeshToolUnknownTool: 'Outil inconnu : {toolName}',
   studioMeshToolUnknownError: 'Erreur inconnue',
   meshPreviewAuthMissing:

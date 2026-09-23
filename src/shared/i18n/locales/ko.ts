@@ -1049,6 +1049,9 @@ snapshotHideGrid: '그리드',
   studioMeshToolGenerationFailed: 'URDF+STL 재생성 실패',
   studioMeshToolCancelled: '취소됨',
   studioMeshToolJobInProgress: 'URDF+STL 재생성 작업이 진행 중입니다. 완료될 때까지 기다려 주세요',
+  studioMeshToolPollTimeout:
+    'URDF+STL 생성이 예상보다 오래 걸리고 있습니다(작업이 대기 중일 수 있습니다). 새 요청 없이 진행 상황을 다시 확인할 수 있습니다.',
+  studioMeshToolResumePollFailed: '진행 상황을 다시 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.',
   studioMeshToolUnknownTool: '알 수 없는 도구: {toolName}',
   studioMeshToolUnknownError: '알 수 없는 오류',
 

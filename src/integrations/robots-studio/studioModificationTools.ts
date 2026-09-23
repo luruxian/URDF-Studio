@@ -19,9 +19,12 @@ import type { Language } from '@/shared/i18n';
 import {
   createMeshImportGrant,
   formatMeshJobFailure,
+  MESH_CLIENT_POLL_TIMEOUT_DETAIL,
   pollMeshJob,
   regenerateMesh,
+  resumeMeshPoll,
 } from './meshRegenerateApi';
+import type { MeshJobResponse } from './types';
 import {
   getRequirementsDocument,
   getRobotsStudioErrorCode,
@@ -372,15 +375,25 @@ export function createParseToolCalls(lang: Language) {
   };
 }
 
-async function runMeshRegenerateAndImport(
+function meshPollRetryResult(
   revision: number,
+  texts: ReturnType<typeof getStudioMeshToolTexts>,
+  meshRetry: 'resume_poll' | 'continue_poll',
+): ToolResult {
+  return {
+    success: false,
+    message: texts.studioMeshToolPollTimeout,
+    meshRetry,
+    meshRevision: revision,
+  };
+}
+
+async function importFromMeshJob(
+  job: MeshJobResponse,
   options: CreateStudioModificationToolsOptions,
   texts: ReturnType<typeof getStudioMeshToolTexts>,
 ): Promise<ToolResult> {
-  const { lang, importUrdfPackage, signal } = options;
-
-  await regenerateMesh({ revision, locale: localeFromLang(lang) });
-  const job = await pollMeshJob(revision, signal);
+  const { importUrdfPackage } = options;
 
   if (job.status === 'failed') {
     return {
@@ -411,6 +424,62 @@ async function runMeshRegenerateAndImport(
   });
 
   return { success: true, message: texts.studioMeshToolModelUpdated };
+}
+
+async function waitMeshJobAndImport(
+  revision: number,
+  options: CreateStudioModificationToolsOptions,
+  texts: ReturnType<typeof getStudioMeshToolTexts>,
+): Promise<ToolResult> {
+  const { signal } = options;
+
+  let job: MeshJobResponse;
+  try {
+    job = await pollMeshJob(revision, signal);
+  } catch (error) {
+    if (
+      error instanceof RobotsStudioApiError
+      && error.status === 408
+      && (error.message === MESH_CLIENT_POLL_TIMEOUT_DETAIL
+        || getRobotsStudioErrorCode(error.body) === MESH_CLIENT_POLL_TIMEOUT_DETAIL)
+    ) {
+      return meshPollRetryResult(revision, texts, 'continue_poll');
+    }
+    throw error;
+  }
+
+  if (job.status === 'timeout') {
+    return meshPollRetryResult(revision, texts, 'resume_poll');
+  }
+
+  return importFromMeshJob(job, options, texts);
+}
+
+async function runMeshRegenerateAndImport(
+  revision: number,
+  options: CreateStudioModificationToolsOptions,
+  texts: ReturnType<typeof getStudioMeshToolTexts>,
+): Promise<ToolResult> {
+  const { lang } = options;
+
+  await regenerateMesh({ revision, locale: localeFromLang(lang) });
+  return waitMeshJobAndImport(revision, options, texts);
+}
+
+async function runMeshResumePollAndImport(
+  revision: number,
+  options: CreateStudioModificationToolsOptions,
+  texts: ReturnType<typeof getStudioMeshToolTexts>,
+): Promise<ToolResult> {
+  try {
+    await resumeMeshPoll();
+  } catch (error) {
+    if (error instanceof RobotsStudioApiError) {
+      return { success: false, message: texts.studioMeshToolResumePollFailed };
+    }
+    throw error;
+  }
+  return waitMeshJobAndImport(revision, options, texts);
 }
 
 async function executePhaseA(
@@ -487,10 +556,34 @@ function mapExecuteError(
   };
 }
 
-function createOnExecute(options: CreateStudioModificationToolsOptions) {
-  const texts = getStudioMeshToolTexts(options.lang);
-  const phaseCache = new Map<string, PhaseACacheEntry>();
+function createOnRetry(
+  options: CreateStudioModificationToolsOptions,
+  texts: ReturnType<typeof getStudioMeshToolTexts>,
+) {
+  return async function onRetry(
+    _toolCall: ParsedToolCall,
+    context: { meshRetry: 'resume_poll' | 'continue_poll'; meshRevision: number },
+  ): Promise<ToolResult> {
+    if (!hasBootstrap()) {
+      return { success: false, message: texts.studioMeshToolSessionExpired };
+    }
 
+    try {
+      if (context.meshRetry === 'resume_poll') {
+        return await runMeshResumePollAndImport(context.meshRevision, options, texts);
+      }
+      return await waitMeshJobAndImport(context.meshRevision, options, texts);
+    } catch (error) {
+      return mapExecuteError(error, options.lang, texts, options.signal);
+    }
+  };
+}
+
+function createOnExecute(
+  options: CreateStudioModificationToolsOptions,
+  texts: ReturnType<typeof getStudioMeshToolTexts>,
+  phaseCache: Map<string, PhaseACacheEntry>,
+) {
   return async function onExecute(toolCall: ParsedToolCall): Promise<ToolResult> {
     if (!hasBootstrap()) {
       return { success: false, message: texts.studioMeshToolSessionExpired };
@@ -575,10 +668,14 @@ export async function createStudioModificationTools(
     return null;
   }
 
+  const texts = getStudioMeshToolTexts(options.lang);
+  const phaseCache = new Map<string, PhaseACacheEntry>();
+
   return {
     tools: TOOL_DEFS,
     parseToolCalls: createParseToolCalls(options.lang),
-    onExecute: createOnExecute(options),
+    onExecute: createOnExecute(options, texts, phaseCache),
+    onRetry: createOnRetry(options, texts),
     bannerTexts: createBannerTexts(options.lang),
   };
 }

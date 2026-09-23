@@ -15,6 +15,7 @@ import type {
   MeshJobResponse,
   MeshRegenerateRequest,
   MeshRegenerateResponse,
+  MeshResumePollResponse,
 } from './types';
 
 export {
@@ -25,6 +26,9 @@ export {
   resolveMeshJobPollConfig,
 } from './meshRegeneratePollConfig';
 export type { MeshJobPollConfig, MeshJobPollEnvSource } from './meshRegeneratePollConfig';
+
+/** Thrown when the browser poll budget expires while the server job is still in progress. */
+export const MESH_CLIENT_POLL_TIMEOUT_DETAIL = 'client_poll_timeout';
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -76,8 +80,24 @@ export async function getMeshJob(revision?: number): Promise<MeshJobResponse> {
   return handleRobotsStudioResponse<MeshJobResponse>(response);
 }
 
+export async function resumeMeshPoll(): Promise<MeshResumePollResponse> {
+  const context = requireRobotsStudioContext();
+  const response = await fetch(
+    robotsStudioProjectUrl(context, '/mesh/resume-poll'),
+    {
+      method: 'POST',
+      headers: robotsStudioAuthHeaders(context),
+    },
+  );
+  return handleRobotsStudioResponse<MeshResumePollResponse>(response);
+}
+
+function isTerminalMeshJobStatus(status: MeshJobResponse['status']): boolean {
+  return status === 'done' || status === 'failed' || status === 'timeout';
+}
+
 /**
- * Poll mesh job until done / failed / timeout.
+ * Poll mesh job until done / failed / timeout (server or client budget).
  * Returns the final job status.
  */
 export async function pollMeshJob(
@@ -91,15 +111,18 @@ export async function pollMeshJob(
       throw new RobotsStudioApiError('Polling aborted', 0);
     }
     if (Date.now() - startedAt > MESH_JOB_POLL_TIMEOUT_MS) {
-      throw new RobotsStudioApiError(
-        'URDF+STL 再生成超时，请稍后重试',
-        408,
-      );
+      const job = await getMeshJob(revision);
+      if (isTerminalMeshJobStatus(job.status)) {
+        return job;
+      }
+      throw new RobotsStudioApiError(MESH_CLIENT_POLL_TIMEOUT_DETAIL, 408, {
+        detail: MESH_CLIENT_POLL_TIMEOUT_DETAIL,
+      });
     }
 
     const job = await getMeshJob(revision);
 
-    if (job.status === 'done' || job.status === 'failed') {
+    if (isTerminalMeshJobStatus(job.status)) {
       return job;
     }
 

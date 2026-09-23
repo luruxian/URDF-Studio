@@ -21,6 +21,8 @@ export {
   getMeshJob,
   pollMeshJob,
   regenerateMesh,
+  resumeMeshPoll,
+  MESH_CLIENT_POLL_TIMEOUT_DETAIL,
 } from './meshRegenerateApi';
 
 export {

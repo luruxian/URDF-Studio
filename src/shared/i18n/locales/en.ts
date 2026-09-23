@@ -1091,6 +1091,9 @@ export const en: TranslationKeys = {
   studioMeshToolCancelled: 'Cancelled',
   studioMeshToolJobInProgress:
     'A URDF+STL regeneration job is already running. Please wait for it to finish.',
+  studioMeshToolPollTimeout:
+    'URDF+STL generation is taking longer than expected (the job may still be queued). You can check progress again without starting a new request.',
+  studioMeshToolResumePollFailed: 'Could not resume progress check. Please try again.',
   studioMeshToolUnknownTool: 'Unknown tool: {toolName}',
   studioMeshToolUnknownError: 'Unknown error',
 

@@ -14,6 +14,8 @@ export type StudioMeshToolTexts = Pick<
   | 'studioMeshToolGenerationFailed'
   | 'studioMeshToolCancelled'
   | 'studioMeshToolJobInProgress'
+  | 'studioMeshToolPollTimeout'
+  | 'studioMeshToolResumePollFailed'
   | 'studioMeshToolUnknownTool'
   | 'studioMeshToolUnknownError'
 >;
@@ -41,6 +43,8 @@ export function getStudioMeshToolTexts(lang: Language): StudioMeshToolTexts {
     studioMeshToolGenerationFailed: t.studioMeshToolGenerationFailed,
     studioMeshToolCancelled: t.studioMeshToolCancelled,
     studioMeshToolJobInProgress: t.studioMeshToolJobInProgress,
+    studioMeshToolPollTimeout: t.studioMeshToolPollTimeout,
+    studioMeshToolResumePollFailed: t.studioMeshToolResumePollFailed,
     studioMeshToolUnknownTool: t.studioMeshToolUnknownTool,
     studioMeshToolUnknownError: t.studioMeshToolUnknownError,
   };

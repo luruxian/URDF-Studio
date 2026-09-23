@@ -473,8 +473,8 @@ test('pollMeshJob throws 408 when polling exceeds the timeout', async (t) => {
   await assert.rejects(
     pollPromise,
     (error: unknown) =>
-      isRobotsStudioApiError(error, 408) &&
-      /超时/.test(error.message),
+      isRobotsStudioApiError(error, 408)
+      && error.message === 'client_poll_timeout',
   );
 });
 

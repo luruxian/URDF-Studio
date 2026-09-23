@@ -76,9 +76,14 @@ export interface ParsedToolCall {
   summary: string; // 确认 UI 展示用概括（edit 取模型 subject，regenerate 取本地化标签）
 }
 
+export type MeshToolRetryAction = 'resume_poll' | 'continue_poll';
+
 export interface ToolResult {
   success: boolean;
   message: string;
+  /** When set, tool retry should resume/continue mesh polling instead of re-running the tool. */
+  meshRetry?: MeshToolRetryAction;
+  meshRevision?: number;
 }
 
 /** Localized labels for ToolConfirmBanner when a tools config supplies custom copy. */
@@ -113,6 +118,11 @@ export interface AIConversationToolsConfig {
   ) => ParsedToolCall | null;
   /** Execute the confirmed tool call. Returns result for UI feedback. */
   onExecute: (toolCall: ParsedToolCall) => Promise<ToolResult>;
+  /** Optional retry handler (e.g. mesh poll resume without re-regenerate). */
+  onRetry?: (
+    toolCall: ParsedToolCall,
+    context: { meshRetry: MeshToolRetryAction; meshRevision: number },
+  ) => Promise<ToolResult>;
   /** Optional banner copy; defaults to agileRobotTool* when omitted. */
   bannerTexts?: ToolConfirmBannerTexts;
 }

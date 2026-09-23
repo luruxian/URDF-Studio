@@ -29,9 +29,9 @@ test('markdown prompt source documents the editable sections and placeholders fo
   assert.match(promptMarkdownSource, /^## Editable Sections/m);
   assert.match(promptMarkdownSource, /`generation`/);
   assert.match(promptMarkdownSource, /`inspection\.en`/);
-  assert.match(promptMarkdownSource, /`inspection\.zh`/);
+  assert.match(promptMarkdownSource, /`inspection\.zh-Hant`/);
   assert.match(promptMarkdownSource, /`conversation\.en`/);
-  assert.match(promptMarkdownSource, /`conversation\.zh`/);
+  assert.match(promptMarkdownSource, /`conversation\.zh-Hant`/);
   assert.match(promptMarkdownSource, /^## Placeholders/m);
   assert.match(promptMarkdownSource, /`__ROBOT_CONTEXT__`/);
   assert.match(promptMarkdownSource, /`__MOTOR_LIBRARY_CONTEXT__`/);
@@ -46,9 +46,9 @@ test('markdown prompt source documents the editable sections and placeholders fo
 test('markdown prompt sections use structured subsection headings for easier editing', () => {
   const generationPrompt = extractPromptFromMarkdown('generation');
   const inspectionEnPrompt = extractPromptFromMarkdown('inspection.en');
-  const inspectionZhPrompt = extractPromptFromMarkdown('inspection.zh');
+  const inspectionZhPrompt = extractPromptFromMarkdown('inspection.zh-Hant');
   const conversationEnPrompt = extractPromptFromMarkdown('conversation.en');
-  const conversationZhPrompt = extractPromptFromMarkdown('conversation.zh');
+  const conversationZhPrompt = extractPromptFromMarkdown('conversation.zh-Hant');
 
   assert.match(generationPrompt, /^## Role/m);
   assert.match(generationPrompt, /^## Context/m);
@@ -60,9 +60,9 @@ test('markdown prompt sections use structured subsection headings for easier edi
   assert.match(inspectionEnPrompt, /^## Rules/m);
 
   assert.match(inspectionZhPrompt, /^## 角色/m);
-  assert.match(inspectionZhPrompt, /^## 输入上下文/m);
-  assert.match(inspectionZhPrompt, /^## 输出契约/m);
-  assert.match(inspectionZhPrompt, /^## 规则/m);
+  assert.match(inspectionZhPrompt, /^## 輸入上下文/m);
+  assert.match(inspectionZhPrompt, /^## 輸出契約/m);
+  assert.match(inspectionZhPrompt, /^## 規則/m);
 
   assert.match(conversationEnPrompt, /^## Role/m);
   assert.match(conversationEnPrompt, /^## Input Context/m);
@@ -70,17 +70,17 @@ test('markdown prompt sections use structured subsection headings for easier edi
   assert.match(conversationEnPrompt, /^## Rules/m);
 
   assert.match(conversationZhPrompt, /^## 角色/m);
-  assert.match(conversationZhPrompt, /^## 输入上下文/m);
-  assert.match(conversationZhPrompt, /^## 输出契约/m);
-  assert.match(conversationZhPrompt, /^## 规则/m);
+  assert.match(conversationZhPrompt, /^## 輸入上下文/m);
+  assert.match(conversationZhPrompt, /^## 輸出契約/m);
+  assert.match(conversationZhPrompt, /^## 規則/m);
 });
 
 test('generated prompt module stays in sync with the single markdown source of truth', () => {
   assert.equal(AI_PROMPT_TEMPLATES.generation, extractPromptFromMarkdown('generation'));
   assert.equal(AI_PROMPT_TEMPLATES.inspection.en, extractPromptFromMarkdown('inspection.en'));
-  assert.equal(AI_PROMPT_TEMPLATES.inspection.zh, extractPromptFromMarkdown('inspection.zh'));
+  assert.equal(AI_PROMPT_TEMPLATES.inspection['zh-Hant'], extractPromptFromMarkdown('inspection.zh-Hant'));
   assert.equal(AI_PROMPT_TEMPLATES.conversation.en, extractPromptFromMarkdown('conversation.en'));
-  assert.equal(AI_PROMPT_TEMPLATES.conversation.zh, extractPromptFromMarkdown('conversation.zh'));
+  assert.equal(AI_PROMPT_TEMPLATES.conversation['zh-Hant'], extractPromptFromMarkdown('conversation.zh-Hant'));
 });
 
 test('generation prompt template lives in a standalone config module', () => {
@@ -104,9 +104,9 @@ test('getGenerationSystemPrompt keeps the existing context injection contract', 
 
 test('inspection prompt templates live in a standalone config module', () => {
   assert.equal(typeof INSPECTION_SYSTEM_PROMPT_TEMPLATES.en, 'string');
-  assert.equal(typeof INSPECTION_SYSTEM_PROMPT_TEMPLATES.zh, 'string');
+  assert.equal(typeof INSPECTION_SYSTEM_PROMPT_TEMPLATES['zh-Hant'], 'string');
   assert.match(INSPECTION_SYSTEM_PROMPT_TEMPLATES.en, /You are an expert URDF Robot Inspector/);
-  assert.match(INSPECTION_SYSTEM_PROMPT_TEMPLATES.zh, /你是一位专业的URDF机器人检查专家/);
+  assert.match(INSPECTION_SYSTEM_PROMPT_TEMPLATES['zh-Hant'], /你是一位專業的 URDF 機器人檢查專家/);
   assert.match(
     INSPECTION_SYSTEM_PROMPT_TEMPLATES.en,
     new RegExp(INSPECTION_PROMPT_PLACEHOLDERS.criteriaDescription),
@@ -116,11 +116,11 @@ test('inspection prompt templates live in a standalone config module', () => {
     new RegExp(INSPECTION_PROMPT_PLACEHOLDERS.inspectionNotes),
   );
   assert.match(
-    INSPECTION_SYSTEM_PROMPT_TEMPLATES.zh,
+    INSPECTION_SYSTEM_PROMPT_TEMPLATES['zh-Hant'],
     new RegExp(INSPECTION_PROMPT_PLACEHOLDERS.criteriaDescription),
   );
   assert.match(
-    INSPECTION_SYSTEM_PROMPT_TEMPLATES.zh,
+    INSPECTION_SYSTEM_PROMPT_TEMPLATES['zh-Hant'],
     new RegExp(INSPECTION_PROMPT_PLACEHOLDERS.inspectionNotes),
   );
 });
@@ -128,12 +128,12 @@ test('inspection prompt templates live in a standalone config module', () => {
 test('inspection prompt contract is profile-only and rejects legacy category fields', () => {
   assert.match(INSPECTION_SYSTEM_PROMPT_TEMPLATES.en, /"profileId"/);
   assert.match(INSPECTION_SYSTEM_PROMPT_TEMPLATES.en, /"itemId"/);
-  assert.match(INSPECTION_SYSTEM_PROMPT_TEMPLATES.zh, /"profileId"/);
-  assert.match(INSPECTION_SYSTEM_PROMPT_TEMPLATES.zh, /"itemId"/);
+  assert.match(INSPECTION_SYSTEM_PROMPT_TEMPLATES['zh-Hant'], /"profileId"/);
+  assert.match(INSPECTION_SYSTEM_PROMPT_TEMPLATES['zh-Hant'], /"itemId"/);
   assert.doesNotMatch(INSPECTION_SYSTEM_PROMPT_TEMPLATES.en, /"category"/);
-  assert.doesNotMatch(INSPECTION_SYSTEM_PROMPT_TEMPLATES.zh, /"category"/);
+  assert.doesNotMatch(INSPECTION_SYSTEM_PROMPT_TEMPLATES['zh-Hant'], /"category"/);
   assert.doesNotMatch(INSPECTION_SYSTEM_PROMPT_TEMPLATES.en, /legacy/i);
-  assert.doesNotMatch(INSPECTION_SYSTEM_PROMPT_TEMPLATES.zh, /旧字段/);
+  assert.doesNotMatch(INSPECTION_SYSTEM_PROMPT_TEMPLATES['zh-Hant'], /旧字段/);
 });
 
 test('getInspectionSystemPrompt injects english profile criteria without changing the profile JSON contract', () => {
@@ -159,18 +159,18 @@ test('getInspectionSystemPrompt injects chinese profile criteria without changin
   assert.match(prompt, /源格式附加说明/);
   assert.doesNotMatch(prompt, new RegExp(INSPECTION_PROMPT_PLACEHOLDERS.criteriaDescription));
   assert.doesNotMatch(prompt, new RegExp(INSPECTION_PROMPT_PLACEHOLDERS.inspectionNotes));
-  assert.match(prompt, /返回一个纯JSON对象/);
-  assert.match(prompt, /每个问题必须包含 'profileId' 和 'itemId'/);
+  assert.match(prompt, /返回一個純 JSON 物件/);
+  assert.match(prompt, /每個問題必須包含 'profileId' 和 'itemId'/);
   assert.doesNotMatch(prompt, /category/);
 });
 
 test('conversation prompt templates live in a standalone config module', () => {
   assert.equal(typeof CONVERSATION_SYSTEM_PROMPT_TEMPLATES.en, 'string');
-  assert.equal(typeof CONVERSATION_SYSTEM_PROMPT_TEMPLATES.zh, 'string');
+  assert.equal(typeof CONVERSATION_SYSTEM_PROMPT_TEMPLATES['zh-Hant'], 'string');
   assert.match(CONVERSATION_SYSTEM_PROMPT_TEMPLATES.en, /URDF Studio conversation assistant/);
-  assert.match(CONVERSATION_SYSTEM_PROMPT_TEMPLATES.zh, /URDF Studio 的对话助手/);
+  assert.match(CONVERSATION_SYSTEM_PROMPT_TEMPLATES['zh-Hant'], /URDF Studio 的對話助手/);
   assert.match(CONVERSATION_SYSTEM_PROMPT_TEMPLATES.en, /Use lightweight Markdown/);
-  assert.match(CONVERSATION_SYSTEM_PROMPT_TEMPLATES.zh, /轻量 Markdown/);
+  assert.match(CONVERSATION_SYSTEM_PROMPT_TEMPLATES['zh-Hant'], /輕量 Markdown/);
   assert.match(
     CONVERSATION_SYSTEM_PROMPT_TEMPLATES.en,
     new RegExp(CONVERSATION_PROMPT_PLACEHOLDERS.mode),
@@ -208,11 +208,22 @@ test('getConversationSystemPrompt injects context for inspection follow-up mode 
     history: '[{"role":"assistant","content":"已发现 2 个 warning"}]',
   });
 
-  assert.match(prompt, /对话模式：inspection-followup/);
+  assert.match(prompt, /對話模式：inspection-followup/);
   assert.match(prompt, /存在关节限位风险/);
   assert.match(prompt, /已发现 2 个 warning/);
   assert.doesNotMatch(prompt, new RegExp(CONVERSATION_PROMPT_PLACEHOLDERS.mode));
   assert.doesNotMatch(prompt, new RegExp(CONVERSATION_PROMPT_PLACEHOLDERS.context));
   assert.doesNotMatch(prompt, new RegExp(CONVERSATION_PROMPT_PLACEHOLDERS.history));
-  assert.match(prompt, /请使用中文回复/);
+  assert.match(prompt, /請使用繁體中文回覆/);
+});
+
+test('getConversationSystemPrompt injects korean language instruction', () => {
+  const prompt = getConversationSystemPrompt('ko', {
+    mode: 'general',
+    context: '{}',
+    history: '[]',
+  });
+
+  assert.match(prompt, /한국어로 간결하고/);
+  assert.doesNotMatch(prompt, /Please respond in English/);
 });

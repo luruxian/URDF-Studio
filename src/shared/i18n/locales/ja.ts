@@ -1102,6 +1102,10 @@ export const ja: TranslationKeys = {
   studioMeshToolCancelled: 'キャンセルしました',
   studioMeshToolJobInProgress:
     'URDF+STL の再生成タスクが実行中です。完了までお待ちください。',
+  studioMeshToolPollTimeout:
+    'URDF+STL の生成に想定より時間がかかっています（ジョブがキュー待ちの可能性があります）。新規依頼なしで進捗を再確認できます。',
+  studioMeshToolResumePollFailed:
+    '進捗の再確認に失敗しました。しばらくしてからお試しください。',
   studioMeshToolUnknownTool: '不明なツール: {toolName}',
   studioMeshToolUnknownError: '不明なエラー',
   meshPreviewAuthMissing: 'プレビュー認証情報がありません。Agile Robot から再度開いてください。',

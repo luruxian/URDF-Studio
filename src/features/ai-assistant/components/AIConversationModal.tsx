@@ -679,9 +679,37 @@ export function AIConversationModal({
     setMessages((prev) => [...prev, createConversationMessage('assistant', '已取消')]);
   }, []);
 
-  const handleToolRetry = useCallback(() => {
-    void handleToolConfirm();
-  }, [handleToolConfirm]);
+  const handleToolRetry = useCallback(async () => {
+    if (!pendingToolCall || !toolsConfig) {
+      return;
+    }
+
+    setToolConfirmState('executing');
+
+    const meshRetry = toolResult?.meshRetry;
+    const meshRevision = toolResult?.meshRevision;
+    const result =
+      meshRetry !== undefined
+      && meshRevision !== undefined
+      && toolsConfig.onRetry
+        ? await toolsConfig.onRetry(pendingToolCall, { meshRetry, meshRevision })
+        : await toolsConfig.onExecute(pendingToolCall);
+
+    setToolResult(result);
+    setToolConfirmState(result.success ? 'done' : 'error');
+    if (!result.success) {
+      return;
+    }
+
+    if (doneTimeoutRef.current) {
+      clearTimeout(doneTimeoutRef.current);
+    }
+    doneTimeoutRef.current = setTimeout(() => {
+      setToolConfirmState((current) => (current === 'done' ? 'idle' : current));
+      setPendingToolCall((current) => (current === pendingToolCall ? null : current));
+      setToolResult((current) => (current === result ? null : current));
+    }, 3000);
+  }, [pendingToolCall, toolResult, toolsConfig]);
 
   const handleInquireClick = useCallback(() => {
     if (!bootstrap) {
