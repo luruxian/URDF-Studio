@@ -37,11 +37,12 @@ export function formatMeshJobFailure(
   job: MeshJobResponse,
   fallback = 'URDF+STL 再生成失败',
 ): string {
+  const errorMessage = job.error_message?.trim();
+  if (errorMessage) {
+    return errorMessage;
+  }
   if (job.error_code) {
     return job.error_code;
-  }
-  if (job.error_message) {
-    return job.error_message;
   }
   return fallback;
 }

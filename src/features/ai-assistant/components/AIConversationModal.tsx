@@ -453,7 +453,12 @@ export function AIConversationModal({
     replaceCurrentConversation = false,
     withTools = false,
   }: ConversationSubmissionState & { withTools?: boolean }) => {
-    if (!launchContext || !userMessage.trim() || isSending) {
+    if (
+      !launchContext
+      || !userMessage.trim()
+      || isSending
+      || (toolConfirmState === 'executing' && pendingToolCall)
+    ) {
       return;
     }
     if (withTools && !toolsConfig) {
@@ -605,7 +610,12 @@ export function AIConversationModal({
     userMessage: string,
     turnOptions?: Pick<ConversationSubmissionState, 'history' | 'replaceCurrentConversation'>,
   ) => {
-    if (!launchContext || !userMessage.trim() || isSending) {
+    if (
+      !launchContext
+      || !userMessage.trim()
+      || isSending
+      || (toolConfirmState === 'executing' && pendingToolCall)
+    ) {
       return;
     }
 
@@ -649,6 +659,23 @@ export function AIConversationModal({
     });
   };
 
+  const applyMeshToolExecuteResult = useCallback((result: ToolResult) => {
+    if (result.meshRetry) {
+      setToolResult(result);
+      setToolConfirmState('error');
+      return;
+    }
+
+    const chatText = result.chatMessage?.trim();
+    if (chatText) {
+      setMessages((prev) => [...prev, createConversationMessage('assistant', chatText)]);
+    }
+
+    setToolConfirmState('idle');
+    setPendingToolCall(null);
+    setToolResult(null);
+  }, []);
+
   const handleToolConfirm = useCallback(async () => {
     if (!pendingToolCall || !toolsConfig) {
       return;
@@ -656,21 +683,8 @@ export function AIConversationModal({
 
     setToolConfirmState('executing');
     const result = await toolsConfig.onExecute(pendingToolCall);
-    setToolResult(result);
-    setToolConfirmState(result.success ? 'done' : 'error');
-    if (!result.success) {
-      return;
-    }
-
-    if (doneTimeoutRef.current) {
-      clearTimeout(doneTimeoutRef.current);
-    }
-    doneTimeoutRef.current = setTimeout(() => {
-      setToolConfirmState((current) => (current === 'done' ? 'idle' : current));
-      setPendingToolCall((current) => (current === pendingToolCall ? null : current));
-      setToolResult((current) => (current === result ? null : current));
-    }, 3000);
-  }, [pendingToolCall, toolsConfig]);
+    applyMeshToolExecuteResult(result);
+  }, [applyMeshToolExecuteResult, pendingToolCall, toolsConfig]);
 
   const handleToolCancel = useCallback(() => {
     setToolConfirmState('cancelled');
@@ -695,21 +709,8 @@ export function AIConversationModal({
         ? await toolsConfig.onRetry(pendingToolCall, { meshRetry, meshRevision })
         : await toolsConfig.onExecute(pendingToolCall);
 
-    setToolResult(result);
-    setToolConfirmState(result.success ? 'done' : 'error');
-    if (!result.success) {
-      return;
-    }
-
-    if (doneTimeoutRef.current) {
-      clearTimeout(doneTimeoutRef.current);
-    }
-    doneTimeoutRef.current = setTimeout(() => {
-      setToolConfirmState((current) => (current === 'done' ? 'idle' : current));
-      setPendingToolCall((current) => (current === pendingToolCall ? null : current));
-      setToolResult((current) => (current === result ? null : current));
-    }, 3000);
-  }, [pendingToolCall, toolResult, toolsConfig]);
+    applyMeshToolExecuteResult(result);
+  }, [applyMeshToolExecuteResult, pendingToolCall, toolResult, toolsConfig]);
 
   const handleInquireClick = useCallback(() => {
     if (!bootstrap) {
@@ -728,6 +729,17 @@ export function AIConversationModal({
   if (!isOpen || !launchContext) {
     return null;
   }
+
+  const isMeshToolExecuting = Boolean(
+    toolsConfig && pendingToolCall && toolConfirmState === 'executing',
+  );
+  const showMeshToolConfirmBanner = Boolean(
+    toolsConfig
+    && pendingToolCall
+    && (toolConfirmState === 'parsed'
+      || toolConfirmState === 'executing'
+      || (toolConfirmState === 'error' && toolResult?.meshRetry !== undefined)),
+  );
 
   const confirmDialogTitle =
     pendingResetAction === 'new-conversation'
@@ -909,7 +921,7 @@ export function AIConversationModal({
               ) : null}
             </div>
 
-            {toolsConfig && pendingToolCall && (
+            {showMeshToolConfirmBanner && pendingToolCall && (
               <div className="shrink-0 border-t border-border-black bg-element-bg px-4 py-3">
                 <ToolConfirmBanner
                   lang={lang}
@@ -956,7 +968,8 @@ export function AIConversationModal({
                     }
                   }}
                   placeholder={t.chatPlaceholder}
-                  className={`w-full resize-none rounded-lg border-none bg-transparent px-1 py-1 text-[11px] text-text-primary outline-none placeholder:text-text-tertiary ${
+                  disabled={isMeshToolExecuting}
+                  className={`w-full resize-none rounded-lg border-none bg-transparent px-1 py-1 text-[11px] text-text-primary outline-none placeholder:text-text-tertiary disabled:cursor-not-allowed disabled:opacity-50 ${
                     isCompactLayout ? 'min-h-[64px]' : 'min-h-[88px]'
                   }`}
                 />
@@ -1013,6 +1026,7 @@ export function AIConversationModal({
                       }}
                       disabled={
                         isSending ||
+                        isMeshToolExecuting ||
                         !input.trim() ||
                         (robotsConversationReady && !sessionId)
                       }

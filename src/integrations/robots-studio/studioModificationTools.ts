@@ -396,25 +396,31 @@ async function importFromMeshJob(
   const { importUrdfPackage } = options;
 
   if (job.status === 'failed') {
+    const failureMessage = formatMeshJobFailure(job, texts.studioMeshToolGenerationFailed);
     return {
       success: false,
-      message: formatMeshJobFailure(job, texts.studioMeshToolGenerationFailed),
+      message: failureMessage,
+      chatMessage: failureMessage,
     };
   }
 
   if (!job.attachment_id) {
+    const failureMessage = texts.studioMeshToolGenerationFailed;
     return {
       success: false,
-      message: texts.studioMeshToolGenerationFailed,
+      message: failureMessage,
+      chatMessage: failureMessage,
     };
   }
 
   const grant = await createMeshImportGrant({ attachment_id: job.attachment_id });
 
   if (!importUrdfPackage) {
+    const failureMessage = texts.studioMeshToolPreviewNotConnected;
     return {
       success: false,
-      message: texts.studioMeshToolPreviewNotConnected,
+      message: failureMessage,
+      chatMessage: failureMessage,
     };
   }
 
@@ -423,7 +429,12 @@ async function importFromMeshJob(
     fromOrigin: grant.from_origin,
   });
 
-  return { success: true, message: texts.studioMeshToolModelUpdated };
+  const summary = job.result_summary?.trim();
+  return {
+    success: true,
+    message: texts.studioMeshToolModelUpdated,
+    chatMessage: summary || undefined,
+  };
 }
 
 async function waitMeshJobAndImport(
@@ -475,7 +486,7 @@ async function runMeshResumePollAndImport(
     await resumeMeshPoll();
   } catch (error) {
     if (error instanceof RobotsStudioApiError) {
-      return { success: false, message: texts.studioMeshToolResumePollFailed };
+      return meshToolFailure(texts.studioMeshToolResumePollFailed);
     }
     throw error;
   }
@@ -516,6 +527,10 @@ async function executePhaseA(
   return patched.revision;
 }
 
+function meshToolFailure(message: string): ToolResult {
+  return { success: false, message, chatMessage: message };
+}
+
 function mapExecuteError(
   error: unknown,
   lang: Language,
@@ -523,37 +538,36 @@ function mapExecuteError(
   signal?: AbortSignal,
 ): ToolResult {
   if (signal?.aborted) {
-    return { success: false, message: texts.studioMeshToolCancelled };
+    return meshToolFailure(texts.studioMeshToolCancelled);
   }
   if (error instanceof RobotsStudioApiError) {
     if (error.status === 401) {
-      return { success: false, message: texts.studioMeshToolSessionExpired };
+      return meshToolFailure(texts.studioMeshToolSessionExpired);
     }
     if (error.status === 409) {
       const code = getRobotsStudioErrorCode(error.body);
       if (code === 'revision_conflict') {
-        return { success: false, message: REVISION_CONFLICT_MESSAGES[lang] };
+        return meshToolFailure(REVISION_CONFLICT_MESSAGES[lang]);
       }
       if (code === 'duplicate_content') {
-        return { success: false, message: DUPLICATE_CONTENT_MESSAGES[lang] };
+        return meshToolFailure(DUPLICATE_CONTENT_MESSAGES[lang]);
       }
       if (code === 'invalid_section') {
-        return { success: false, message: INVALID_SECTION_MESSAGES[lang] };
+        return meshToolFailure(INVALID_SECTION_MESSAGES[lang]);
       }
       if (code === 'invalid_document_schema') {
-        return { success: false, message: INVALID_DOCUMENT_SCHEMA_MESSAGES[lang] };
+        return meshToolFailure(INVALID_DOCUMENT_SCHEMA_MESSAGES[lang]);
       }
       if (code === 'job_in_progress') {
-        return { success: false, message: texts.studioMeshToolJobInProgress };
+        return meshToolFailure(texts.studioMeshToolJobInProgress);
       }
-      return { success: false, message: error.message };
+      return meshToolFailure(error.message);
     }
-    return { success: false, message: error.message };
+    return meshToolFailure(error.message);
   }
-  return {
-    success: false,
-    message: error instanceof Error ? error.message : texts.studioMeshToolUnknownError,
-  };
+  return meshToolFailure(
+    error instanceof Error ? error.message : texts.studioMeshToolUnknownError,
+  );
 }
 
 function createOnRetry(
@@ -565,7 +579,7 @@ function createOnRetry(
     context: { meshRetry: 'resume_poll' | 'continue_poll'; meshRevision: number },
   ): Promise<ToolResult> {
     if (!hasBootstrap()) {
-      return { success: false, message: texts.studioMeshToolSessionExpired };
+      return meshToolFailure(texts.studioMeshToolSessionExpired);
     }
 
     try {
@@ -586,14 +600,14 @@ function createOnExecute(
 ) {
   return async function onExecute(toolCall: ParsedToolCall): Promise<ToolResult> {
     if (!hasBootstrap()) {
-      return { success: false, message: texts.studioMeshToolSessionExpired };
+      return meshToolFailure(texts.studioMeshToolSessionExpired);
     }
 
     try {
       if (toolCall.toolName === 'propose_requirements_revision') {
         const parsed = parseProposeToolArgs(toolCall.args);
         if (!parsed) {
-          return { success: false, message: texts.studioMeshToolUnknownError };
+          return meshToolFailure(texts.studioMeshToolUnknownError);
         }
 
         const payloadCacheKey = buildProposePayloadCacheKey(parsed);
@@ -616,16 +630,15 @@ function createOnExecute(
       if (toolCall.toolName === 'regenerate_robot_model') {
         const revision = toolCall.args.revision;
         if (typeof revision !== 'number' || !Number.isFinite(revision)) {
-          return { success: false, message: texts.studioMeshToolUnknownError };
+          return meshToolFailure(texts.studioMeshToolUnknownError);
         }
 
         return await runMeshRegenerateAndImport(revision, options, texts);
       }
 
-      return {
-        success: false,
-        message: texts.studioMeshToolUnknownTool.replace('{toolName}', toolCall.toolName),
-      };
+      return meshToolFailure(
+        texts.studioMeshToolUnknownTool.replace('{toolName}', toolCall.toolName),
+      );
     } catch (error) {
       return mapExecuteError(error, options.lang, texts, options.signal);
     }

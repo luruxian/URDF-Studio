@@ -387,7 +387,7 @@ test('getMeshJob includes revision query when provided', async () => {
   assert.ok(spy.calls[0].url.includes('revision=4'));
 });
 
-test('formatMeshJobFailure prefers error_code over error_message', () => {
+test('formatMeshJobFailure prefers error_message over error_code', () => {
   assert.equal(
     formatMeshJobFailure({
       job_id: 'j1',
@@ -398,7 +398,7 @@ test('formatMeshJobFailure prefers error_code over error_message', () => {
       error_code: 'E1',
       error_message: 'boom',
     }),
-    'E1',
+    'boom',
   );
   assert.equal(
     formatMeshJobFailure({

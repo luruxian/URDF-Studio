@@ -600,6 +600,55 @@ test('onExecute for regenerate_robot_model skips PATCH and runs mesh pipeline', 
   assert.equal(importCalls.length, 1);
 });
 
+test('onExecute puts result_summary in chatMessage on mesh success', async () => {
+  storeBootstrapAndAuth();
+  installFetchMock([
+    jsonResponse(
+      {
+        job_id: 'job-1',
+        revision: 4,
+        status: 'queued',
+        external_job_id: 'ext-1',
+      },
+      202,
+    ),
+    jsonResponse({
+      job_id: 'job-1',
+      revision: 4,
+      status: 'done',
+      attachment_id: 'att-new',
+      package_type: 'urdf_stl',
+      error_code: null,
+      error_message: null,
+      result_summary: 'Generated biped URDF package.',
+    }),
+    jsonResponse({
+      package_type: 'urdf_stl',
+      import_grant_id: 'pvw_abc',
+      from_origin: 'https://robots.example.com',
+      expires_at: '2026-08-27T06:00:00Z',
+      attachment_id: 'att-new',
+    }),
+  ]);
+
+  const config = await createStudioModificationTools({
+    lang: 'en',
+    packageType: 'urdf_stl',
+    importUrdfPackage: async () => {},
+  });
+  assert.ok(config);
+
+  const result = await config.onExecute({
+    toolName: 'regenerate_robot_model',
+    args: { revision: 4 },
+    summary: 'regenerate',
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.chatMessage, 'Generated biped URDF package.');
+  assert.doesNotMatch(result.message ?? '', /Generated biped URDF package/);
+});
+
 test('onExecute maps revision_conflict 409 to a refresh message', async () => {
   storeBootstrapAndAuth();
   installFetchMock([
@@ -705,7 +754,8 @@ test('onExecute surfaces failed mesh jobs', async () => {
   });
 
   assert.equal(result.success, false);
-  assert.equal(result.message, 'mesh_failed');
+  assert.equal(result.message, 'boom');
+  assert.equal(result.chatMessage, 'boom');
 });
 
 test('onExecute forwards AbortSignal to pollMeshJob', async (t) => {

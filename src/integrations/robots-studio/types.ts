@@ -68,6 +68,7 @@ export interface MeshJobResponse {
   package_type: StudioPackageType;
   error_code: string | null;
   error_message: string | null;
+  result_summary?: string | null;
 }
 
 export interface MeshImportGrantRequest {
