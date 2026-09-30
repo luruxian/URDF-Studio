@@ -4,7 +4,6 @@
 > 交叉引用：[architecture.md](architecture.md)、[file-io.md](file-io.md)、[style-guide.md](style-guide.md)、[wasm-build.md](wasm-build.md)
 
 ## 1. 单模式 Editor
-
 Editor 子域划分与快速映射见 [CLAUDE.md](../CLAUDE.md) §Editor 单模式。
 
 新增功能前，先判断属于哪类子能力，避免跨子系统逻辑缠绕。
