@@ -12,6 +12,7 @@ import {
   getInspectionSystemPrompt,
   INSPECTION_PROMPT_PLACEHOLDERS,
   INSPECTION_SYSTEM_PROMPT_TEMPLATES,
+  resolveRequestPromptLanguage,
 } from './prompts.ts';
 import { AI_PROMPT_TEMPLATES } from './aiPromptTemplates.generated.ts';
 
@@ -30,8 +31,10 @@ test('markdown prompt source documents the editable sections and placeholders fo
   assert.match(promptMarkdownSource, /`generation`/);
   assert.match(promptMarkdownSource, /`inspection\.en`/);
   assert.match(promptMarkdownSource, /`inspection\.zh-Hant`/);
+  assert.match(promptMarkdownSource, /`inspection\.zh-CN`/);
   assert.match(promptMarkdownSource, /`conversation\.en`/);
   assert.match(promptMarkdownSource, /`conversation\.zh-Hant`/);
+  assert.match(promptMarkdownSource, /`conversation\.zh-CN`/);
   assert.match(promptMarkdownSource, /^## Placeholders/m);
   assert.match(promptMarkdownSource, /`__ROBOT_CONTEXT__`/);
   assert.match(promptMarkdownSource, /`__MOTOR_LIBRARY_CONTEXT__`/);
@@ -47,8 +50,10 @@ test('markdown prompt sections use structured subsection headings for easier edi
   const generationPrompt = extractPromptFromMarkdown('generation');
   const inspectionEnPrompt = extractPromptFromMarkdown('inspection.en');
   const inspectionZhPrompt = extractPromptFromMarkdown('inspection.zh-Hant');
+  const inspectionZhCnPrompt = extractPromptFromMarkdown('inspection.zh-CN');
   const conversationEnPrompt = extractPromptFromMarkdown('conversation.en');
   const conversationZhPrompt = extractPromptFromMarkdown('conversation.zh-Hant');
+  const conversationZhCnPrompt = extractPromptFromMarkdown('conversation.zh-CN');
 
   assert.match(generationPrompt, /^## Role/m);
   assert.match(generationPrompt, /^## Context/m);
@@ -73,14 +78,55 @@ test('markdown prompt sections use structured subsection headings for easier edi
   assert.match(conversationZhPrompt, /^## 輸入上下文/m);
   assert.match(conversationZhPrompt, /^## 輸出契約/m);
   assert.match(conversationZhPrompt, /^## 規則/m);
+
+  assert.match(inspectionZhCnPrompt, /^## 角色/m);
+  assert.match(inspectionZhCnPrompt, /^## 输入上下文/m);
+  assert.match(inspectionZhCnPrompt, /^## 输出契约/m);
+  assert.match(inspectionZhCnPrompt, /^## 规则/m);
+
+  assert.match(conversationZhCnPrompt, /^## 角色/m);
+  assert.match(conversationZhCnPrompt, /^## 输入上下文/m);
+  assert.match(conversationZhCnPrompt, /^## 输出契约/m);
+  assert.match(conversationZhCnPrompt, /^## 规则/m);
 });
 
 test('generated prompt module stays in sync with the single markdown source of truth', () => {
   assert.equal(AI_PROMPT_TEMPLATES.generation, extractPromptFromMarkdown('generation'));
   assert.equal(AI_PROMPT_TEMPLATES.inspection.en, extractPromptFromMarkdown('inspection.en'));
   assert.equal(AI_PROMPT_TEMPLATES.inspection['zh-Hant'], extractPromptFromMarkdown('inspection.zh-Hant'));
+  assert.equal(AI_PROMPT_TEMPLATES.inspection['zh-CN'], extractPromptFromMarkdown('inspection.zh-CN'));
   assert.equal(AI_PROMPT_TEMPLATES.conversation.en, extractPromptFromMarkdown('conversation.en'));
   assert.equal(AI_PROMPT_TEMPLATES.conversation['zh-Hant'], extractPromptFromMarkdown('conversation.zh-Hant'));
+  assert.equal(AI_PROMPT_TEMPLATES.conversation['zh-CN'], extractPromptFromMarkdown('conversation.zh-CN'));
+  assert.match(AI_PROMPT_TEMPLATES.inspection['zh-CN'], /简体中文/);
+  assert.doesNotMatch(AI_PROMPT_TEMPLATES.inspection['zh-CN'], /繁體/);
+  assert.match(AI_PROMPT_TEMPLATES.conversation['zh-CN'], /简体中文/);
+  assert.doesNotMatch(AI_PROMPT_TEMPLATES.conversation['zh-CN'], /繁體/);
+  assert.notEqual(AI_PROMPT_TEMPLATES.inspection['zh-CN'], AI_PROMPT_TEMPLATES.inspection['zh-Hant']);
+});
+
+test('resolveRequestPromptLanguage keeps traditional and simplified request locales apart', () => {
+  assert.equal(resolveRequestPromptLanguage('zh-CN'), 'zh-CN');
+  assert.equal(resolveRequestPromptLanguage('zh-TW'), 'zh-Hant');
+});
+
+test('raw zh-CN locale fills simplified prompt language instructions', () => {
+  const inspection = getInspectionSystemPrompt('zh-CN', {
+    criteriaDescription: 'criteria',
+    inspectionNotes: '',
+  });
+  const conversation = getConversationSystemPrompt('zh-CN', {
+    mode: 'general',
+    context: '{}',
+    history: '',
+  });
+
+  assert.match(inspection, /返回一个纯 JSON 对象/);
+  assert.match(inspection, /请使用简体中文生成所有报告内容，包括总结、问题标题和描述。/);
+  assert.match(conversation, /对话助手/);
+  assert.match(conversation, /请使用简体中文回复，简洁准确。/);
+  assert.doesNotMatch(inspection, /繁體/);
+  assert.doesNotMatch(conversation, /請使用繁體中文/);
 });
 
 test('generation prompt template lives in a standalone config module', () => {

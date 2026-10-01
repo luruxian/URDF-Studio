@@ -15,13 +15,16 @@ const REQUIRED_PROMPT_SECTIONS = [
   'generation',
   'inspection.en',
   'inspection.zh-Hant',
+  'inspection.zh-CN',
   'conversation.en',
   'conversation.zh-Hant',
+  'conversation.zh-CN',
 ];
 const REQUIRED_SECTION_PLACEHOLDERS = {
   generation: ['__ROBOT_CONTEXT__', '__MOTOR_LIBRARY_CONTEXT__'],
   'inspection.en': ['__CRITERIA_DESCRIPTION__', '__INSPECTION_NOTES__', '__LANGUAGE_INSTRUCTION__'],
   'inspection.zh-Hant': ['__CRITERIA_DESCRIPTION__', '__INSPECTION_NOTES__', '__LANGUAGE_INSTRUCTION__'],
+  'inspection.zh-CN': ['__CRITERIA_DESCRIPTION__', '__INSPECTION_NOTES__', '__LANGUAGE_INSTRUCTION__'],
   'conversation.en': [
     '__CONVERSATION_MODE__',
     '__CONVERSATION_CONTEXT__',
@@ -29,6 +32,12 @@ const REQUIRED_SECTION_PLACEHOLDERS = {
     '__LANGUAGE_INSTRUCTION__',
   ],
   'conversation.zh-Hant': [
+    '__CONVERSATION_MODE__',
+    '__CONVERSATION_CONTEXT__',
+    '__CONVERSATION_HISTORY__',
+    '__LANGUAGE_INSTRUCTION__',
+  ],
+  'conversation.zh-CN': [
     '__CONVERSATION_MODE__',
     '__CONVERSATION_CONTEXT__',
     '__CONVERSATION_HISTORY__',
@@ -78,11 +87,13 @@ export const AI_PROMPT_TEMPLATES = {
   generation: ${JSON.stringify(extractPrompt('generation'))},
   inspection: {
     en: ${JSON.stringify(extractPrompt('inspection.en'))},
-    'zh-Hant': ${JSON.stringify(extractPrompt('inspection.zh-Hant'))}
+    'zh-Hant': ${JSON.stringify(extractPrompt('inspection.zh-Hant'))},
+    'zh-CN': ${JSON.stringify(extractPrompt('inspection.zh-CN'))}
   },
   conversation: {
     en: ${JSON.stringify(extractPrompt('conversation.en'))},
-    'zh-Hant': ${JSON.stringify(extractPrompt('conversation.zh-Hant'))}
+    'zh-Hant': ${JSON.stringify(extractPrompt('conversation.zh-Hant'))},
+    'zh-CN': ${JSON.stringify(extractPrompt('conversation.zh-CN'))}
   }
 } as const;
 `;

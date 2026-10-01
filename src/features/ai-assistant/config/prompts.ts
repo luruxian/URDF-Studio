@@ -1,13 +1,40 @@
 import { AI_PROMPT_TEMPLATES } from './aiPromptTemplates.generated.ts'
 import { isChineseLanguage, type Language } from '@/shared/i18n'
 
-type PromptTemplateLanguage = 'en' | 'zh-Hant'
+type PromptTemplateLanguage = 'en' | 'zh-Hant' | 'zh-CN'
 
-function resolvePromptTemplateLanguage(lang: Language): PromptTemplateLanguage {
-  return isChineseLanguage(lang) ? 'zh-Hant' : 'en'
+const CHROME_LANGUAGES = new Set<Language>(['en', 'zh-Hant', 'ja', 'fr', 'de', 'es', 'ko'])
+
+export function resolveRequestPromptLanguage(lang: string): 'en' | 'zh-Hant' | 'zh-CN' {
+  const lower = lang.trim().toLowerCase()
+  if (lower === 'zh-hant' || lower === 'zh-tw' || lower === 'zh-hk') return 'zh-Hant'
+  if (lower === 'zh-cn' || lower === 'zh-hans' || lower === 'zh') return 'zh-CN'
+  if (lower.startsWith('zh-')) return 'zh-CN'
+  return 'en'
 }
 
-function inspectionLanguageInstruction(lang: Language): string {
+function isChromeLanguage(lang: string): lang is Language {
+  return CHROME_LANGUAGES.has(lang as Language)
+}
+
+function resolvePromptTemplateLanguage(lang: string): PromptTemplateLanguage {
+  if (isChromeLanguage(lang)) {
+    return isChineseLanguage(lang) ? 'zh-Hant' : 'en'
+  }
+  return resolveRequestPromptLanguage(lang)
+}
+
+function inspectionLanguageInstruction(lang: string): string {
+  if (!isChromeLanguage(lang)) {
+    const resolved = resolveRequestPromptLanguage(lang)
+    if (resolved === 'zh-CN') {
+      return '请使用简体中文生成所有报告内容，包括总结、问题标题和描述。'
+    }
+    if (resolved === 'zh-Hant') {
+      return '請使用繁體中文生成所有報告內容，包括總結、問題標題和描述。'
+    }
+    return 'Please generate all report content in English, including summary, issue titles and descriptions.'
+  }
   if (isChineseLanguage(lang)) {
     return '請使用繁體中文生成所有報告內容，包括總結、問題標題和描述。'
   }
@@ -29,7 +56,17 @@ function inspectionLanguageInstruction(lang: Language): string {
   return 'Please generate all report content in English, including summary, issue titles and descriptions.'
 }
 
-function conversationLanguageInstruction(lang: Language): string {
+function conversationLanguageInstruction(lang: string): string {
+  if (!isChromeLanguage(lang)) {
+    const resolved = resolveRequestPromptLanguage(lang)
+    if (resolved === 'zh-CN') {
+      return '请使用简体中文回复，简洁准确。'
+    }
+    if (resolved === 'zh-Hant') {
+      return '請使用繁體中文回覆，簡潔準確。'
+    }
+    return 'Please respond in English with concise and accurate technical language.'
+  }
   if (isChineseLanguage(lang)) {
     return '請使用繁體中文回覆，簡潔準確。'
   }
@@ -73,11 +110,13 @@ export const GENERATION_SYSTEM_PROMPT_TEMPLATE = AI_PROMPT_TEMPLATES.generation
 
 export const INSPECTION_SYSTEM_PROMPT_TEMPLATES = {
   'zh-Hant': AI_PROMPT_TEMPLATES.inspection['zh-Hant'],
+  'zh-CN': AI_PROMPT_TEMPLATES.inspection['zh-CN'],
   en: AI_PROMPT_TEMPLATES.inspection.en,
 } as const
 
 export const CONVERSATION_SYSTEM_PROMPT_TEMPLATES = {
   'zh-Hant': AI_PROMPT_TEMPLATES.conversation['zh-Hant'],
+  'zh-CN': AI_PROMPT_TEMPLATES.conversation['zh-CN'],
   en: AI_PROMPT_TEMPLATES.conversation.en,
 } as const
 
@@ -106,7 +145,7 @@ export function getGenerationSystemPrompt(context: GenerationContext): string {
 }
 
 export function getInspectionSystemPrompt(
-  lang: Language,
+  lang: Language | string,
   context: InspectionContext
 ): string {
   const templateLanguage = resolvePromptTemplateLanguage(lang)
@@ -119,7 +158,7 @@ export function getInspectionSystemPrompt(
 }
 
 export function getConversationSystemPrompt(
-  lang: Language,
+  lang: Language | string,
   context: ConversationPromptContext
 ): string {
   const templateLanguage = resolvePromptTemplateLanguage(lang)
