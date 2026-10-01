@@ -75,14 +75,20 @@ function handleSharedWorkerMessage(event: MessageEvent<ImportPreparationWorkerRe
     return;
   }
 
-  // Log every message arriving from the worker (diagnostic). This includes
-  // both the `__diag:true` self-reports and protocol messages.
-  console.error('[import prep worker] msg from worker', message);
-
   // Diagnostic traffic from inside the worker — not part of the request protocol.
   const diag = message as unknown as { __diag?: boolean; kind?: string };
-  if (diag?.__diag) {
+  if (diag.__diag) {
+    if (diag.kind === 'worker-init-failed' || diag.kind === 'worker-runtime-error') {
+      console.error('[import prep worker] diagnostic failure', message);
+    }
     return;
+  }
+
+  if (
+    message.type === 'prepare-import-error' ||
+    message.type === 'hydrate-deferred-import-assets-error'
+  ) {
+    console.error('[import prep worker] request failed', message);
   }
 
   const pendingRequest = pendingWorkerRequests.get(message.requestId) ?? null;
@@ -179,13 +185,6 @@ function ensureSharedWorker(): Worker {
       sharedWorker.addEventListener('message', handleSharedWorkerMessage);
       sharedWorker.addEventListener('error', handleSharedWorkerError as EventListener);
       sharedWorker.addEventListener('messageerror', handleSharedWorkerMessageError as EventListener);
-      console.error('[import prep worker] worker created', {
-        ctor: sharedWorker?.constructor?.name,
-        pageCrossOriginIsolated:
-          typeof crossOriginIsolated !== 'undefined' ? crossOriginIsolated : null,
-        pageSecureContext: typeof isSecureContext !== 'undefined' ? isSecureContext : null,
-        hasSharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
-      });
     } catch (creationError) {
       workerUnavailable = true;
       console.error('[import prep worker] worker creation threw', {
