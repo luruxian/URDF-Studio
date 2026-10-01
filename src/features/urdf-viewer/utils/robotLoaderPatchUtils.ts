@@ -2,6 +2,7 @@ import type { RefObject } from 'react';
 import * as THREE from 'three';
 import { URDFJoint as RuntimeURDFJoint } from '@/core/parsers/urdf/loader';
 import { parseThreeColorWithOpacity } from '@/core/utils/color.ts';
+import { materialForStlGeometry } from '@/core/utils/stlFlatShading';
 import type { VisualMaterialOverride } from '@/core/utils/visualMaterialOverrides';
 import { disposeObject3D, disposeMaterial } from './dispose';
 import { disposeReplacedMaterials } from '@/shared/components/3d/materialDisposal';
@@ -332,7 +333,13 @@ export function updateVisualMaterial(
       next.userData.urdfEmissiveIntensityApplied = true;
       next.userData.urdfEmissiveIntensity = normalizedOverride.emissiveIntensity;
     }
-    return next;
+    // createMatteMaterial does not copy flat shading. Clone only for STL
+    // geometry so a material shared with a normal-bearing mesh stays smooth.
+    const assigned = materialForStlGeometry(mesh.geometry, next);
+    if (assigned !== next) {
+      next.dispose();
+    }
+    return assigned;
   };
 
   if (highlightedSnapshot?.activeRole) {

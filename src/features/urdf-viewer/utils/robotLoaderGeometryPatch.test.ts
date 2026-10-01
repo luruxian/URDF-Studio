@@ -307,6 +307,76 @@ test('applyGeometryPatchInPlace updates visual material colors in place for link
   );
 });
 
+test('applyGeometryPatchInPlace keeps STL flat shading when a visual color is edited', () => {
+  const stlGeometry = new THREE.BufferGeometry();
+  stlGeometry.setAttribute(
+    'position',
+    new THREE.Float32BufferAttribute([0, 0, 0, 1, 0, 0, 0, 1, 0], 3),
+  );
+  stlGeometry.userData.requiresFlatShading = true;
+  assert.equal(stlGeometry.getAttribute('normal'), undefined);
+
+  const robotModel = new THREE.Group() as THREE.Group & {
+    links?: Record<string, THREE.Object3D>;
+  };
+  const linkObject = new THREE.Group();
+  linkObject.name = 'base_link';
+  markAsUrdfLink(linkObject);
+
+  const visualGroup = new URDFVisual();
+  const boxMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshPhongMaterial({ color: new THREE.Color('#808080') }),
+  );
+  const stlMesh = new THREE.Mesh(
+    stlGeometry,
+    new THREE.MeshPhongMaterial({ color: new THREE.Color('#808080'), flatShading: true }),
+  );
+  visualGroup.add(boxMesh);
+  visualGroup.add(stlMesh);
+  linkObject.add(visualGroup);
+  robotModel.add(linkObject);
+  robotModel.links = { base_link: linkObject };
+
+  const previousLinkData = makeLink({
+    id: 'base_link',
+    name: 'base_link',
+    visual: makeGeometry({ color: '#808080' }),
+  });
+  const linkData = makeLink({
+    id: 'base_link',
+    name: 'base_link',
+    visual: makeGeometry({ color: '#12ab34' }),
+  });
+
+  const applied = applyGeometryPatchInPlace({
+    robotModel,
+    patch: {
+      linkName: 'base_link',
+      previousLinkData,
+      linkData,
+      visualChanged: true,
+      visualBodiesChanged: false,
+      collisionChanged: false,
+      collisionBodiesChanged: false,
+      inertialChanged: false,
+      visibilityChanged: false,
+    },
+    assets: {},
+    showVisual: true,
+    showCollision: false,
+    linkMeshMapRef: { current: new Map<string, THREE.Mesh[]>() },
+    invalidate: () => {},
+  });
+
+  const boxMaterial = boxMesh.material as THREE.MeshStandardMaterial;
+  const stlMaterial = stlMesh.material as THREE.MeshStandardMaterial;
+  assert.equal(applied, true);
+  assert.equal(stlMaterial.flatShading, true);
+  assert.equal(boxMaterial.flatShading, false);
+  assert.notEqual(boxMaterial, stlMaterial);
+});
+
 test('applyGeometryPatchesInPlace prevalidates all runtime targets before mutating', () => {
   const robotModel = new THREE.Group() as THREE.Group & {
     links?: Record<string, THREE.Object3D>;

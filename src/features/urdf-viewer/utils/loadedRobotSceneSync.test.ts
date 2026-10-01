@@ -21,6 +21,7 @@ import {
   COLLISION_STANDARD_RENDER_ORDER,
   MATERIAL_CONFIG,
   collisionBaseMaterial,
+  collisionFlatShadingMaterial,
 } from './materials';
 import {
   collectURDFMaterialsFromLinks,
@@ -429,6 +430,7 @@ test('syncLoadedRobotScene hides MJCF world runtime geometry when the world togg
 
 test('syncLoadedRobotScene boosts collision overlay opacity when visuals are hidden', () => {
   const previousOpacity = collisionBaseMaterial.opacity;
+  const previousFlatShadingOpacity = collisionFlatShadingMaterial.opacity;
   const robot = new THREE.Group();
   const link = new URDFLink();
   link.name = 'base_link';
@@ -459,6 +461,8 @@ test('syncLoadedRobotScene boosts collision overlay opacity when visuals are hid
 
   collisionBaseMaterial.opacity = previousOpacity;
   collisionBaseMaterial.needsUpdate = true;
+  collisionFlatShadingMaterial.opacity = previousFlatShadingOpacity;
+  collisionFlatShadingMaterial.needsUpdate = true;
 });
 
 test('syncLoadedRobotScene maps folded MJCF visual meshes onto semantic synthetic link ids', () => {
