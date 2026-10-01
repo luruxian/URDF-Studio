@@ -114,7 +114,7 @@ test('resolveRequestPromptLanguage keeps traditional and simplified request loca
   assert.equal(resolveRequestPromptLanguage('zh-Hans-CN'), 'zh-CN');
 });
 
-test('raw zh-CN locale fills simplified prompt language instructions', () => {
+test('zh-CN chrome language fills simplified prompt language instructions', () => {
   const inspection = getInspectionSystemPrompt('zh-CN', {
     criteriaDescription: 'criteria',
     inspectionNotes: '',

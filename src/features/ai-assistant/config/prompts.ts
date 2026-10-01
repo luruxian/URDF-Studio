@@ -1,9 +1,9 @@
 import { AI_PROMPT_TEMPLATES } from './aiPromptTemplates.generated.ts'
-import { isChineseLanguage, type Language } from '@/shared/i18n'
+import { type Language } from '@/shared/i18n'
 
 type PromptTemplateLanguage = 'en' | 'zh-Hant' | 'zh-CN'
 
-const CHROME_LANGUAGES = new Set<Language>(['en', 'zh-Hant', 'ja', 'fr', 'de', 'es', 'ko'])
+const CHROME_LANGUAGES = new Set<Language>(['en', 'zh-CN', 'zh-Hant', 'ja', 'fr', 'de', 'es', 'ko'])
 
 export function resolveRequestPromptLanguage(lang: string): 'en' | 'zh-Hant' | 'zh-CN' {
   const lower = lang.trim().toLowerCase()
@@ -19,13 +19,17 @@ function isChromeLanguage(lang: string): lang is Language {
 }
 
 function resolvePromptTemplateLanguage(lang: string): PromptTemplateLanguage {
+  if (lang === 'zh-CN') return 'zh-CN'
   if (isChromeLanguage(lang)) {
-    return isChineseLanguage(lang) ? 'zh-Hant' : 'en'
+    return lang === 'zh-Hant' ? 'zh-Hant' : 'en'
   }
   return resolveRequestPromptLanguage(lang)
 }
 
 function inspectionLanguageInstruction(lang: string): string {
+  if (lang === 'zh-CN') {
+    return '请使用简体中文生成所有报告内容，包括总结、问题标题和描述。'
+  }
   if (!isChromeLanguage(lang)) {
     const resolved = resolveRequestPromptLanguage(lang)
     if (resolved === 'zh-CN') {
@@ -36,7 +40,7 @@ function inspectionLanguageInstruction(lang: string): string {
     }
     return 'Please generate all report content in English, including summary, issue titles and descriptions.'
   }
-  if (isChineseLanguage(lang)) {
+  if (lang === 'zh-Hant') {
     return '請使用繁體中文生成所有報告內容，包括總結、問題標題和描述。'
   }
   if (lang === 'ja') {
@@ -58,6 +62,9 @@ function inspectionLanguageInstruction(lang: string): string {
 }
 
 function conversationLanguageInstruction(lang: string): string {
+  if (lang === 'zh-CN') {
+    return '请使用简体中文回复，简洁准确。'
+  }
   if (!isChromeLanguage(lang)) {
     const resolved = resolveRequestPromptLanguage(lang)
     if (resolved === 'zh-CN') {
@@ -68,7 +75,7 @@ function conversationLanguageInstruction(lang: string): string {
     }
     return 'Please respond in English with concise and accurate technical language.'
   }
-  if (isChineseLanguage(lang)) {
+  if (lang === 'zh-Hant') {
     return '請使用繁體中文回覆，簡潔準確。'
   }
   if (lang === 'ja') {
