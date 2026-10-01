@@ -389,7 +389,7 @@ export class URDFLoader {
                       applyMaterialToLoadedObject(obj, material);
                     }
                   } else if (obj instanceof THREE.Mesh) {
-                    obj.material = material;
+                    obj.material = materialForStlGeometry(obj.geometry, material);
                   }
 
                   group.add(obj);
@@ -798,7 +798,7 @@ export class URDFLoader {
                       applyMaterialToLoadedObject(obj, material);
                     }
                   } else if (obj instanceof THREE.Mesh) {
-                    obj.material = material;
+                    obj.material = materialForStlGeometry(obj.geometry, material);
                   }
 
                   group.add(obj);

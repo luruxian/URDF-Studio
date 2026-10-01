@@ -344,9 +344,10 @@ export function applyVisualMaterialOverrideToObject(
       const sourceSide = material.side;
       const sourceTransparent = material.transparent || (nextOpacity ?? 1) < 1;
       const sourceMapKey = hasTextureOverride ? 'override' : (material as any).map?.uuid || 'none';
+      const requiresFlatShading = mesh.geometry?.userData?.requiresFlatShading === true;
       const fullCacheKey =
         cacheKeyBase && cache
-          ? `${cacheKeyBase}|side=${sourceSide}|tr=${sourceTransparent ? 1 : 0}|src=${sourceMapKey}|nm=${material.name || ''}`
+          ? `${cacheKeyBase}|side=${sourceSide}|tr=${sourceTransparent ? 1 : 0}|src=${sourceMapKey}|nm=${material.name || ''}|fs=${requiresFlatShading ? 1 : 0}`
           : null;
 
       if (fullCacheKey) {
@@ -418,7 +419,7 @@ export function applyVisualMaterialOverrideToObject(
         nextMaterial.userData.urdfEmissiveIntensity = emissiveIntensityOverride;
       }
 
-      if (mesh.geometry?.userData?.requiresFlatShading === true) {
+      if (requiresFlatShading) {
         nextMaterial.flatShading = true;
       }
 

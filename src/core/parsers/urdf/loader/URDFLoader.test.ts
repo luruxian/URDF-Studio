@@ -1034,3 +1034,27 @@ test('URDFLoader flat-shades an STL mesh without mutating another mesh that shar
   assert.equal((stl.material as THREE.Material & { flatShading?: boolean }).flatShading, true);
   assert.notEqual(box.material, stl.material);
 });
+
+test('URDFLoader flat-shades an STL mesh that has no material tag', () => {
+  const buffer = new ArrayBuffer(134);
+  const view = new DataView(buffer);
+  view.setUint32(80, 1, true);
+  view.setFloat32(104, 1, true);
+  view.setFloat32(128, 1, true);
+  const geometry = createGeometryFromSerializedStlData(parseStlGeometryData(buffer));
+  const loader = new URDFLoader(new THREE.LoadingManager());
+  loader.loadMeshCb = (_path, _manager, done) => {
+    done(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial()));
+  };
+  const robot = loader.parse(`<?xml version="1.0"?>
+    <robot name="flat">
+      <link name="base">
+        <visual>
+          <geometry><mesh filename="part.stl"/></geometry>
+        </visual>
+      </link>
+    </robot>`);
+  const visuals = robot.links.base.children.filter((child) => (child as { isURDFVisual?: boolean }).isURDFVisual);
+  const stl = visuals[0].children[0] as THREE.Mesh;
+  assert.equal((stl.material as THREE.Material & { flatShading?: boolean }).flatShading, true);
+});

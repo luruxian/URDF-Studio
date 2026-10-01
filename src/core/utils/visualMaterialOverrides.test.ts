@@ -7,6 +7,7 @@ import {
   hasExplicitGeometryMaterialOverride,
   resolvePrimaryAuthoredVisualMaterialOverride,
   resolveVisualMaterialOverrideFromGeometry,
+  type VisualMaterialOverrideCache,
 } from './visualMaterialOverrides';
 
 test('resolveVisualMaterialOverrideFromGeometry includes first-batch PBR parameters', () => {
@@ -302,4 +303,25 @@ test('applyVisualMaterialOverrideToObject keeps flat shading on STL geometry', (
   const material = mesh.material as THREE.MeshStandardMaterial;
   assert.equal(material.flatShading, true);
   assert.equal(material.color.getHexString(), '224466');
+});
+
+test('applyVisualMaterialOverrideToObject does not share flat shading through the material cache', () => {
+  const override = { color: '#224466' };
+  const run = (stlFirst: boolean) => {
+    const cache: VisualMaterialOverrideCache = new Map();
+    const stlGeometry = new THREE.BufferGeometry();
+    stlGeometry.userData.requiresFlatShading = true;
+    const stl = new THREE.Mesh(stlGeometry, new THREE.MeshStandardMaterial());
+    const box = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial());
+    const meshes = stlFirst ? [stl, box] : [box, stl];
+    for (const mesh of meshes) {
+      applyVisualMaterialOverrideToObject(mesh, override, undefined, cache);
+    }
+    assert.equal((stl.material as THREE.MeshStandardMaterial).flatShading, true);
+    assert.equal((box.material as THREE.MeshStandardMaterial).flatShading, false);
+    assert.notEqual(stl.material, box.material);
+  };
+
+  run(true);
+  run(false);
 });
