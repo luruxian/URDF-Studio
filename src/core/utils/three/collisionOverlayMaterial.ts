@@ -53,3 +53,20 @@ export const collisionBaseMaterial = configureCollisionOverlayMaterial(
 );
 
 markMaterialAsShared(collisionBaseMaterial);
+
+// STL collision meshes have no normals. This is a separate shared overlay so
+// boxes and other collision shapes can keep collisionBaseMaterial smooth.
+export const collisionFlatShadingMaterial = collisionBaseMaterial.clone();
+collisionFlatShadingMaterial.flatShading = true;
+collisionFlatShadingMaterial.name = 'collisionFlatShadingMaterial';
+markMaterialAsShared(collisionFlatShadingMaterial);
+markMaterialAsCollision(collisionFlatShadingMaterial);
+
+export function collisionMaterialForGeometry(
+  geometry: THREE.BufferGeometry | null | undefined,
+): THREE.Material {
+  if (geometry?.userData?.requiresFlatShading === true) {
+    return collisionFlatShadingMaterial;
+  }
+  return collisionBaseMaterial;
+}

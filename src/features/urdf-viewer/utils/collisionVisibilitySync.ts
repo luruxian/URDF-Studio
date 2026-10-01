@@ -4,7 +4,7 @@ import type { UrdfLink } from '@/types';
 import { getCollisionGeometryByObjectIndex } from '@/core/robot';
 
 import {
-  collisionBaseMaterial,
+  collisionMaterialForGeometry,
   resolveCollisionRenderOrder,
   syncCollisionBaseMaterialPriority,
 } from './materials';
@@ -124,11 +124,12 @@ export function syncCollisionGroupVisibility({
       return;
     }
 
-    if (inner.material !== collisionBaseMaterial) {
+    const nextCollisionMaterial = collisionMaterialForGeometry(inner.geometry);
+    if (inner.material !== nextCollisionMaterial) {
       changed = true;
       const previousMaterial = inner.material as THREE.Material | THREE.Material[] | undefined;
       meshWithOriginalMaterial.__origMaterial ??= previousMaterial;
-      inner.material = collisionBaseMaterial;
+      inner.material = nextCollisionMaterial;
       disposeReplacedMaterials(previousMaterial, disposedMaterials, true);
     } else {
       meshWithOriginalMaterial.__origMaterial ??= inner.material as

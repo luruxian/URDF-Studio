@@ -4,7 +4,9 @@ import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { JSDOM } from 'jsdom';
 
+import { createGeometryFromSerializedStlData, parseStlGeometryData } from '@/core/loaders/stlGeometryData';
 import { parseURDF } from '@/core/parsers';
+import { URDFLoader } from '@/core/parsers/urdf/loader/URDFLoader';
 import { URDFLink, URDFVisual } from '@/core/parsers/urdf/loader/URDFClasses';
 import { prepareAssemblyRobotData } from '@/core/robot/assemblyComponentPreparation';
 import {
@@ -29,6 +31,10 @@ import { syncLoadedRobotScene } from './loadedRobotSceneSync';
 
 const dom = new JSDOM('<!doctype html><html><body></body></html>');
 globalThis.DOMParser = dom.window.DOMParser as typeof DOMParser;
+globalThis.Document = dom.window.Document as typeof Document;
+globalThis.Element = dom.window.Element as typeof Element;
+globalThis.XMLSerializer = dom.window.XMLSerializer as typeof XMLSerializer;
+globalThis.ProgressEvent = dom.window.ProgressEvent as typeof ProgressEvent;
 
 function toLinearTuple(r: number, g: number, b: number): number[] {
   return new THREE.Color()
@@ -1163,4 +1169,108 @@ test('syncLoadedRobotScene disposes replaced collision materials when normalizin
   assert.equal(collisionMesh.material, collisionBaseMaterial);
   assert.equal(materialDisposeCalls, 1);
   assert.equal(textureDisposeCalls, 1);
+});
+
+function createSerializedStlGeometry(): THREE.BufferGeometry {
+  const buffer = new ArrayBuffer(134);
+  const view = new DataView(buffer);
+  view.setUint32(80, 1, true);
+  view.setFloat32(104, 1, true);
+  view.setFloat32(128, 1, true);
+  return createGeometryFromSerializedStlData(parseStlGeometryData(buffer));
+}
+
+function flatShadingOf(material: THREE.Material | THREE.Material[]): boolean {
+  const resolved = Array.isArray(material) ? material[0] : material;
+  return (resolved as THREE.MeshStandardMaterial).flatShading === true;
+}
+
+test('syncLoadedRobotScene keeps STL visual flat shading after the material upgrade', () => {
+  const stlGeometry = createSerializedStlGeometry();
+  assert.equal(stlGeometry.getAttribute('normal'), undefined);
+  assert.equal(stlGeometry.userData.requiresFlatShading, true);
+
+  const loader = new URDFLoader(new THREE.LoadingManager());
+  loader.loadMeshCb = (_path, _manager, done) => {
+    done(new THREE.Mesh(stlGeometry, new THREE.MeshStandardMaterial()));
+  };
+  const robot = loader.parse(`<?xml version="1.0"?>
+    <robot name="flat">
+      <material name="paint"><color rgba="0.2 0.4 0.6 1"/></material>
+      <link name="base_link">
+        <visual>
+          <geometry><box size="1 1 1"/></geometry>
+          <material name="paint"/>
+        </visual>
+        <visual>
+          <geometry><mesh filename="part.stl"/></geometry>
+          <material name="paint"/>
+        </visual>
+      </link>
+    </robot>`);
+
+  const link = robot.links.base_link;
+  const visuals = link.children.filter(
+    (child) => (child as { isURDFVisual?: boolean }).isURDFVisual,
+  );
+  const box = visuals[0].children[0] as THREE.Mesh;
+  const stl = visuals[1].children[0] as THREE.Mesh;
+  assert.equal(box.geometry.getAttribute('normal') === undefined, false);
+
+  syncLoadedRobotScene({
+    robot,
+    sourceFormat: 'urdf',
+    showCollision: false,
+    showVisual: true,
+    urdfMaterials: null,
+  });
+
+  assert.equal(box.material instanceof THREE.MeshStandardMaterial, true);
+  assert.equal(stl.material instanceof THREE.MeshStandardMaterial, true);
+  assert.equal(flatShadingOf(stl.material), true);
+  assert.equal(flatShadingOf(box.material), false);
+  assert.notEqual(box.material, stl.material);
+});
+
+test('syncLoadedRobotScene flat-shades collision STL meshes on a separate shared material', () => {
+  const stlGeometry = createSerializedStlGeometry();
+  assert.equal(stlGeometry.userData.requiresFlatShading, true);
+
+  const robot = new THREE.Group();
+  const link = new URDFLink();
+  link.name = 'base_link';
+
+  const collisionGroup = new THREE.Group();
+  collisionGroup.name = 'base_collision';
+  (collisionGroup as THREE.Group & { isURDFCollider?: boolean }).isURDFCollider = true;
+
+  const stlMesh = new THREE.Mesh(stlGeometry, new THREE.MeshPhongMaterial());
+  const secondStlMesh = new THREE.Mesh(stlGeometry, new THREE.MeshPhongMaterial());
+  const boxMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    new THREE.MeshPhongMaterial(),
+  );
+
+  collisionGroup.add(stlMesh);
+  collisionGroup.add(secondStlMesh);
+  collisionGroup.add(boxMesh);
+  link.add(collisionGroup);
+  robot.add(link);
+  (robot as THREE.Group & { links?: Record<string, THREE.Object3D> }).links = {
+    base_link: link,
+  };
+
+  syncLoadedRobotScene({
+    robot,
+    sourceFormat: 'urdf',
+    showCollision: true,
+    showVisual: true,
+    urdfMaterials: null,
+  });
+
+  assert.equal(flatShadingOf(stlMesh.material), true);
+  assert.equal(secondStlMesh.material, stlMesh.material);
+  assert.notEqual(stlMesh.material, collisionBaseMaterial);
+  assert.equal(boxMesh.material, collisionBaseMaterial);
+  assert.equal(flatShadingOf(collisionBaseMaterial), false);
 });

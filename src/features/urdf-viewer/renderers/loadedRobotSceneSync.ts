@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { getVisualGeometryEntries } from '@/core/robot';
+import { assignMaterialForStlGeometry } from '@/core/utils/stlFlatShading';
 import { isProtectedMaterial } from '@/core/utils/three/materialProtection';
 import { GeometryType, type UrdfLink } from '@/types';
 
 import {
-  collisionBaseMaterial,
+  collisionMaterialForGeometry,
   enhanceMaterials,
   resolveCollisionRenderOrder,
   syncCollisionBaseMaterialPriority,
@@ -530,10 +531,11 @@ export function syncLoadedRobotScene({
     mesh.userData.isVisual = false;
     mesh.userData.isVisualMesh = false;
 
-    if (mesh.material !== collisionBaseMaterial) {
+    const nextCollisionMaterial = collisionMaterialForGeometry(mesh.geometry);
+    if (mesh.material !== nextCollisionMaterial) {
       changed = true;
       const previousMaterial = mesh.material as THREE.Material | THREE.Material[] | undefined;
-      mesh.material = collisionBaseMaterial;
+      mesh.material = nextCollisionMaterial;
       disposeReplacedMaterials(previousMaterial, disposedMaterials, true);
     }
 
@@ -667,6 +669,10 @@ export function syncLoadedRobotScene({
 
     if (shouldUpgradeVisualMaterial) {
       enhanceMaterials(mesh, null, enhancedMaterialMemo);
+      // The upgrade replaces the loader Phong material with a MeshStandardMaterial
+      // that has flat shading off. STL meshes have no normals, so restore it on a
+      // clone and leave any material shared with a non-STL mesh unchanged.
+      assignMaterialForStlGeometry(mesh);
       changed = true;
     }
 

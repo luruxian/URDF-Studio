@@ -7,7 +7,7 @@ import { disposeObject3D, disposeMaterial } from './dispose';
 import { disposeReplacedMaterials } from '@/shared/components/3d/materialDisposal';
 import {
   COLLISION_OVERLAY_RENDER_ORDER,
-  collisionBaseMaterial,
+  collisionMaterialForGeometry,
   createHighlightOverrideMaterial,
   createMatteMaterial,
 } from './materials';
@@ -522,7 +522,7 @@ export function markCollisionObject(obj: THREE.Object3D, linkName: string): void
     child.userData.isCollision = true;
     child.userData.isVisual = false;
     child.userData.isVisualMesh = false;
-    child.material = collisionBaseMaterial;
+    child.material = collisionMaterialForGeometry(child.geometry);
     child.renderOrder = COLLISION_OVERLAY_RENDER_ORDER;
 
     disposeReplacedMaterials(previousMaterial, disposedMaterials, true);

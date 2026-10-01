@@ -13,6 +13,7 @@ import {
   COLLISION_STANDARD_RENDER_ORDER,
   COLLISION_OVERLAY_RENDER_ORDER,
   collisionBaseMaterial,
+  collisionFlatShadingMaterial,
   configureCollisionOverlayMaterial,
   createCollisionOverlayMaterial,
 } from '@/core/utils/three/collisionOverlayMaterial';
@@ -20,6 +21,8 @@ export {
   COLLISION_STANDARD_RENDER_ORDER,
   COLLISION_OVERLAY_RENDER_ORDER,
   collisionBaseMaterial,
+  collisionFlatShadingMaterial,
+  collisionMaterialForGeometry,
   configureCollisionOverlayMaterial,
   createCollisionOverlayMaterial,
 } from '@/core/utils/three/collisionOverlayMaterial';
@@ -39,21 +42,20 @@ export function syncCollisionBaseMaterialPriority(
   const nextOpacity = showVisual ? COLLISION_WITH_VISUAL_OPACITY : COLLISION_ONLY_OPACITY;
   let changed = false;
 
-  if (
-    collisionBaseMaterial.depthTest !== nextDepthTest ||
-    collisionBaseMaterial.depthWrite !== nextDepthWrite
-  ) {
-    collisionBaseMaterial.depthTest = nextDepthTest;
-    collisionBaseMaterial.depthWrite = nextDepthWrite;
-    collisionBaseMaterial.needsUpdate = true;
-    changed = true;
-  }
+  for (const material of [collisionBaseMaterial, collisionFlatShadingMaterial]) {
+    if (material.depthTest !== nextDepthTest || material.depthWrite !== nextDepthWrite) {
+      material.depthTest = nextDepthTest;
+      material.depthWrite = nextDepthWrite;
+      material.needsUpdate = true;
+      changed = true;
+    }
 
-  if (Math.abs(collisionBaseMaterial.opacity - nextOpacity) > 1e-6) {
-    collisionBaseMaterial.opacity = nextOpacity;
-    collisionBaseMaterial.transparent = nextOpacity < 1;
-    collisionBaseMaterial.needsUpdate = true;
-    changed = true;
+    if (Math.abs(material.opacity - nextOpacity) > 1e-6) {
+      material.opacity = nextOpacity;
+      material.transparent = nextOpacity < 1;
+      material.needsUpdate = true;
+      changed = true;
+    }
   }
 
   return changed;

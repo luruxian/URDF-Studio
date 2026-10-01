@@ -21,6 +21,7 @@ import {
 } from '@/core/robot';
 import { createBoxFaceMaterialArray } from '@/core/utils/boxFaceMaterialArray';
 import { applyVisualMeshMaterialGroupsToObject } from '@/core/utils/meshMaterialGroups';
+import { assignMaterialForStlGeometry } from '@/core/utils/stlFlatShading';
 import { forceObjectMaterialSide } from '@/core/utils/three/materialSide';
 import {
   applyVisualMaterialOverrideToObject,
@@ -379,6 +380,10 @@ export function patchGeometryCategory({
         if (authoredMaterialPalette && authoredMaterialPalette.size > 1) {
           const paletteApplied = applyURDFMaterials(obj, authoredMaterialPalette);
           enhanceMaterials(obj);
+          // Palette hits stay on the upgraded material and do not go through
+          // applyVisualMaterialOverrideToObject, which is the other path that
+          // restores STL flat shading.
+          assignMaterialForStlGeometry(obj);
           if (paletteApplied) {
             // Runs after enhanceMaterials because that pass clones materials and would
             // drop a texture assigned before it.
