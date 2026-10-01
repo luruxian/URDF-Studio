@@ -1,7 +1,7 @@
 # URDF Studio 简体中文界面
 
-> 状态：设计完成，待审阅 | 2026-10-01
-> 实现计划：待 writing-plans 产出
+> 状态：已审阅 | 2026-10-01
+> 实现计划：[2026-10-01-urdf-studio-zh-cn.md](../plans/2026-10-01-urdf-studio-zh-cn.md)
 
 Studio 界面增加简体中文，和繁体并列。主站用 `?lang=zh-CN` 打开时，界面显示简体，并覆盖 Studio 已保存的语言。检查和对话使用已有的简体提示词。
 
