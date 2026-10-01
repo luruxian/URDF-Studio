@@ -7,7 +7,8 @@ const CHROME_LANGUAGES = new Set<Language>(['en', 'zh-Hant', 'ja', 'fr', 'de', '
 
 export function resolveRequestPromptLanguage(lang: string): 'en' | 'zh-Hant' | 'zh-CN' {
   const lower = lang.trim().toLowerCase()
-  if (lower === 'zh-hant' || lower === 'zh-tw' || lower === 'zh-hk') return 'zh-Hant'
+  // zh-Hant-TW / zh-Hant-HK / zh-Hant-MO stay traditional before the zh-* fallback.
+  if (lower.startsWith('zh-hant') || lower === 'zh-tw' || lower === 'zh-hk') return 'zh-Hant'
   if (lower === 'zh-cn' || lower === 'zh-hans' || lower === 'zh') return 'zh-CN'
   if (lower.startsWith('zh-')) return 'zh-CN'
   return 'en'

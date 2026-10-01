@@ -108,6 +108,10 @@ test('generated prompt module stays in sync with the single markdown source of t
 test('resolveRequestPromptLanguage keeps traditional and simplified request locales apart', () => {
   assert.equal(resolveRequestPromptLanguage('zh-CN'), 'zh-CN');
   assert.equal(resolveRequestPromptLanguage('zh-TW'), 'zh-Hant');
+  assert.equal(resolveRequestPromptLanguage('zh-Hant-TW'), 'zh-Hant');
+  assert.equal(resolveRequestPromptLanguage('zh-Hant-HK'), 'zh-Hant');
+  assert.equal(resolveRequestPromptLanguage('zh-Hant-MO'), 'zh-Hant');
+  assert.equal(resolveRequestPromptLanguage('zh-Hans-CN'), 'zh-CN');
 });
 
 test('raw zh-CN locale fills simplified prompt language instructions', () => {
