@@ -5,6 +5,7 @@ import { AppErrorBoundary } from '@/app/components/AppErrorBoundary';
 import { RobotsHandoffGate } from '@/app/components/RobotsHandoffGate';
 import { useUIStore } from '@/store';
 import {
+  applyLanguageAfterHydration,
   getInitialLanguageFromUrl,
   getLanguageFromRobotsHandoffSearch,
   hideRobotsHandoffLangFromUserUrl,
@@ -57,17 +58,25 @@ import.meta.hot?.dispose(() => {
   window.removeEventListener('unhandledrejection', handleUnhandledRejection);
 });
 
-// SEO emits a Chinese static entry at /zh/. Use it as an initial language hint
-// for direct visits, then hide the SEO-only path before the interactive app runs.
 const handoffLanguage = getLanguageFromRobotsHandoffSearch(window.location.search);
 const urlLanguage = getInitialLanguageFromUrl();
-if (urlLanguage !== null) {
+if (handoffLanguage !== null) {
+  applyLanguageAfterHydration(
+    handoffLanguage,
+    {
+      hasHydrated: () => useUIStore.persist.hasHydrated(),
+      onFinishHydration: (fn) => {
+        useUIStore.persist.onFinishHydration(fn);
+      },
+      setLang: (lang) => {
+        useUIStore.getState().setLang(lang);
+      },
+    },
+    hideRobotsHandoffLangFromUserUrl,
+  );
+} else if (urlLanguage !== null) {
   useUIStore.getState().setLang(urlLanguage);
-  if (handoffLanguage !== null) {
-    hideRobotsHandoffLangFromUserUrl();
-  } else {
-    hideSeoLanguagePathFromUserUrl();
-  }
+  hideSeoLanguagePathFromUserUrl();
 }
 
 const rootElement = document.getElementById('root');

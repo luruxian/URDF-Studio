@@ -26,6 +26,31 @@ export function getLanguageFromRobotsHandoffSearch(search: string): Language | n
   return normalizeLanguage(params.get(ROBOTS_HANDOFF_LANG_QUERY_PARAM));
 }
 
+export interface LanguageHydration {
+  hasHydrated: () => boolean;
+  onFinishHydration: (fn: () => void) => void;
+  setLang: (lang: Language) => void;
+}
+
+export function applyLanguageAfterHydration(
+  lang: Language | null,
+  hydration: LanguageHydration,
+  afterApply: () => void,
+): void {
+  if (lang === null) {
+    return;
+  }
+  const apply = () => {
+    hydration.setLang(lang);
+    afterApply();
+  };
+  if (hydration.hasHydrated()) {
+    apply();
+    return;
+  }
+  hydration.onFinishHydration(apply);
+}
+
 /** Reads the URL language signal in the browser; null on the server or when absent. */
 export function getInitialLanguageFromUrl(): Language | null {
   if (typeof window === 'undefined') return null;

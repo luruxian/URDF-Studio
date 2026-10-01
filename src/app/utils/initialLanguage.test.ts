@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 
 import {
+  applyLanguageAfterHydration,
   getLanguageFromPath,
   getLanguageFromRobotsHandoffSearch,
   hideRobotsHandoffLangFromUserUrl,
@@ -39,6 +40,73 @@ test('getLanguageFromPath recognizes explicit English, Chinese, Japanese, French
   assert.equal(getLanguageFromPath('/robots/fr/model'), null);
   assert.equal(getLanguageFromPath('/robots/de/model'), null);
   assert.equal(getLanguageFromPath('/robots/es/model'), null);
+});
+
+test('applyLanguageAfterHydration waits until persist hydration before writing zh-CN', () => {
+  const writes: string[] = [];
+  let hydrated = false;
+  let listener: (() => void) | null = null;
+  let hidden = false;
+
+  applyLanguageAfterHydration(
+    'zh-CN',
+    {
+      hasHydrated: () => hydrated,
+      onFinishHydration: (fn) => {
+        listener = fn;
+      },
+      setLang: (lang) => {
+        writes.push(lang);
+      },
+    },
+    () => {
+      hidden = true;
+    },
+  );
+
+  assert.deepEqual(writes, []);
+  assert.equal(hidden, false);
+  listener?.();
+  assert.deepEqual(writes, ['zh-CN']);
+  assert.equal(hidden, true);
+});
+
+test('applyLanguageAfterHydration writes immediately when hydration already finished', () => {
+  const writes: string[] = [];
+  applyLanguageAfterHydration(
+    'zh-CN',
+    {
+      hasHydrated: () => true,
+      onFinishHydration: () => {
+        throw new Error('listener should not be registered');
+      },
+      setLang: (lang) => {
+        writes.push(lang);
+      },
+    },
+    () => {},
+  );
+  assert.deepEqual(writes, ['zh-CN']);
+});
+
+test('applyLanguageAfterHydration ignores an unrecognized handoff language', () => {
+  let called = false;
+  applyLanguageAfterHydration(
+    null,
+    {
+      hasHydrated: () => true,
+      onFinishHydration: () => {
+        throw new Error('listener should not be registered');
+      },
+      setLang: () => {
+        called = true;
+      },
+    },
+    () => {
+      called = true;
+    },
+  );
+  assert.equal(called, false);
 });
 
 test('getLanguageFromRobotsHandoffSearch maps main-site locale query param', () => {
