@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createStlParseWorkerPoolClient } from './stlParseWorkerBridge.ts';
+import {
+  cloneSerializedStlGeometryData,
+  createStlParseWorkerPoolClient,
+} from './stlParseWorkerBridge.ts';
 
 type WorkerEventHandler = (event: { data?: unknown; error?: unknown; message?: string }) => void;
 
@@ -234,4 +237,13 @@ test('STL parse worker pool can be disposed and recreated on demand', async () =
     result: serializedResult,
   });
   await assert.doesNotReject(secondLoad);
+});
+
+test('cloneSerializedStlGeometryData copies positions and keeps no normals', () => {
+  const positions = new Float32Array([1, 2, 3]).buffer;
+  const cloned = cloneSerializedStlGeometryData({ positions, maxDimension: 4 });
+  assert.notEqual(cloned.positions, positions);
+  assert.deepEqual(Array.from(new Float32Array(cloned.positions)), [1, 2, 3]);
+  assert.equal(cloned.maxDimension, 4);
+  assert.equal('normals' in cloned, false);
 });

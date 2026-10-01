@@ -39,7 +39,6 @@ function cloneSerializedStlGeometryData(
 ): SerializedStlGeometryData {
   return {
     positions: result.positions.slice(0),
-    normals: result.normals.slice(0),
     maxDimension: result.maxDimension,
   };
 }

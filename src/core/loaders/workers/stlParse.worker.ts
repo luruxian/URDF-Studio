@@ -29,7 +29,7 @@ workerScope.addEventListener('message', async (event: MessageEvent<StlParseWorke
             result,
         };
 
-        workerScope.postMessage(response, [result.positions, result.normals]);
+        workerScope.postMessage(response, [result.positions]);
     } catch (error) {
         const response: StlParseWorkerResponse = {
             type: 'parse-stl-error',
