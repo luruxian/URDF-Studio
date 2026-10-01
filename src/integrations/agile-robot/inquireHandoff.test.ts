@@ -12,6 +12,7 @@ test('studioLangToOrdersLocale matches robots public locales', () => {
   assert.equal(studioLangToOrdersLocale('zh-Hant'), 'zh-Hant');
   assert.equal(studioLangToOrdersLocale('en'), 'en');
   assert.equal(studioLangToOrdersLocale('ko'), 'ko');
+  assert.equal(studioLangToOrdersLocale('zh-CN'), 'zh-CN');
 });
 
 test('buildStudioInquireOrdersUrl builds absolute inquire deep link', () => {
@@ -23,6 +24,18 @@ test('buildStudioInquireOrdersUrl builds absolute inquire deep link', () => {
   assert.equal(
     url,
     `https://robots.test/zh-Hant/orders?order=${ORDER_ID}&action=inquire`,
+  );
+});
+
+test('buildStudioInquireOrdersUrl uses zh-CN path prefix', () => {
+  const url = buildStudioInquireOrdersUrl({
+    mainSiteOrigin: 'https://robots.test',
+    lang: 'zh-CN',
+    orderId: ORDER_ID,
+  });
+  assert.equal(
+    url,
+    `https://robots.test/zh-CN/orders?order=${ORDER_ID}&action=inquire`,
   );
 });
 

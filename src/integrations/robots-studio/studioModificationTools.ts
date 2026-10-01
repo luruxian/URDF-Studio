@@ -145,6 +145,7 @@ const TOOL_DEFS: AIConversationToolDef[] = [
 
 const REVISION_CONFLICT_MESSAGES: Record<Language, string> = {
   en: 'Requirements document was updated elsewhere. Refresh and try again.',
+  'zh-CN': '需求确认书已在别处更新，请刷新后重试。',
   'zh-Hant': '需求確認書已在別處更新，請刷新後重試。',
   ja: '要件確認書が別の場所で更新されました。更新してから再試行してください。',
   fr: 'Le document d’exigences a été mis à jour ailleurs. Actualisez et réessayez.',
@@ -154,6 +155,7 @@ const REVISION_CONFLICT_MESSAGES: Record<Language, string> = {
 
 const DUPLICATE_CONTENT_MESSAGES: Record<Language, string> = {
   en: 'This revision duplicates existing requirements content. Rephrase the change and try again.',
+  'zh-CN': '本次修订与现有需求内容重复，请改写变更后重试。',
   'zh-Hant': '本次修訂與現有需求內容重複，請改寫變更後重試。',
   ja: 'この改訂は既存の要件內容と重複しています。変更內容を書き直して再試行してください。',
   fr: 'Cette révision duplique le contenu existant. Reformulez la modification et réessayez.',
@@ -163,6 +165,7 @@ const DUPLICATE_CONTENT_MESSAGES: Record<Language, string> = {
 
 const INVALID_SECTION_MESSAGES: Record<Language, string> = {
   en: 'Invalid requirements section in the proposed revision.',
+  'zh-CN': '提议的修订包含无效的需求章节。',
   'zh-Hant': '提議的修訂包含無效的需求章節。',
   ja: '提案された改訂に無効な要件セクションが含まれています。',
   fr: 'Section d’exigences invalide dans la révision proposée.',
@@ -172,6 +175,7 @@ const INVALID_SECTION_MESSAGES: Record<Language, string> = {
 
 const INVALID_DOCUMENT_SCHEMA_MESSAGES: Record<Language, string> = {
   en: 'Requirements document format is invalid. Contact support.',
+  'zh-CN': '需求确认书格式无效，请联系运营处理。',
   'zh-Hant': '需求確認書格式無效，請聯繫運營處理。',
   ja: '要件確認書の形式が無効です。サポートにお問い合わせください。',
   fr: 'Format du document d’exigences invalide. Contactez le support.',
@@ -179,8 +183,10 @@ const INVALID_DOCUMENT_SCHEMA_MESSAGES: Record<Language, string> = {
   es: 'Formato del documento de requisitos no válido. Contacte con soporte.',
 };
 
-function localeFromLang(lang: Language): string {
+export function localeFromLang(lang: Language): string {
   switch (lang) {
+    case 'zh-CN':
+      return 'zh-CN';
     case 'zh-Hant':
       return 'zh-Hant';
     case 'ja':

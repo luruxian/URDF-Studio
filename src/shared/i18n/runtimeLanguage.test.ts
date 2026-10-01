@@ -24,10 +24,14 @@ function installDom(html = '<!doctype html><html><body></body></html>') {
 }
 
 test('normalizeLanguage maps regional browser language tags', () => {
-  assert.equal(normalizeLanguage('zh-CN'), 'zh-Hant');
-  assert.equal(normalizeLanguage('zh-Hans'), 'zh-Hant');
+  assert.equal(normalizeLanguage('zh-CN'), 'zh-CN');
+  assert.equal(normalizeLanguage('zh-Hans'), 'zh-CN');
+  assert.equal(normalizeLanguage('zh-Hans-CN'), 'zh-CN');
+  assert.equal(normalizeLanguage('zh'), 'zh-CN');
   assert.equal(normalizeLanguage('zh-Hant'), 'zh-Hant');
-  assert.equal(normalizeLanguage('zh'), 'zh-Hant');
+  assert.equal(normalizeLanguage('zh-Hant-TW'), 'zh-Hant');
+  assert.equal(normalizeLanguage('zh-TW'), 'zh-Hant');
+  assert.equal(normalizeLanguage('zh-HK'), 'zh-Hant');
   assert.equal(normalizeLanguage('en-US'), 'en');
   assert.equal(normalizeLanguage('en-GB'), 'en');
   assert.equal(normalizeLanguage('ja-JP'), 'en');
@@ -65,7 +69,7 @@ test('resolveRuntimeLanguage uses persisted app language before navigator langua
     document.documentElement.removeAttribute('data-lang');
     document.documentElement.removeAttribute('lang');
     window.localStorage.setItem('language', 'zh-CN');
-    assert.equal(resolveRuntimeLanguage(), 'zh-Hant');
+    assert.equal(resolveRuntimeLanguage(), 'zh-CN');
   } finally {
     dom.window.close();
   }

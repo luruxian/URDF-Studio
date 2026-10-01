@@ -3,6 +3,7 @@ import type { Language } from './types';
 /** TEMPORARY (2026-09-21): ja disabled — re-add Japanese option to re-enable. */
 export const LANGUAGE_OPTIONS = [
   { value: 'en' as const, label: 'English', shortLabel: 'EN' },
+  { value: 'zh-CN' as const, label: '简体中文', shortLabel: '简' },
   { value: 'zh-Hant' as const, label: '繁體中文', shortLabel: '繁' },
   { value: 'fr' as const, label: 'Français', shortLabel: 'FR' },
   { value: 'de' as const, label: 'Deutsch', shortLabel: 'DE' },
@@ -26,6 +27,8 @@ export function getLanguageShortLabel(lang: Language): string {
 
 export function resolveDocumentLocale(lang: Language): string {
   switch (lang) {
+    case 'zh-CN':
+      return 'zh-CN';
     case 'zh-Hant':
       return 'zh-Hant';
     case 'ja':
@@ -45,6 +48,8 @@ export function resolveDocumentLocale(lang: Language): string {
 
 export function resolveDateLocale(lang: Language): string {
   switch (lang) {
+    case 'zh-CN':
+      return 'zh-CN';
     case 'zh-Hant':
       return 'zh-TW';
     case 'ja':
@@ -63,5 +68,5 @@ export function resolveDateLocale(lang: Language): string {
 }
 
 export function isChineseLanguage(lang: Language): boolean {
-  return lang === 'zh-Hant';
+  return lang === 'zh-CN' || lang === 'zh-Hant';
 }

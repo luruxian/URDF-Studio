@@ -44,7 +44,7 @@ test('getLanguageFromPath recognizes explicit English, Chinese, Japanese, French
 test('getLanguageFromRobotsHandoffSearch maps main-site locale query param', () => {
   assert.equal(getLanguageFromRobotsHandoffSearch('?mesh=x&lang=zh-Hant'), 'zh-Hant');
   assert.equal(getLanguageFromRobotsHandoffSearch('?lang=en&import=pvw_1'), 'en');
-  assert.equal(getLanguageFromRobotsHandoffSearch('?lang=zh-CN'), 'zh-Hant');
+  assert.equal(getLanguageFromRobotsHandoffSearch('?lang=zh-CN'), 'zh-CN');
   assert.equal(getLanguageFromRobotsHandoffSearch('?mesh=x'), null);
 });
 

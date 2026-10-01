@@ -8,11 +8,20 @@ export function normalizeLanguage(value: unknown): Language | null {
   }
 
   const normalized = value.trim().toLowerCase();
-  if (normalized === 'zh-hant') {
+  if (
+    normalized.startsWith('zh-hant') ||
+    normalized === 'zh-tw' ||
+    normalized === 'zh-hk'
+  ) {
     return 'zh-Hant';
   }
-  if (normalized === 'zh' || normalized === 'zh-cn' || normalized === 'zh-hans' || normalized.startsWith('zh-')) {
-    return 'zh-Hant';
+  if (
+    normalized === 'zh' ||
+    normalized === 'zh-cn' ||
+    normalized === 'zh-hans' ||
+    normalized.startsWith('zh-')
+  ) {
+    return 'zh-CN';
   }
   if (normalized === 'en' || normalized === 'en-us' || normalized.startsWith('en-')) {
     return 'en';

@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   formatProposeRevisionSectionSummary,
   getRequirementsSectionLabel,
+  localeFromLang,
   resolveRequirementsSectionId,
 } from './requirementsSectionLabels';
 
@@ -39,4 +40,16 @@ test('formatProposeRevisionSectionSummary keeps CJK labels for zh-Hant', () => {
 test('getRequirementsSectionLabel returns localized label', () => {
   assert.equal(getRequirementsSectionLabel('機型', 'en'), 'Robot model');
   assert.equal(getRequirementsSectionLabel('機型', 'zh-Hant'), '機型');
+});
+
+test('requirements localeFromLang keeps simplified Chinese', () => {
+  assert.equal(localeFromLang('zh-CN'), 'zh-CN');
+  assert.equal(localeFromLang('zh-Hant'), 'zh-Hant');
+});
+
+test('simplified requirements summary uses simplified labels and fullwidth parentheses', () => {
+  assert.equal(
+    formatProposeRevisionSectionSummary('已更新', ['機型'], 'zh-CN'),
+    '已更新（机型）',
+  );
 });

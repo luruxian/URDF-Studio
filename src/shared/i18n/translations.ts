@@ -9,10 +9,12 @@ import { es } from './locales/es';
 import { fr } from './locales/fr';
 import { ja } from './locales/ja';
 import { ko } from './locales/ko';
+import { zhCn } from './locales/zh-CN';
 import { zhHant } from './locales/zh-Hant';
 
 export const translations: Translations = {
   en,
+  'zh-CN': zhCn,
   'zh-Hant': zhHant,
   ja,
   fr,

@@ -13,6 +13,12 @@ const REQUIREMENTS_SECTION_LABELS: Record<
     性能參數: 'Performance parameters',
     其他約束: 'Other constraints',
   },
+  'zh-CN': {
+    背景: '背景',
+    機型: '机型',
+    性能參數: '性能参数',
+    其他約束: '其他约束',
+  },
   'zh-Hant': {
     背景: '背景',
     機型: '機型',
@@ -60,8 +66,10 @@ export const REQUIREMENTS_SECTION_KEY_ALIASES: Readonly<
   其他约束: '其他約束',
 };
 
-function localeFromLang(lang: Language): string {
+export function localeFromLang(lang: Language): string {
   switch (lang) {
+    case 'zh-CN':
+      return 'zh-CN';
     case 'zh-Hant':
       return 'zh-Hant';
     case 'ja':
@@ -109,7 +117,7 @@ export function formatProposeRevisionSectionSummary(
     type: 'conjunction',
   }).format(labels);
 
-  if (lang === 'zh-Hant' || lang === 'ja') {
+  if (lang === 'zh-CN' || lang === 'zh-Hant' || lang === 'ja') {
     return `${baseSummary}（${formattedList}）`;
   }
 
