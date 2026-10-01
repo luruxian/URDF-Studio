@@ -418,6 +418,10 @@ export function applyVisualMaterialOverrideToObject(
         nextMaterial.userData.urdfEmissiveIntensity = emissiveIntensityOverride;
       }
 
+      if (mesh.geometry?.userData?.requiresFlatShading === true) {
+        nextMaterial.flatShading = true;
+      }
+
       if (fullCacheKey && cache) {
         cache.set(fullCacheKey, nextMaterial);
       }

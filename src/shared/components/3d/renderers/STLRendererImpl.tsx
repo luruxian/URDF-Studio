@@ -2,6 +2,7 @@ import { use, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { createGeometryFromSerializedStlData } from '@/core/loaders/stlGeometryData';
 import { loadSerializedStlGeometryData } from '@/core/loaders/stlParseWorkerBridge';
+import { materialForStlGeometry } from '@/core/utils/stlFlatShading';
 
 interface ScaleProps {
   x: number;
@@ -29,6 +30,10 @@ export function STLRendererImpl({
     () => createGeometryFromSerializedStlData(serializedGeometry),
     [serializedGeometry],
   );
+  const meshMaterial = useMemo(
+    () => materialForStlGeometry(clone, material),
+    [clone, material],
+  );
 
   useEffect(() => {
     onResolved?.();
@@ -41,12 +46,21 @@ export function STLRendererImpl({
     [clone],
   );
 
+  useEffect(
+    () => () => {
+      if (meshMaterial !== material) {
+        meshMaterial.dispose();
+      }
+    },
+    [meshMaterial, material],
+  );
+
   const scaleArr: [number, number, number] = scale ? [scale.x, scale.y, scale.z] : [1, 1, 1];
 
   return (
     <mesh
       geometry={clone}
-      material={material}
+      material={meshMaterial}
       rotation={[0, 0, 0]}
       scale={scaleArr}
       castShadow={enableShadows}

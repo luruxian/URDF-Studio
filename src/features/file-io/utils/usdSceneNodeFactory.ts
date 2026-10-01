@@ -865,7 +865,9 @@ const loadUsdMeshObject = async (
 
   if (lowerPath.endsWith('.stl')) {
     const geometry = await buildCachedUsdStlGeometry(resolvedUrl, registry, meshCompression);
-    return new THREE.Mesh(geometry, createUsdBaseMaterial(colorOverride || visual.color));
+    const material = createUsdBaseMaterial(colorOverride || visual.color);
+    material.flatShading = true;
+    return new THREE.Mesh(geometry, material);
   }
 
   if (lowerPath.endsWith('.msh')) {

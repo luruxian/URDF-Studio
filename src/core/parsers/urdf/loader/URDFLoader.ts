@@ -9,6 +9,7 @@ import {
 } from './URDFClasses';
 import { stackCoincidentVisualRoots } from '@/core/loaders/visualMeshStacking';
 import { setThreeColorFromSRGB } from '@/core/utils/color.ts';
+import { materialForStlGeometry } from '@/core/utils/stlFlatShading';
 import { createMainThreadYieldController } from '@/core/utils/yieldToMainThread';
 import {
   createRobotCapsuleGeometry,
@@ -38,16 +39,20 @@ function applyRotation(obj: THREE.Object3D, rpy: number[], additive = false) {
 }
 
 function applyMaterialToLoadedObject(obj: THREE.Object3D, material: THREE.Material) {
+  const assign = (target: THREE.Object3D) => {
+    if (!(target as THREE.Mesh).isMesh) {
+      return;
+    }
+    const mesh = target as THREE.Mesh;
+    mesh.material = materialForStlGeometry(mesh.geometry, material);
+  };
+
   if ((obj as THREE.Mesh).isMesh) {
-    (obj as THREE.Mesh).material = material;
+    assign(obj);
     return;
   }
 
-  obj.traverse((child) => {
-    if ((child as THREE.Mesh).isMesh) {
-      (child as THREE.Mesh).material = material;
-    }
-  });
+  obj.traverse(assign);
 }
 
 function loadedObjectShouldPreserveEmbeddedMaterials(obj: THREE.Object3D): boolean {

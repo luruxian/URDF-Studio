@@ -11,6 +11,7 @@ import {
   createPlaceholderMesh,
   isCoplanarOffsetMaterial,
 } from '@/core/loaders';
+import { createGeometryFromSerializedStlData, parseStlGeometryData } from '@/core/loaders/stlGeometryData';
 import { parseURDF } from '@/core/parsers/urdf/parser';
 import { URDFLoader } from './URDFLoader';
 
@@ -999,4 +1000,37 @@ test('URDFLoader preserves Unitree A2 base_link mesh offsets without translating
   assert.ok(Math.abs(center.x - 0.029698431491851807) < 1e-6);
   assert.ok(Math.abs(center.y - 0.0000037103891372680664) < 1e-6);
   assert.ok(Math.abs(center.z - 0.02502359077334404) < 1e-6);
+});
+
+test('URDFLoader flat-shades an STL mesh without mutating another mesh that shares the parsed material object', () => {
+  const buffer = new ArrayBuffer(134);
+  const view = new DataView(buffer);
+  view.setUint32(80, 1, true);
+  view.setFloat32(104, 1, true);
+  view.setFloat32(128, 1, true);
+  const geometry = createGeometryFromSerializedStlData(parseStlGeometryData(buffer));
+  const loader = new URDFLoader(new THREE.LoadingManager());
+  loader.loadMeshCb = (_path, _manager, done) => {
+    done(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial()));
+  };
+  const robot = loader.parse(`<?xml version="1.0"?>
+    <robot name="flat">
+      <material name="paint"><color rgba="0.2 0.4 0.6 1"/></material>
+      <link name="base">
+        <visual>
+          <geometry><box size="1 1 1"/></geometry>
+          <material name="paint"/>
+        </visual>
+        <visual>
+          <geometry><mesh filename="part.stl"/></geometry>
+          <material name="paint"/>
+        </visual>
+      </link>
+    </robot>`);
+  const visuals = robot.links.base.children.filter((child) => (child as { isURDFVisual?: boolean }).isURDFVisual);
+  const box = visuals[0].children[0] as THREE.Mesh;
+  const stl = visuals[1].children[0] as THREE.Mesh;
+  assert.equal((box.material as THREE.MeshPhongMaterial).flatShading, false);
+  assert.equal((stl.material as THREE.Material & { flatShading?: boolean }).flatShading, true);
+  assert.notEqual(box.material, stl.material);
 });

@@ -141,7 +141,11 @@ const loadCachedMJCFMeshAsset = async (
         throwIfMJCFLoadAborted(abortSignal);
       }
       return {
-        createInstance: () => new THREE.Mesh(geometry, createDefaultMaterial()),
+        createInstance: () => {
+          const material = createDefaultMaterial();
+          material.flatShading = true;
+          return new THREE.Mesh(geometry, material);
+        },
         disposeSource: () => geometry.dispose(),
       };
     }

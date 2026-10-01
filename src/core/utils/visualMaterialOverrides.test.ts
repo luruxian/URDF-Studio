@@ -289,3 +289,17 @@ test('resolvePrimaryAuthoredVisualMaterialOverride returns null without authored
   assert.equal(resolvePrimaryAuthoredVisualMaterialOverride({ color: '#808080' }), null);
   assert.equal(resolvePrimaryAuthoredVisualMaterialOverride(null), null);
 });
+
+test('applyVisualMaterialOverrideToObject keeps flat shading on STL geometry', () => {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute(
+    'position',
+    new THREE.Float32BufferAttribute([0, 0, 0, 1, 0, 0, 0, 1, 0], 3),
+  );
+  geometry.userData.requiresFlatShading = true;
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0x888888 }));
+  applyVisualMaterialOverrideToObject(mesh, { color: '#224466' });
+  const material = mesh.material as THREE.MeshStandardMaterial;
+  assert.equal(material.flatShading, true);
+  assert.equal(material.color.getHexString(), '224466');
+});

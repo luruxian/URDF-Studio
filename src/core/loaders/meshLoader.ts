@@ -497,7 +497,11 @@ export const createMeshLoader = (
         await yieldIfNeeded();
 
         return {
-          createInstance: () => new THREE.Mesh(geometry, DEFAULT_MESH_MATERIAL.clone()),
+          createInstance: () => {
+            const material = DEFAULT_MESH_MATERIAL.clone();
+            material.flatShading = true;
+            return new THREE.Mesh(geometry, material);
+          },
           maxDimension: serializedGeometry.maxDimension,
           hasDeclaredUnitScale: false,
           supportsAutoUnitScale: true,

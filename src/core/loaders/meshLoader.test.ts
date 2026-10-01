@@ -460,6 +460,53 @@ test('createMeshLoader reuses parsed STL assets for concurrent duplicate request
   }
 });
 
+function buildBinaryTriangleStl(): ArrayBuffer {
+  const buffer = new ArrayBuffer(134);
+  const view = new DataView(buffer);
+  view.setUint32(80, 1, true);
+  view.setFloat32(96, 0, true);
+  view.setFloat32(100, 0, true);
+  view.setFloat32(104, 0, true);
+  view.setFloat32(108, 1, true);
+  view.setFloat32(112, 0, true);
+  view.setFloat32(116, 0, true);
+  view.setFloat32(120, 0, true);
+  view.setFloat32(124, 1, true);
+  view.setFloat32(128, 0, true);
+  return buffer;
+}
+
+test('createMeshLoader flat-shades STL meshes and does not store normals', async () => {
+  const stl = buildBinaryTriangleStl();
+  const stlDataUrl = `data:model/stl;base64,${Buffer.from(stl).toString('base64')}`;
+  const manager = new THREE.LoadingManager();
+  const originalWorker = (globalThis as { Worker?: typeof Worker }).Worker;
+  const loadMesh = createMeshLoader({ 'meshes/triangle.stl': stlDataUrl }, manager, '');
+  disposeStlParseWorkerPoolClient();
+  delete (globalThis as { Worker?: typeof Worker }).Worker;
+
+  try {
+    const loaded = await new Promise<THREE.Object3D>((resolve, reject) => {
+      loadMesh('meshes/triangle.stl', manager, (result, err) => {
+        if (err || !result) {
+          reject(err ?? new Error('missing mesh'));
+          return;
+        }
+        resolve(result);
+      });
+    });
+    assert.ok(loaded instanceof THREE.Mesh);
+    const mesh = loaded as THREE.Mesh;
+    assert.equal(mesh.geometry.getAttribute('normal'), undefined);
+    assert.equal((mesh.material as THREE.MeshStandardMaterial).flatShading, true);
+  } finally {
+    disposeStlParseWorkerPoolClient();
+    if (originalWorker) {
+      (globalThis as { Worker?: typeof Worker }).Worker = originalWorker;
+    }
+  }
+});
+
 test('createMeshLoader parses same-stem STL fallback assets using the resolved asset extension', async () => {
   const stlContent = [
     'solid r_clav',
