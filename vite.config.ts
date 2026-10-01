@@ -366,13 +366,26 @@ export default defineConfig(({ mode }) => {
   const devServerAllowedHosts = resolveDevServerAllowedHosts(env);
   const viteCacheDir = resolveViteCacheDir(env);
   const llmDevProxy = resolveLlmDevProxy(env);
+  // Public HTTPS host (robots scripts/dev-up.sh). The browser connects on 443;
+  // Caddy forwards the HMR websocket to this loopback server.
+  const devServerHmrHost = env.URDF_STUDIO_DEV_HMR_HOST?.trim() || '';
 
   return {
     cacheDir: viteCacheDir,
     server: {
       port: 3000,
-      strictPort: false,
+      strictPort: devServerHmrHost.length > 0,
       host: resolveDevServerHost(env),
+      ...(devServerHmrHost
+        ? {
+            origin: `https://${devServerHmrHost}`,
+            hmr: {
+              protocol: 'wss' as const,
+              host: devServerHmrHost,
+              clientPort: 443,
+            },
+          }
+        : {}),
       ...(devServerAllowedHosts ? { allowedHosts: devServerAllowedHosts } : {}),
       ...(llmDevProxy ? { proxy: llmDevProxy } : {}),
       // Optimized dependency URLs can retain the same Vite browser hash across

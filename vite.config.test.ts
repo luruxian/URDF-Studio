@@ -12,6 +12,7 @@ import { createServer, loadConfigFromFile, type UserConfig } from 'vite';
 const CONFIG_ENV_KEYS = [
   'URDF_STUDIO_DEV_HOST',
   'URDF_STUDIO_DEV_ALLOWED_HOSTS',
+  'URDF_STUDIO_DEV_HMR_HOST',
   'URDF_STUDIO_VITE_CACHE_DIR',
 ] as const;
 
@@ -162,6 +163,20 @@ test('vite config resolves Three from the active dependency graph', async () => 
   );
   assert.ok(threeAlias && typeof threeAlias === 'object');
   assert.equal(existsSync(String(threeAlias.replacement)), true);
+});
+
+test('dev server points HMR at the public HTTPS host when configured', async () => {
+  const config = await loadViteConfigWithDevServerEnv({
+    URDF_STUDIO_DEV_HMR_HOST: '3d.robots.test',
+  });
+
+  assert.equal(config.server?.strictPort, true);
+  assert.equal(config.server?.origin, 'https://3d.robots.test');
+  assert.deepEqual(config.server?.hmr, {
+    protocol: 'wss',
+    host: '3d.robots.test',
+    clientPort: 443,
+  });
 });
 
 test('dev server accepts a comma-separated preview host allow-list', async () => {
