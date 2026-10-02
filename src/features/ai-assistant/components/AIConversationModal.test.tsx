@@ -151,7 +151,7 @@ const getTextarea = (scope: ParentNode): HTMLTextAreaElement => {
 
 const getCopyButtons = (scope: ParentNode): HTMLButtonElement[] =>
   Array.from(scope.querySelectorAll('button')).filter(
-    (button) => button.getAttribute('aria-label') === '复制到剪贴板',
+    (button) => button.getAttribute('aria-label') === '複製到剪貼板',
   ) as HTMLButtonElement[];
 
 const clickButton = async (button: HTMLButtonElement) => {
@@ -243,7 +243,7 @@ const mockConversationSessionFetch = () => {
 const findSendButton = (scope: ParentNode): HTMLButtonElement => {
   const match = Array.from(scope.querySelectorAll('button')).find((button) => {
     const label = button.textContent?.trim() ?? '';
-    return label.includes('发送') || label.includes('Ask AI');
+    return label.includes('发送') || label.includes('發送') || label.includes('Ask AI');
   });
   assert.ok(match, 'expected send button to render');
   return match as HTMLButtonElement;
@@ -418,7 +418,7 @@ test('compact conversation layout fits the viewport and keeps content scrollable
     assert.equal(textarea.className.includes('min-h-[64px]'), true);
     assert.equal(
       container
-        .querySelector<HTMLButtonElement>('button[aria-label="新开对话"]')
+        .querySelector<HTMLButtonElement>('button[aria-label="新開對話"]')
         ?.textContent?.trim(),
       '',
     );
@@ -465,22 +465,22 @@ test('new conversation requires confirmation, preserves history, and inserts a d
     assert.equal(container.textContent?.includes(TEST_CONVERSATION_MESSAGE), true);
     assert.equal(getCopyButtons(container).length > 0, true);
 
-    await clickButton(findButtonByText(container, '新开对话'));
+    await clickButton(findButtonByText(container, '新開對話'));
     await flush();
 
     const confirmDialog = dom.window.document.querySelector('[role="dialog"][aria-modal="true"]');
     assert.ok(confirmDialog, 'expected confirmation dialog to open');
-    assert.equal(confirmDialog.textContent?.includes('开始新对话？'), true);
-    assert.equal(confirmDialog.textContent?.includes('后续回复将不再参考之前的对话内容'), true);
+    assert.equal(confirmDialog.textContent?.includes('開始新對話？'), true);
+    assert.equal(confirmDialog.textContent?.includes('後續回覆將不再參考之前的對話內容'), true);
 
-    await clickButton(findButtonByText(confirmDialog, '新开对话'));
+    await clickButton(findButtonByText(confirmDialog, '新開對話'));
     await flush();
 
     assert.equal(onStartNewConversationCalls.length, 1);
     assert.equal(onStartNewConversationCalls[0], launchContext);
     assert.equal(getTextarea(container).value, '');
     assert.equal(container.textContent?.includes(TEST_CONVERSATION_MESSAGE), true);
-    assert.equal(container.textContent?.includes('新对话从这里开始'), true);
+    assert.equal(container.textContent?.includes('新對話從這裡開始'), true);
     assert.equal(getCopyButtons(container).length > 0, true);
   } finally {
     if (previousApiKey === undefined) {
@@ -530,18 +530,18 @@ test('clear history requires confirmation and removes prior messages after reset
     assert.equal(container.textContent?.includes(TEST_CONVERSATION_MESSAGE), true);
     assert.equal(getCopyButtons(container).length > 0, true);
 
-    await clickButton(findButtonByText(container, '清除历史'));
+    await clickButton(findButtonByText(container, '清除歷史'));
     await flush();
 
     const confirmDialog = dom.window.document.querySelector('[role="dialog"][aria-modal="true"]');
     assert.ok(confirmDialog, 'expected confirmation dialog to open');
-    assert.equal(confirmDialog.textContent?.includes('清空当前对话记录？'), true);
+    assert.equal(confirmDialog.textContent?.includes('清空當前對話記錄？'), true);
     assert.equal(
-      confirmDialog.textContent?.includes('这会清空窗口中的对话记录，并重置当前问答上下文'),
+      confirmDialog.textContent?.includes('這會清空窗口中的對話記錄，並重置當前問答上下文'),
       true,
     );
 
-    await clickButton(findButtonByText(confirmDialog, '清除历史'));
+    await clickButton(findButtonByText(confirmDialog, '清除歷史'));
     await flush();
 
     assert.equal(startNewConversationCount, 0);
@@ -590,8 +590,10 @@ test('missing robots handoff surfaces handoff-required message', async () => {
     await flush();
 
     assert.equal(container.textContent?.includes(TEST_CONVERSATION_MESSAGE), true);
-    assert.match(container.textContent || '', /Agile Robot 主站|Studio/);
-    assert.equal(container.textContent?.includes('未配置 AI'), false);
+    assert.equal(
+      container.textContent?.includes('請從 Agile Robot 主站打開 Studio 後再使用 AI 對話。'),
+      true,
+    );
     assert.equal(getCopyButtons(container).length, 2);
     assert.equal(findButtonByText(container, '重新生成').textContent?.includes('重新生成'), true);
   } finally {
@@ -670,7 +672,7 @@ test('header actions expose hover and focus border highlight styles', async () =
     });
     await flush();
 
-    const newConversationButton = findButtonByText(container, '新开对话');
+    const newConversationButton = findButtonByText(container, '新開對話');
 
     assert.equal(
       newConversationButton.className.includes('hover:border-system-blue/35'),
@@ -733,8 +735,8 @@ test('shows inquire button when bootstrap can_inquire and opens orders deep link
     });
     await flush();
 
-    const inquireButton = findButtonByText(container, '与客服联系并询价');
-    assert.equal(inquireButton.textContent?.includes('与客服联系并询价'), true);
+    const inquireButton = findButtonByText(container, '與客服聯繫並詢價');
+    assert.equal(inquireButton.textContent?.includes('與客服聯繫並詢價'), true);
 
     await clickButton(inquireButton);
     await flush();
@@ -745,7 +747,7 @@ test('shows inquire button when bootstrap can_inquire and opens orders deep link
     assert.equal(openCalls[0]?.[2], 'noopener,noreferrer');
     assert.equal(
       openCalls[0]?.[0],
-      `https://robots.test/zh-CN/orders?order=${INQUIRE_ORDER_ID}&action=inquire`,
+      `https://robots.test/zh-Hant/orders?order=${INQUIRE_ORDER_ID}&action=inquire`,
     );
   } finally {
     dom.window.open = previousOpen;
@@ -783,7 +785,7 @@ test('hides inquire button when bootstrap lacks can_inquire', async () => {
     await flush();
 
     const inquireButton = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.trim().includes('与客服联系并询价'),
+      button.textContent?.trim().includes('與客服聯繫並詢價'),
     );
     assert.equal(inquireButton, undefined);
   } finally {
@@ -869,7 +871,7 @@ test('toolsConfig path surfaces ToolConfirmBanner when the model returns tool_ca
     await flush();
 
     assert.match(container.textContent || '', /手臂加长 5cm/);
-    assert.equal(findButtonByText(container, '确认').textContent?.includes('确认'), true);
+    assert.equal(findButtonByText(container, '確認').textContent?.includes('確認'), true);
     assert.equal(findButtonByText(container, '取消').textContent?.includes('取消'), true);
   } finally {
     __setConversationTurnStreamForTests(null);
@@ -1083,6 +1085,46 @@ test('reopening while mesh generation is still running keeps the executing banne
 
     assert.match(harness.container.textContent || '', new RegExp(MESH_TOOL_EXECUTING_BANNER));
     assert.equal(harness.meshGenerationFailedCalls.count, 0);
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+test('mesh wait disables conversation reset and still shows the failure banner', async () => {
+  const harness = await startClosedDialogMeshExecution();
+
+  try {
+    const newConversationButton = findButtonByText(harness.container, '新开对话');
+    const clearHistoryButton = findButtonByText(harness.container, '清除历史');
+    assert.equal(newConversationButton.disabled, true);
+    assert.equal(clearHistoryButton.disabled, true);
+
+    await clickButton(newConversationButton);
+    await flush();
+    assert.equal(
+      harness.container.ownerDocument.querySelector('[role="dialog"][aria-modal="true"]'),
+      null,
+    );
+
+    await act(async () => {
+      harness.deferred.resolveExecute({
+        success: false,
+        message: 'URDF+STL regeneration failed',
+        chatMessage: 'URDF+STL regeneration failed',
+      });
+      await Promise.resolve();
+    });
+    await flush();
+
+    const failureMessage = Array.from(harness.container.querySelectorAll('span')).find((span) =>
+      span.textContent?.includes('URDF+STL regeneration failed'),
+    );
+    assert.ok(failureMessage, 'expected the red mesh failure message');
+    assert.match(failureMessage.className, /text-red-600/);
+    assert.equal(
+      findButtonByText(harness.container, '重试').textContent?.includes('重试'),
+      true,
+    );
   } finally {
     await harness.cleanup();
   }

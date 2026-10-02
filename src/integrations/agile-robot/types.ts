@@ -81,7 +81,7 @@ export type MeshToolRetryAction = 'resume_poll' | 'continue_poll';
 export interface ToolResult {
   success: boolean;
   message: string;
-  /** When set, appended as an assistant chat bubble on mesh terminal success/failure (not poll timeout). */
+  /** When set on success, appended as an assistant chat bubble. Failures do not append an assistant message. */
   chatMessage?: string;
   /** When set, tool retry should resume/continue mesh polling instead of re-running the tool. */
   meshRetry?: MeshToolRetryAction;

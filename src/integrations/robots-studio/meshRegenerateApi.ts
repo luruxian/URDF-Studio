@@ -24,8 +24,6 @@ export {
 } from './meshRegeneratePollConfig';
 export type { MeshJobPollConfig, MeshJobPollEnvSource } from './meshRegeneratePollConfig';
 
-export const MESH_CLIENT_POLL_TIMEOUT_DETAIL = 'client_poll_timeout';
-
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /** User-facing message for a failed mesh job (prefer API error_code). */

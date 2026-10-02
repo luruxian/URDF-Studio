@@ -232,6 +232,7 @@ export function AIConversationModal({
   isOpenRef.current = isOpen;
   const skipNextSessionResetRef = useRef(false);
   const skipNextBffSessionResetRef = useRef(false);
+  const executingToolCallRef = useRef<ParsedToolCall | null>(null);
 
   const isReportFollowup = launchContext?.mode === 'inspection-followup';
   const focusedIssue = isReportFollowup ? (launchContext?.focusedIssue ?? null) : null;
@@ -443,7 +444,7 @@ export function AIConversationModal({
   };
 
   const handleConfirmResetAction = () => {
-    if (!launchContext || !pendingResetAction) {
+    if (!launchContext || !pendingResetAction || toolConfirmState === 'executing') {
       return;
     }
 
@@ -681,14 +682,17 @@ export function AIConversationModal({
 
   const applyMeshToolExecuteResult = useCallback((result: ToolResult) => {
     if (!result.success) {
+      const executingToolCall = executingToolCallRef.current;
       setToolResult(result);
       setToolConfirmState('error');
+      setPendingToolCall((current) => current ?? executingToolCall);
       if (!isOpenRef.current) {
         onMeshGenerationFailed?.();
       }
       return;
     }
 
+    executingToolCallRef.current = null;
     const chatText = result.chatMessage?.trim();
     if (chatText) {
       setMessages((prev) => [...prev, createConversationMessage('assistant', chatText)]);
@@ -704,6 +708,7 @@ export function AIConversationModal({
       return;
     }
 
+    executingToolCallRef.current = pendingToolCall;
     setToolConfirmState('executing');
     const result = await toolsConfig.onExecute(pendingToolCall);
     applyMeshToolExecuteResult(result);
@@ -721,6 +726,7 @@ export function AIConversationModal({
       return;
     }
 
+    executingToolCallRef.current = pendingToolCall;
     setToolConfirmState('executing');
 
     const meshRetry = toolResult?.meshRetry;
@@ -774,8 +780,9 @@ export function AIConversationModal({
       : t.clearConversationHistoryConfirmMessage;
   const confirmDialogActionLabel =
     pendingResetAction === 'new-conversation' ? t.newConversation : t.clearConversationHistory;
+  const resetActionsDisabled = toolConfirmState === 'executing';
   const headerActionButtonClassName =
-    'inline-flex h-8 items-center gap-1.5 rounded-lg border border-border-black bg-panel-bg px-2.5 text-[11px] font-semibold text-text-secondary transition-colors hover:bg-element-hover focus:outline-none focus:ring-2 focus:ring-system-blue/30 dark:bg-panel-bg';
+    'inline-flex h-8 items-center gap-1.5 rounded-lg border border-border-black bg-panel-bg px-2.5 text-[11px] font-semibold text-text-secondary transition-colors hover:bg-element-hover focus:outline-none focus:ring-2 focus:ring-system-blue/30 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-panel-bg';
   const newConversationButtonClassName = `${headerActionButtonClassName} hover:border-system-blue/35 hover:text-system-blue focus:border-system-blue/35 focus:text-system-blue`;
   const clearHistoryButtonClassName = `${headerActionButtonClassName} hover:border-danger-border hover:bg-danger-soft hover:text-danger-hover focus:ring-danger/20`;
 
@@ -799,7 +806,13 @@ export function AIConversationModal({
             <button
               data-window-control
               type="button"
-              onClick={() => setPendingResetAction('new-conversation')}
+              onClick={() => {
+                if (resetActionsDisabled) {
+                  return;
+                }
+                setPendingResetAction('new-conversation');
+              }}
+              disabled={resetActionsDisabled}
               className={newConversationButtonClassName}
               aria-label={t.newConversation}
               title={t.newConversation}
@@ -810,7 +823,13 @@ export function AIConversationModal({
             <button
               data-window-control
               type="button"
-              onClick={() => setPendingResetAction('clear-history')}
+              onClick={() => {
+                if (resetActionsDisabled) {
+                  return;
+                }
+                setPendingResetAction('clear-history');
+              }}
+              disabled={resetActionsDisabled}
               className={clearHistoryButtonClassName}
               aria-label={t.clearConversationHistory}
               title={t.clearConversationHistory}
@@ -1088,7 +1107,12 @@ export function AIConversationModal({
             <Button type="button" variant="secondary" onClick={() => setPendingResetAction(null)}>
               {t.cancel}
             </Button>
-            <Button type="button" variant="danger" onClick={handleConfirmResetAction}>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={handleConfirmResetAction}
+              disabled={resetActionsDisabled}
+            >
               {confirmDialogActionLabel}
             </Button>
           </div>

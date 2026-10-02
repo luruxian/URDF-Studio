@@ -41,7 +41,7 @@ export interface RequirementsDocumentPatchResponse {
   updated_at: string;
 }
 
-export type MeshJobStatus = 'queued' | 'running' | 'done' | 'failed' | 'timeout';
+export type MeshJobStatus = 'pending' | 'queued' | 'running' | 'done' | 'failed' | 'timeout';
 
 export interface MeshResumePollResponse {
   job_id: string;
