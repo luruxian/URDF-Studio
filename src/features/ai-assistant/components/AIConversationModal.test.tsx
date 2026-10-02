@@ -1172,6 +1172,19 @@ const proposeToolCall = {
 const messagePosts = (calls: RecordedFetch[]) =>
   calls.filter((call) => call.url.includes('/messages') && call.init?.method === 'POST');
 
+const sessionCreates = (calls: RecordedFetch[]) =>
+  calls.filter(
+    (call) =>
+      call.init?.method === 'POST'
+      && call.url.includes('/ai/conversation-sessions')
+      && !call.url.includes('/messages'),
+  );
+
+const sessionDeletes = (calls: RecordedFetch[]) =>
+  calls.filter(
+    (call) => call.init?.method === 'DELETE' && call.url.includes('/ai/conversation-sessions/'),
+  );
+
 const postBody = (call: RecordedFetch): { role?: string; content?: string } =>
   JSON.parse(String(call.init?.body ?? '{}')) as { role?: string; content?: string };
 
@@ -1740,6 +1753,99 @@ test('closed-dialog import success posts the assistant line and does not reopen 
       (call) => postBody(call).role === 'assistant' && postBody(call).content === RESULT_SUMMARY,
     );
     assert.ok(summaryPost, 'expected the success line to be posted while the dialog is closed');
+    assert.equal(sessionDeletes(fetchSpy.calls).length, 0);
+    assert.match(
+      summaryPost.url,
+      new RegExp(`/conversation-sessions/${TEST_BFF_SESSION_ID}/messages`),
+    );
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+test('closing during generation keeps the session and shows the success line on reopen', async () => {
+  const fetchSpy = installDialogFetch();
+  let resolveExecute: (result: ToolResult) => void = () => {};
+  const toolsConfig: AIConversationToolsConfig = {
+    tools: stubToolDef,
+    parseToolCalls: createParseToolCalls('zh-CN'),
+    bannerTexts: zhCnBannerTexts,
+    onExecute: () => new Promise((resolve) => {
+      resolveExecute = resolve;
+    }),
+  };
+  const openCalls = { count: 0 };
+  __setConversationTurnStreamForTests(async (input) => {
+    input.onToolCalls?.([proposeToolCall]);
+    return { status: 'completed', reply: PROPOSE_MODEL_TEXT, error: null };
+  });
+  const harness = await renderHistoryModal({
+    toolsConfig,
+    onMeshGenerationFailed: () => {
+      openCalls.count += 1;
+    },
+  });
+
+  try {
+    await typeAndSend(harness.container, '把手臂加长');
+    await flush();
+    await clickButton(findButtonByText(harness.container, '确认'));
+    await flush();
+    assert.ok(sessionCreates(fetchSpy.calls).length >= 1);
+
+    await harness.render(false);
+    await act(async () => {
+      resolveExecute({ success: true, message: 'updated', chatMessage: RESULT_SUMMARY });
+      await Promise.resolve();
+    });
+    await flush();
+
+    assert.equal(sessionDeletes(fetchSpy.calls).length, 0);
+    assert.equal(openCalls.count, 0);
+    const summaryPost = messagePosts(fetchSpy.calls).find(
+      (call) => postBody(call).role === 'assistant' && postBody(call).content === RESULT_SUMMARY,
+    );
+    assert.ok(summaryPost, 'expected the success line to be posted to the original session');
+    assert.equal(postBody(summaryPost).role, 'assistant');
+    assert.equal(postBody(summaryPost).content, RESULT_SUMMARY);
+    assert.match(
+      summaryPost.url,
+      new RegExp(`/conversation-sessions/${TEST_BFF_SESSION_ID}/messages`),
+    );
+
+    const createsBeforeReopen = sessionCreates(fetchSpy.calls).length;
+    await harness.render(true);
+    await flush();
+
+    assert.equal(sessionCreates(fetchSpy.calls).length, createsBeforeReopen);
+    assert.equal(sessionDeletes(fetchSpy.calls).length, 0);
+    const assistant = lastAssistantRow(harness.container);
+    assert.equal(assistant?.content, RESULT_SUMMARY);
+    assert.match(harness.container.textContent ?? '', new RegExp(RESULT_SUMMARY));
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+test('closing the dialog while the confirm bar is idle deletes the conversation session', async () => {
+  const fetchSpy = installDialogFetch();
+  const toolsConfig: AIConversationToolsConfig = {
+    tools: stubToolDef,
+    parseToolCalls: createParseToolCalls('zh-CN'),
+    bannerTexts: zhCnBannerTexts,
+    onExecute: async () => ({ success: true, message: 'ok' }),
+  };
+  const harness = await renderHistoryModal({ toolsConfig });
+
+  try {
+    await waitForFetch(() => sessionCreates(fetchSpy.calls).length >= 1);
+    await flush();
+    await harness.render(false);
+    await flush();
+
+    const deletes = sessionDeletes(fetchSpy.calls);
+    assert.equal(deletes.length, 1);
+    assert.match(deletes[0].url, new RegExp(`/conversation-sessions/${TEST_BFF_SESSION_ID}$`));
   } finally {
     await harness.cleanup();
   }

@@ -283,6 +283,12 @@ export function AIConversationModal({
   const abortControllerRef = useRef<AbortController | null>(null);
   const isOpenRef = useRef(isOpen);
   isOpenRef.current = isOpen;
+  // Closing while the confirm bar is executing must keep this BFF session.
+  // The success line is posted to that id even if the dialog is already
+  // closed, and the next open reuses it instead of starting an empty session.
+  const toolConfirmStateRef = useRef(toolConfirmState);
+  toolConfirmStateRef.current = toolConfirmState;
+  const retainSessionAcrossCloseRef = useRef(false);
   const skipNextSessionResetRef = useRef(false);
   const skipNextBffSessionResetRef = useRef(false);
   const executingToolCallRef = useRef<ParsedToolCall | null>(null);
@@ -409,6 +415,10 @@ export function AIConversationModal({
       return;
     }
 
+    if (retainSessionAcrossCloseRef.current) {
+      return;
+    }
+
     void resetSession();
   }, [isOpen, launchContext?.sessionId, resetSession, robotsConversationReady]);
 
@@ -430,6 +440,12 @@ export function AIConversationModal({
       return;
     }
 
+    if (toolConfirmStateRef.current === 'executing') {
+      retainSessionAcrossCloseRef.current = true;
+      return;
+    }
+
+    retainSessionAcrossCloseRef.current = false;
     void deleteConversationSession(activeSessionId).catch((error) => {
       console.error('Failed to delete conversation session', error);
     });
