@@ -577,6 +577,70 @@ test('onExecute for propose_requirements_revision runs PATCH → regenerate → 
   ]);
 });
 
+test('onExecute polls the running job revision returned by regenerate', async () => {
+  storeBootstrapAndAuth();
+  const spy = installFetchMock([
+    jsonResponse({
+      order_id: 'order-123',
+      revision: 3,
+      requirements_document: '## doc',
+      updated_at: '2026-08-27T05:00:00Z',
+      package_type: 'urdf_stl',
+    }),
+    jsonResponse({
+      revision: 4,
+      requirements_document: '## doc\n## v4',
+      change_summary: 'arm +5cm',
+      updated_at: '2026-08-27T05:01:00Z',
+    }),
+    jsonResponse(
+      {
+        job_id: 'job-running',
+        revision: 2,
+        status: 'running',
+        external_job_id: 'mesh_running',
+      },
+      202,
+    ),
+    jsonResponse({
+      job_id: 'job-running',
+      revision: 2,
+      status: 'done',
+      attachment_id: 'att-new',
+      package_type: 'urdf_stl',
+      error_code: null,
+      error_message: null,
+    }),
+    jsonResponse({
+      package_type: 'urdf_stl',
+      import_grant_id: 'pvw_abc',
+      from_origin: 'https://robots.example.com',
+      expires_at: '2026-08-27T06:00:00Z',
+      attachment_id: 'att-new',
+    }),
+  ]);
+
+  const config = await createStudioModificationTools({
+    lang: 'zh-Hant',
+    packageType: 'urdf_stl',
+    importUrdfPackage: async () => {},
+  });
+  assert.ok(config);
+
+  const result = await config.onExecute({
+    toolName: 'propose_requirements_revision',
+    args: {
+      change_summary: 'arm +5cm',
+      section_updates: { 性能參數: '臂展 +5cm' },
+      history_bullets: ['臂展 +5cm'],
+    },
+    summary: 'arm +5cm',
+  });
+
+  assert.equal(result.success, true);
+  assert.ok(spy.calls[3].url.includes('revision=2'));
+});
+
 test('onExecute retries mesh only after successful PATCH (single PATCH call)', async () => {
   storeBootstrapAndAuth();
   const spy = installFetchMock([

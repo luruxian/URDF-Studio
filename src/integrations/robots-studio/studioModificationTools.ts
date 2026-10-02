@@ -437,8 +437,8 @@ async function runMeshRegenerateAndImport(
 ): Promise<ToolResult> {
   const { lang } = options;
 
-  await regenerateMesh({ revision, locale: localeFromLang(lang) });
-  return waitMeshJobAndImport(revision, options, texts);
+  const started = await regenerateMesh({ revision, locale: localeFromLang(lang) });
+  return waitMeshJobAndImport(started.revision, options, texts);
 }
 
 async function executePhaseA(
