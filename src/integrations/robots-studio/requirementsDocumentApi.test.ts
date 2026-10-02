@@ -493,6 +493,49 @@ test('pollMeshJob keeps polling through timeout until done', async (t) => {
   assert.equal(spy.calls.some((call) => String(call.url).includes('resume-poll')), false);
 });
 
+test('pollMeshJob keeps waiting after a query error and resolves the same job', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  storeBootstrapAndAuth();
+  const spy = installFetchMock([
+    () => {
+      throw new TypeError('network down');
+    },
+    jsonResponse({
+      job_id: 'job-1',
+      revision: 4,
+      status: 'done',
+      attachment_id: 'att-new',
+      package_type: 'urdf_stl',
+      error_code: null,
+      error_message: null,
+    }),
+  ]);
+
+  const pollPromise = pollMeshJob(4);
+  let settled = false;
+  pollPromise.then(
+    () => {
+      settled = true;
+    },
+    () => {
+      settled = true;
+    },
+  );
+  const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
+  await flush();
+  assert.equal(settled, false);
+
+  await t.mock.timers.tick(MESH_JOB_POLL_INTERVAL_MS);
+  await flush();
+
+  const result = await pollPromise;
+  assert.equal(result.status, 'done');
+  assert.equal(result.attachment_id, 'att-new');
+  assert.ok(spy.calls.length >= 2);
+  assert.equal(spy.calls.every((call) => call.url.includes('revision=4')), true);
+  assert.equal(spy.calls.some((call) => call.url.includes('resume-poll')), false);
+});
+
 test('pollMeshJob does not stop on the old client poll budget', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
   storeBootstrapAndAuth();

@@ -91,19 +91,28 @@ function isTerminalMeshJobStatus(status: MeshJobResponse['status']): boolean {
   return status === 'done' || status === 'failed';
 }
 
-/** Poll until the server reports done or failed. Timeout stays in progress. */
+function throwIfPollAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new RobotsStudioApiError('Polling aborted', 0);
+  }
+}
+
+/** Poll until the server reports done or failed. Query errors wait and retry the same revision. */
 export async function pollMeshJob(
   revision?: number,
   signal?: AbortSignal,
 ): Promise<MeshJobResponse> {
   while (true) {
-    if (signal?.aborted) {
-      throw new RobotsStudioApiError('Polling aborted', 0);
-    }
+    throwIfPollAborted(signal);
 
-    const job = await getMeshJob(revision);
-    if (isTerminalMeshJobStatus(job.status)) {
-      return job;
+    try {
+      const job = await getMeshJob(revision);
+      if (isTerminalMeshJobStatus(job.status)) {
+        return job;
+      }
+    } catch {
+      // A failure during getMeshJob can race with abort. Cancellation wins; otherwise wait and query again.
+      throwIfPollAborted(signal);
     }
 
     await sleep(MESH_JOB_POLL_INTERVAL_MS);
