@@ -13,6 +13,7 @@ interface AIConversationConnectorProps {
   onApply: (componentId: string, proposedUrdf: string) => boolean;
   /** Routes a regenerated URDF+STL package through the app file-import pipeline. */
   importUrdfPackage: UrdfPackageImportPort['importUrdfPackage'];
+  onMeshGenerationFailed?: () => void;
 }
 
 export function AIConversationConnector({
@@ -23,6 +24,7 @@ export function AIConversationConnector({
   onStartNewConversation,
   onApply,
   importUrdfPackage,
+  onMeshGenerationFailed,
 }: AIConversationConnectorProps) {
   const toolsConfig = useStudioModificationTools({ importUrdfPackage, lang });
 
@@ -35,6 +37,7 @@ export function AIConversationConnector({
       onStartNewConversation={onStartNewConversation}
       onApply={onApply}
       toolsConfig={toolsConfig}
+      onMeshGenerationFailed={onMeshGenerationFailed}
     />
   );
 }

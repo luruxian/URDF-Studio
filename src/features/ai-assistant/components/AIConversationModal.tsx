@@ -62,6 +62,7 @@ interface AIConversationModalProps {
   onStartNewConversation: (launchContext: AIConversationLaunchContext) => void;
   onApply: (componentId: string, proposedUrdf: string) => boolean;
   toolsConfig?: AIConversationToolsConfig | null;
+  onMeshGenerationFailed?: () => void;
 }
 
 interface ConversationSubmissionState {
@@ -129,6 +130,7 @@ export function AIConversationModal({
   onStartNewConversation,
   onApply: _onApply,
   toolsConfig,
+  onMeshGenerationFailed,
 }: AIConversationModalProps) {
   const t = translations[lang];
   const bootstrap = getBootstrap();
@@ -210,6 +212,8 @@ export function AIConversationModal({
   const doneTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isComposingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const isOpenRef = useRef(isOpen);
+  isOpenRef.current = isOpen;
   const skipNextSessionResetRef = useRef(false);
   const skipNextBffSessionResetRef = useRef(false);
 
@@ -660,9 +664,12 @@ export function AIConversationModal({
   };
 
   const applyMeshToolExecuteResult = useCallback((result: ToolResult) => {
-    if (result.meshRetry) {
+    if (!result.success) {
       setToolResult(result);
       setToolConfirmState('error');
+      if (!isOpenRef.current) {
+        onMeshGenerationFailed?.();
+      }
       return;
     }
 
@@ -674,7 +681,7 @@ export function AIConversationModal({
     setToolConfirmState('idle');
     setPendingToolCall(null);
     setToolResult(null);
-  }, []);
+  }, [onMeshGenerationFailed]);
 
   const handleToolConfirm = useCallback(async () => {
     if (!pendingToolCall || !toolsConfig) {
@@ -738,7 +745,7 @@ export function AIConversationModal({
     && pendingToolCall
     && (toolConfirmState === 'parsed'
       || toolConfirmState === 'executing'
-      || (toolConfirmState === 'error' && toolResult?.meshRetry !== undefined)),
+      || (toolConfirmState === 'error' && toolResult !== null)),
   );
 
   const confirmDialogTitle =

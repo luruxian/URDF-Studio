@@ -636,6 +636,7 @@ export function AppContent({ extensions, onExposeActions }: AppContentProps = {}
         isAIConversationOpen={isAIConversationOpen}
         onApplyAIUrdfModification={applyAIUrdfModification}
         importUrdfPackage={importUrdfPackage}
+        onMeshGenerationFailed={openAIConversation}
         isAIInspectionOpen={isAIInspectionOpen}
         isDisconnectedWorkspaceUrdfExporting={isDisconnectedWorkspaceUrdfExporting}
         isExportDialogOpen={isExportDialogOpen}

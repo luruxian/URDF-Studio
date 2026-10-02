@@ -6,6 +6,7 @@ import { createRoot } from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 
 import { __setConversationTurnStreamForTests } from '../services/conversationService';
+import { translations } from '@/shared/i18n';
 import { setAiBackendBaseUrlResolver, setAiBackendAuthTokenProvider } from '@/shared/hostIntegrationState';
 import { BOOTSTRAP_STORAGE_KEY } from '@/integrations/agile-robot/constants';
 import { DEFAULT_MANAGED_WINDOW_ORDER, useUIStore } from '@/store';
@@ -880,4 +881,220 @@ test('toolsConfig path surfaces ToolConfirmBanner when the model returns tool_ca
     restoreRobotsConversationEnv(robotsEnv);
     dom.window.close();
   }
+});
+
+const MESH_TOOL_EXECUTING_BANNER = '正在重新生成仿真模型，请稍候15-30分钟';
+
+const installMeshToolCallStream = () => {
+  __setConversationTurnStreamForTests(async (input) => {
+    input.onToolCalls?.([
+      {
+        function: {
+          name: 'propose_requirements_revision',
+          arguments: JSON.stringify({
+            change_summary: 'arm +5cm',
+            section_updates: { 性能参数: '臂展 +5cm' },
+            history_bullets: ['臂展 +5cm'],
+          }),
+        },
+      },
+    ]);
+    return {
+      status: 'completed',
+      reply: '已生成修订建议，请确认。',
+      error: null,
+    };
+  });
+};
+
+const createDeferredMeshToolsConfig = () => {
+  let resolveExecute: (result: {
+    success: boolean;
+    message: string;
+    chatMessage: string;
+  }) => void = () => {};
+  let executeCallCount = 0;
+  const toolsConfig: AIConversationToolsConfig = {
+    tools: [
+      {
+        type: 'function',
+        function: {
+          name: 'propose_requirements_revision',
+          description: 'Propose revision',
+          parameters: { type: 'object', properties: {} },
+        },
+      },
+    ],
+    parseToolCalls: (rawToolCalls) => {
+      const first = rawToolCalls[0];
+      if (!first?.function?.name) return null;
+      return {
+        toolName: first.function.name,
+        args: JSON.parse(first.function.arguments) as Record<string, unknown>,
+        summary: '手臂加长 5cm',
+      };
+    },
+    bannerTexts: {
+      confirm: '确认',
+      cancel: '取消',
+      retry: '重试',
+      executing: MESH_TOOL_EXECUTING_BANNER,
+    },
+    onExecute: () => {
+      executeCallCount += 1;
+      return new Promise((resolve) => {
+        resolveExecute = resolve;
+      });
+    },
+  };
+
+  return {
+    toolsConfig,
+    resolveExecute: (result: {
+      success: boolean;
+      message: string;
+      chatMessage: string;
+    }) => resolveExecute(result),
+    getExecuteCallCount: () => executeCallCount,
+  };
+};
+
+const startClosedDialogMeshExecution = async () => {
+  const dom = installDom();
+  const robotsEnv = setRobotsConversationEnv();
+  mockConversationSessionFetch();
+  const container = dom.window.document.getElementById('root');
+  assert.ok(container, 'root container should exist');
+
+  const deferred = createDeferredMeshToolsConfig();
+  const meshGenerationFailedCalls = { count: 0 };
+  const onMeshGenerationFailed = () => {
+    meshGenerationFailedCalls.count += 1;
+  };
+  installMeshToolCallStream();
+
+  const { AIConversationModal } = await import('./AIConversationModal.tsx');
+  const root = createRoot(container);
+
+  const renderModal = async (isOpen: boolean) => {
+    await act(async () => {
+      root.render(
+        <AIConversationModal
+          isOpen={isOpen}
+          onClose={() => {}}
+          lang="zh-CN"
+          launchContext={createLaunchContext()}
+          onStartNewConversation={() => {}}
+          onApply={() => true}
+          toolsConfig={deferred.toolsConfig}
+          onMeshGenerationFailed={onMeshGenerationFailed}
+        />,
+      );
+    });
+  };
+
+  await renderModal(true);
+  await flush();
+  await flush();
+  await typeAndSend(container, '把手臂加长 5cm');
+  await flush();
+  await clickButton(findButtonByText(container, '确认'));
+  await flush();
+
+  assert.match(container.textContent || '', new RegExp(MESH_TOOL_EXECUTING_BANNER));
+  assert.equal(deferred.getExecuteCallCount(), 1);
+
+  return {
+    container,
+    deferred,
+    meshGenerationFailedCalls,
+    renderModal,
+    cleanup: async () => {
+      __setConversationTurnStreamForTests(null);
+      await act(async () => {
+        root.unmount();
+      });
+      await flush();
+      await flush();
+      restoreRobotsConversationEnv(robotsEnv);
+      dom.window.close();
+    },
+  };
+};
+
+test('closed dialog mesh failure reopens with the error banner', async () => {
+  const harness = await startClosedDialogMeshExecution();
+
+  try {
+    await harness.renderModal(false);
+    await act(async () => {
+      harness.deferred.resolveExecute({
+        success: false,
+        message: 'URDF+STL regeneration failed',
+        chatMessage: 'URDF+STL regeneration failed',
+      });
+      await Promise.resolve();
+    });
+    await flush();
+
+    assert.equal(harness.meshGenerationFailedCalls.count, 1);
+
+    await harness.renderModal(true);
+    await flush();
+
+    assert.match(harness.container.textContent || '', /URDF\+STL regeneration failed/);
+    assert.equal(
+      findButtonByText(harness.container, '重试').textContent?.includes('重试'),
+      true,
+    );
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+test('closed dialog mesh success does not reopen the dialog', async () => {
+  const harness = await startClosedDialogMeshExecution();
+
+  try {
+    await harness.renderModal(false);
+    await act(async () => {
+      harness.deferred.resolveExecute({
+        success: true,
+        message: 'URDF+STL updated',
+        chatMessage: 'done',
+      });
+      await Promise.resolve();
+    });
+    await flush();
+
+    assert.equal(harness.meshGenerationFailedCalls.count, 0);
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+test('reopening while mesh generation is still running keeps the executing banner', async () => {
+  const harness = await startClosedDialogMeshExecution();
+
+  try {
+    await harness.renderModal(false);
+    await harness.renderModal(true);
+    await flush();
+
+    assert.match(harness.container.textContent || '', new RegExp(MESH_TOOL_EXECUTING_BANNER));
+    assert.equal(harness.meshGenerationFailedCalls.count, 0);
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+test('studioMeshToolExecuting asks the user to wait 15 to 30 minutes', () => {
+  assert.equal(translations['zh-CN'].studioMeshToolExecuting, '正在重新生成仿真模型，请稍候15-30分钟');
+  assert.equal(translations['zh-Hant'].studioMeshToolExecuting, '正在重新生成仿真模型，請稍候15-30分鐘');
+  assert.equal(translations.en.studioMeshToolExecuting, 'Regenerating the simulation model. Please wait 15–30 minutes.');
+  assert.equal(translations.ja.studioMeshToolExecuting, 'シミュレーションモデルを再生成しています。15〜30分ほどお待ちください。');
+  assert.equal(translations.ko.studioMeshToolExecuting, '시뮬레이션 모델을 다시 생성하는 중입니다. 15–30분 정도 기다려 주세요.');
+  assert.equal(translations.fr.studioMeshToolExecuting, 'Régénération du modèle de simulation. Veuillez patienter 15 à 30 minutes.');
+  assert.equal(translations.de.studioMeshToolExecuting, 'Simulationsmodell wird neu generiert. Bitte warten Sie 15–30 Minuten.');
+  assert.equal(translations.es.studioMeshToolExecuting, 'Regenerando el modelo de simulación. Espere 15–30 minutos.');
 });

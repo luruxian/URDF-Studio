@@ -66,6 +66,7 @@ interface AppOverlayLayerProps {
   isAIConversationOpen: boolean;
   onApplyAIUrdfModification: (componentId: string, proposedUrdf: string) => boolean;
   importUrdfPackage: UrdfPackageImportPort['importUrdfPackage'];
+  onMeshGenerationFailed?: () => void;
   isAIInspectionOpen: boolean;
   isDisconnectedWorkspaceUrdfExporting: boolean;
   isExportDialogOpen: boolean;
@@ -100,6 +101,7 @@ export function AppOverlayLayer({
   isAIConversationOpen,
   onApplyAIUrdfModification,
   importUrdfPackage,
+  onMeshGenerationFailed,
   isAIInspectionOpen,
   isDisconnectedWorkspaceUrdfExporting,
   isExportDialogOpen,
@@ -148,6 +150,7 @@ export function AppOverlayLayer({
             onStartNewConversation={handleStartNewAIConversation}
             onApply={onApplyAIUrdfModification}
             importUrdfPackage={importUrdfPackage}
+            onMeshGenerationFailed={onMeshGenerationFailed}
           />
         </Suspense>
       )}

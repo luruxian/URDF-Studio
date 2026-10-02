@@ -1103,7 +1103,7 @@ export const es: TranslationKeys = {
   studioMeshToolConfirm: 'Confirmar',
   studioMeshToolCancel: 'Cancelar',
   studioMeshToolRetry: 'Reintentar',
-  studioMeshToolExecuting: 'Regenerando URDF+STL…',
+  studioMeshToolExecuting: 'Regenerando el modelo de simulación. Espere 15–30 minutos.',
   studioMeshToolProposeSummary: 'Enviar revisión del documento de requisitos',
   studioMeshToolRegenerateSummary: 'Regenerar URDF+STL',
   studioMeshToolSessionExpired:

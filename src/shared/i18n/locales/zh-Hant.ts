@@ -1035,7 +1035,7 @@ export const zhHant: TranslationKeys = {
   studioMeshToolConfirm: '確認',
   studioMeshToolCancel: '取消',
   studioMeshToolRetry: '重試',
-  studioMeshToolExecuting: '正在重新生成 URDF+STL…',
+  studioMeshToolExecuting: '正在重新生成仿真模型，請稍候15-30分鐘',
   studioMeshToolProposeSummary: '提交需求確認書修訂',
   studioMeshToolRegenerateSummary: '重新生成 URDF+STL',
   studioMeshToolSessionExpired: '會話已過期，請回到主站重新點擊預覽',
