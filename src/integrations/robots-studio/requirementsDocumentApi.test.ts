@@ -447,17 +447,64 @@ test('pollMeshJob polls across intervals until done', async (t) => {
   assert.equal(spy.calls.length, 2);
 });
 
-test('pollMeshJob throws 408 when polling exceeds the timeout', async (t) => {
+test('pollMeshJob keeps polling through timeout until done', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
   storeBootstrapAndAuth();
+  const spy = installFetchMock(
+    [
+      () =>
+        jsonResponse({
+          job_id: 'job-1',
+          revision: 4,
+          status: 'timeout',
+          attachment_id: null,
+          package_type: 'urdf_stl',
+          error_code: 'poll_timeout',
+          error_message: 'team mesh job poll timeout',
+        }),
+      () =>
+        jsonResponse({
+          job_id: 'job-1',
+          revision: 4,
+          status: 'running',
+          attachment_id: null,
+          package_type: 'urdf_stl',
+          error_code: null,
+          error_message: null,
+        }),
+      () =>
+        jsonResponse({
+          job_id: 'job-1',
+          revision: 4,
+          status: 'done',
+          attachment_id: 'att-new',
+          package_type: 'urdf_stl',
+          error_code: null,
+          error_message: null,
+        }),
+    ],
+  );
+
+  const pollPromise = pollMeshJob(4);
+  await drivePollUntilSettled(t, pollPromise, 6);
+  const result = await pollPromise;
+
+  assert.equal(result.status, 'done');
+  assert.equal(spy.calls.some((call) => String(call.url).includes('resume-poll')), false);
+});
+
+test('pollMeshJob does not stop on the old client poll budget', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  storeBootstrapAndAuth();
+  let release = false;
   installFetchMock(
     [
       () =>
         jsonResponse({
           job_id: 'job-1',
           revision: 4,
-          status: 'queued',
-          attachment_id: null,
+          status: release ? 'done' : 'queued',
+          attachment_id: release ? 'att-new' : null,
           package_type: 'urdf_stl',
           error_code: null,
           error_message: null,
@@ -466,16 +513,24 @@ test('pollMeshJob throws 408 when polling exceeds the timeout', async (t) => {
     { repeatLast: true },
   );
 
-  const pollPromise = pollMeshJob();
-  const maxTicks = Math.ceil(MESH_JOB_POLL_TIMEOUT_MS / MESH_JOB_POLL_INTERVAL_MS) + 2;
-  await drivePollUntilSettled(t, pollPromise, maxTicks);
-
-  await assert.rejects(
-    pollPromise,
-    (error: unknown) =>
-      isRobotsStudioApiError(error, 408)
-      && error.message === 'client_poll_timeout',
+  const pollPromise = pollMeshJob(4);
+  await t.mock.timers.tick(MESH_JOB_POLL_TIMEOUT_MS + MESH_JOB_POLL_INTERVAL_MS);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  let settled = false;
+  pollPromise.then(
+    () => {
+      settled = true;
+    },
+    () => {
+      settled = true;
+    },
   );
+  assert.equal(settled, false);
+
+  release = true;
+  await drivePollUntilSettled(t, pollPromise, 4);
+  const result = await pollPromise;
+  assert.equal(result.status, 'done');
 });
 
 // ============================================================

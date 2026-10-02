@@ -807,3 +807,131 @@ test('onExecute forwards AbortSignal to pollMeshJob', async (t) => {
   assert.equal(result.success, false);
   assert.match(result.message, /取消|Cancelled|cancel/i);
 });
+
+test('onExecute for regenerate_robot_model polls through timeout then imports once', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  storeBootstrapAndAuth();
+  const importCalls: Array<{ importGrantId: string; fromOrigin: string }> = [];
+  const spy = installFetchMock([
+    jsonResponse(
+      {
+        job_id: 'job-1',
+        revision: 4,
+        status: 'queued',
+        external_job_id: 'ext-1',
+      },
+      202,
+    ),
+    () =>
+      jsonResponse({
+        job_id: 'job-1',
+        revision: 4,
+        status: 'timeout',
+        attachment_id: null,
+        package_type: 'urdf_stl',
+        error_code: 'poll_timeout',
+        error_message: 'team mesh job poll timeout',
+      }),
+    () =>
+      jsonResponse({
+        job_id: 'job-1',
+        revision: 4,
+        status: 'done',
+        attachment_id: 'att-new',
+        package_type: 'urdf_stl',
+        error_code: null,
+        error_message: null,
+      }),
+    jsonResponse({
+      package_type: 'urdf_stl',
+      import_grant_id: 'pvw_abc',
+      from_origin: 'https://robots.example.com',
+      expires_at: '2026-08-27T06:00:00Z',
+      attachment_id: 'att-new',
+    }),
+  ]);
+
+  const config = await createStudioModificationTools({
+    lang: 'en',
+    packageType: 'urdf_stl',
+    importUrdfPackage: async (params) => {
+      importCalls.push(params);
+    },
+  });
+  assert.ok(config);
+
+  const resultPromise = config.onExecute({
+    toolName: 'regenerate_robot_model',
+    args: { revision: 4 },
+    summary: 'regenerate',
+  });
+  await drivePollUntilSettled(t, resultPromise, 6);
+  const result = await resultPromise;
+
+  assert.equal(result.success, true);
+  assert.equal(importCalls.length, 1);
+  assert.equal(spy.calls.some((call) => String(call.url).includes('resume-poll')), false);
+});
+
+test('onExecute reports import failure after the mesh job is done', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  storeBootstrapAndAuth();
+  let importCalls = 0;
+  installFetchMock([
+    jsonResponse(
+      {
+        job_id: 'job-1',
+        revision: 4,
+        status: 'queued',
+        external_job_id: 'ext-1',
+      },
+      202,
+    ),
+    jsonResponse({
+      job_id: 'job-1',
+      revision: 4,
+      status: 'running',
+      attachment_id: null,
+      package_type: 'urdf_stl',
+      error_code: null,
+      error_message: null,
+    }),
+    jsonResponse({
+      job_id: 'job-1',
+      revision: 4,
+      status: 'done',
+      attachment_id: 'att-new',
+      package_type: 'urdf_stl',
+      error_code: null,
+      error_message: null,
+    }),
+    jsonResponse({
+      package_type: 'urdf_stl',
+      import_grant_id: 'pvw_abc',
+      from_origin: 'https://robots.example.com',
+      expires_at: '2026-08-27T06:00:00Z',
+      attachment_id: 'att-new',
+    }),
+  ]);
+
+  const config = await createStudioModificationTools({
+    lang: 'en',
+    packageType: 'urdf_stl',
+    importUrdfPackage: async () => {
+      importCalls += 1;
+      throw new Error('import failed');
+    },
+  });
+  assert.ok(config);
+
+  const resultPromise = config.onExecute({
+    toolName: 'regenerate_robot_model',
+    args: { revision: 4 },
+    summary: 'regenerate',
+  });
+  await drivePollUntilSettled(t, resultPromise, 4);
+  const result = await resultPromise;
+
+  assert.equal(result.success, false);
+  assert.equal(importCalls, 1);
+});

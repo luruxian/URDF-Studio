@@ -5,10 +5,7 @@ import {
   robotsStudioAuthHeaders,
   robotsStudioProjectUrl,
 } from './requirementsDocumentApi';
-import {
-  MESH_JOB_POLL_INTERVAL_MS,
-  MESH_JOB_POLL_TIMEOUT_MS,
-} from './meshRegeneratePollConfig';
+import { MESH_JOB_POLL_INTERVAL_MS } from './meshRegeneratePollConfig';
 import type {
   MeshImportGrantRequest,
   MeshImportGrantResponse,
@@ -27,7 +24,6 @@ export {
 } from './meshRegeneratePollConfig';
 export type { MeshJobPollConfig, MeshJobPollEnvSource } from './meshRegeneratePollConfig';
 
-/** Thrown when the browser poll budget expires while the server job is still in progress. */
 export const MESH_CLIENT_POLL_TIMEOUT_DETAIL = 'client_poll_timeout';
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -94,35 +90,20 @@ export async function resumeMeshPoll(): Promise<MeshResumePollResponse> {
 }
 
 function isTerminalMeshJobStatus(status: MeshJobResponse['status']): boolean {
-  return status === 'done' || status === 'failed' || status === 'timeout';
+  return status === 'done' || status === 'failed';
 }
 
-/**
- * Poll mesh job until done / failed / timeout (server or client budget).
- * Returns the final job status.
- */
+/** Poll until the server reports done or failed. Timeout stays in progress. */
 export async function pollMeshJob(
   revision?: number,
   signal?: AbortSignal,
 ): Promise<MeshJobResponse> {
-  const startedAt = Date.now();
-
   while (true) {
     if (signal?.aborted) {
       throw new RobotsStudioApiError('Polling aborted', 0);
     }
-    if (Date.now() - startedAt > MESH_JOB_POLL_TIMEOUT_MS) {
-      const job = await getMeshJob(revision);
-      if (isTerminalMeshJobStatus(job.status)) {
-        return job;
-      }
-      throw new RobotsStudioApiError(MESH_CLIENT_POLL_TIMEOUT_DETAIL, 408, {
-        detail: MESH_CLIENT_POLL_TIMEOUT_DETAIL,
-      });
-    }
 
     const job = await getMeshJob(revision);
-
     if (isTerminalMeshJobStatus(job.status)) {
       return job;
     }

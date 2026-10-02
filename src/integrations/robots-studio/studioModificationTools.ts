@@ -19,10 +19,8 @@ import type { Language } from '@/shared/i18n';
 import {
   createMeshImportGrant,
   formatMeshJobFailure,
-  MESH_CLIENT_POLL_TIMEOUT_DETAIL,
   pollMeshJob,
   regenerateMesh,
-  resumeMeshPoll,
 } from './meshRegenerateApi';
 import type { MeshJobResponse } from './types';
 import {
@@ -381,19 +379,6 @@ export function createParseToolCalls(lang: Language) {
   };
 }
 
-function meshPollRetryResult(
-  revision: number,
-  texts: ReturnType<typeof getStudioMeshToolTexts>,
-  meshRetry: 'resume_poll' | 'continue_poll',
-): ToolResult {
-  return {
-    success: false,
-    message: texts.studioMeshToolPollTimeout,
-    meshRetry,
-    meshRevision: revision,
-  };
-}
-
 async function importFromMeshJob(
   job: MeshJobResponse,
   options: CreateStudioModificationToolsOptions,
@@ -448,27 +433,7 @@ async function waitMeshJobAndImport(
   options: CreateStudioModificationToolsOptions,
   texts: ReturnType<typeof getStudioMeshToolTexts>,
 ): Promise<ToolResult> {
-  const { signal } = options;
-
-  let job: MeshJobResponse;
-  try {
-    job = await pollMeshJob(revision, signal);
-  } catch (error) {
-    if (
-      error instanceof RobotsStudioApiError
-      && error.status === 408
-      && (error.message === MESH_CLIENT_POLL_TIMEOUT_DETAIL
-        || getRobotsStudioErrorCode(error.body) === MESH_CLIENT_POLL_TIMEOUT_DETAIL)
-    ) {
-      return meshPollRetryResult(revision, texts, 'continue_poll');
-    }
-    throw error;
-  }
-
-  if (job.status === 'timeout') {
-    return meshPollRetryResult(revision, texts, 'resume_poll');
-  }
-
+  const job = await pollMeshJob(revision, options.signal);
   return importFromMeshJob(job, options, texts);
 }
 
@@ -480,22 +445,6 @@ async function runMeshRegenerateAndImport(
   const { lang } = options;
 
   await regenerateMesh({ revision, locale: localeFromLang(lang) });
-  return waitMeshJobAndImport(revision, options, texts);
-}
-
-async function runMeshResumePollAndImport(
-  revision: number,
-  options: CreateStudioModificationToolsOptions,
-  texts: ReturnType<typeof getStudioMeshToolTexts>,
-): Promise<ToolResult> {
-  try {
-    await resumeMeshPoll();
-  } catch (error) {
-    if (error instanceof RobotsStudioApiError) {
-      return meshToolFailure(texts.studioMeshToolResumePollFailed);
-    }
-    throw error;
-  }
   return waitMeshJobAndImport(revision, options, texts);
 }
 
@@ -574,29 +523,6 @@ function mapExecuteError(
   return meshToolFailure(
     error instanceof Error ? error.message : texts.studioMeshToolUnknownError,
   );
-}
-
-function createOnRetry(
-  options: CreateStudioModificationToolsOptions,
-  texts: ReturnType<typeof getStudioMeshToolTexts>,
-) {
-  return async function onRetry(
-    _toolCall: ParsedToolCall,
-    context: { meshRetry: 'resume_poll' | 'continue_poll'; meshRevision: number },
-  ): Promise<ToolResult> {
-    if (!hasBootstrap()) {
-      return meshToolFailure(texts.studioMeshToolSessionExpired);
-    }
-
-    try {
-      if (context.meshRetry === 'resume_poll') {
-        return await runMeshResumePollAndImport(context.meshRevision, options, texts);
-      }
-      return await waitMeshJobAndImport(context.meshRevision, options, texts);
-    } catch (error) {
-      return mapExecuteError(error, options.lang, texts, options.signal);
-    }
-  };
 }
 
 function createOnExecute(
@@ -694,7 +620,6 @@ export async function createStudioModificationTools(
     tools: TOOL_DEFS,
     parseToolCalls: createParseToolCalls(options.lang),
     onExecute: createOnExecute(options, texts, phaseCache),
-    onRetry: createOnRetry(options, texts),
     bannerTexts: createBannerTexts(options.lang),
   };
 }
