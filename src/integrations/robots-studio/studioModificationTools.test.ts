@@ -240,17 +240,17 @@ test('normalizeSectionUpdates turns over-escaped newlines into real line breaks'
   });
 });
 
-test('composeProposeAssistantContent joins model text, summary, and dash bullets', () => {
+test('composeProposeAssistantContent joins model text and the summary', () => {
   assert.equal(
     composeProposeAssistantContent('已整理好', '手臂加长', ['手臂约 5 cm']),
-    '已整理好\n\n手臂加长\n- 手臂约 5 cm',
+    '已整理好\n\n手臂加长',
   );
 });
 
-test('composeProposeAssistantContent drops empty model text and keeps the revision', () => {
+test('composeProposeAssistantContent drops empty model text and keeps the summary', () => {
   assert.equal(
     composeProposeAssistantContent('', '手臂加长', ['手臂约 5 cm']),
-    '手臂加长\n- 手臂约 5 cm',
+    '手臂加长',
   );
 });
 
@@ -279,7 +279,7 @@ test('createParseToolCalls composes the same trimmed unescaped revision the row 
   assert.equal(historyBullets.length, bullets.length);
   assert.equal(
     composeProposeAssistantContent('已整理好', summary, historyBullets),
-    '已整理好\n\n手臂加长\n再确认\n- 手臂约 5 cm\n底座不变',
+    '已整理好\n\n手臂加长\n再确认',
   );
 });
 

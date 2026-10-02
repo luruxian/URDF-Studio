@@ -180,18 +180,18 @@ export function localeFromLang(lang: Language): string {
   }
 }
 
-/** Same revision text the BFF stores on the assistant row and the bubble shows. */
+/** Same text the BFF stores on the assistant row and the bubble shows: model prose if any, then the summary. Bullets stay on the tool call. */
 export function composeProposeAssistantContent(
   modelText: string,
   changeSummary: string,
-  historyBullets: string[],
+  _historyBullets: string[],
 ): string {
-  const revision = `${changeSummary.trim()}\n${historyBullets.map((bullet) => `- ${bullet}`).join('\n')}`;
+  const summary = changeSummary.trim();
   const text = modelText.trim();
   if (!text) {
-    return revision;
+    return summary;
   }
-  return `${text}\n\n${revision}`;
+  return `${text}\n\n${summary}`;
 }
 
 function truncateSummary(text: string, maxLen = 80): string {

@@ -1149,7 +1149,7 @@ test('mesh wait disables conversation reset and still shows the failure banner',
 const PROPOSE_MODEL_TEXT = '已整理好';
 const PROPOSE_CHANGE_SUMMARY = '手臂加长';
 const PROPOSE_BULLET = '手臂约 5 cm';
-const PROPOSE_BUBBLE = `${PROPOSE_MODEL_TEXT}\n\n${PROPOSE_CHANGE_SUMMARY}\n- ${PROPOSE_BULLET}`;
+const PROPOSE_BUBBLE = `${PROPOSE_MODEL_TEXT}\n\n${PROPOSE_CHANGE_SUMMARY}`;
 const FAILURE_STATUS = '生成失败说明';
 const RESULT_SUMMARY = '模型已更新说明';
 
@@ -1422,7 +1422,7 @@ test('propose tool bubble shows the revision text and not the banner summary', a
     const assistant = lastAssistantRow(container);
     assert.ok(assistant, 'expected an assistant bubble');
     assert.equal(assistant.content, PROPOSE_BUBBLE);
-    assert.match(assistant.content ?? '', new RegExp(`- ${PROPOSE_BULLET}`));
+    assert.equal((assistant.content ?? '').includes(PROPOSE_BULLET), false);
     assert.equal((assistant.content ?? '').includes('提交需求确认书修订'), false);
     assert.match(container.textContent ?? '', /提交需求确认书修订/);
   } finally {
