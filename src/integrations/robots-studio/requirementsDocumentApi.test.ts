@@ -514,8 +514,6 @@ test('pollMeshJob does not stop on the old client poll budget', async (t) => {
   );
 
   const pollPromise = pollMeshJob(4);
-  await t.mock.timers.tick(MESH_JOB_POLL_TIMEOUT_MS + MESH_JOB_POLL_INTERVAL_MS);
-  await new Promise<void>((resolve) => setImmediate(resolve));
   let settled = false;
   pollPromise.then(
     () => {
@@ -525,6 +523,10 @@ test('pollMeshJob does not stop on the old client poll budget', async (t) => {
       settled = true;
     },
   );
+  const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
+  await flush();
+  await t.mock.timers.tick(MESH_JOB_POLL_TIMEOUT_MS + MESH_JOB_POLL_INTERVAL_MS);
+  await flush();
   assert.equal(settled, false);
 
   release = true;
