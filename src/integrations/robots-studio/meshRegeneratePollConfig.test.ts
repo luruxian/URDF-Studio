@@ -7,6 +7,10 @@ import {
   resolveMeshJobPollConfig,
 } from './meshRegeneratePollConfig.ts';
 
+test('default mesh poll interval is 10 seconds', () => {
+  assert.equal(DEFAULT_MESH_JOB_POLL_INTERVAL_MS, 10_000);
+});
+
 test('resolveMeshJobPollConfig uses defaults when env is unset', () => {
   assert.deepEqual(resolveMeshJobPollConfig({}, {}), {
     intervalMs: DEFAULT_MESH_JOB_POLL_INTERVAL_MS,

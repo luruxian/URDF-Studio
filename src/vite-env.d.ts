@@ -3,7 +3,7 @@
 declare const __APP_VERSION__: string;
 
 interface ImportMetaEnv {
-  /** URDF+STL mesh job poll interval (ms). Default: 5000. */
+  /** URDF+STL mesh job poll interval (ms). Default: 10000. */
   readonly VITE_MESH_JOB_POLL_INTERVAL_MS?: string;
   /** URDF+STL mesh job client poll timeout (ms). Default: 900000 (15 min). */
   readonly VITE_MESH_JOB_POLL_TIMEOUT_MS?: string;

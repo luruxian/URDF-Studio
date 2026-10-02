@@ -3,7 +3,7 @@
 // ============================================================
 
 /** Default poll interval when env is unset or invalid (ms). */
-export const DEFAULT_MESH_JOB_POLL_INTERVAL_MS = 5000;
+export const DEFAULT_MESH_JOB_POLL_INTERVAL_MS = 10_000;
 
 /** Default poll timeout when env is unset or invalid (ms). */
 export const DEFAULT_MESH_JOB_POLL_TIMEOUT_MS = 15 * 60 * 1000;
