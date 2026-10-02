@@ -881,6 +881,45 @@ test('onExecute surfaces failed mesh jobs', async () => {
   assert.equal(result.chatMessage, 'boom');
 });
 
+test('onExecute replaces a service cancellation with the support message', async () => {
+  storeBootstrapAndAuth();
+  installFetchMock([
+    savedDocument,
+    patchedDocument,
+    jsonResponse(
+      {
+        job_id: 'job-1',
+        revision: 4,
+        status: 'queued',
+        external_job_id: 'ext-1',
+      },
+      202,
+    ),
+    jsonResponse({
+      job_id: 'job-1',
+      revision: 4,
+      status: 'failed',
+      attachment_id: null,
+      package_type: 'urdf_stl',
+      error_code: 'cancelled',
+      error_message: '用户手动终止：清理全部非 succeeded mesh job',
+    }),
+  ]);
+
+  const config = await createStudioModificationTools({
+    lang: 'zh-CN',
+    packageType: 'urdf_stl',
+    importUrdfPackage: async () => {},
+  });
+  assert.ok(config);
+
+  const result = await config.onExecute(proposeCall);
+
+  assert.equal(result.success, false);
+  assert.equal(result.message, '服务被取消，请联系平台客服');
+  assert.equal(result.chatMessage, '服务被取消，请联系平台客服');
+});
+
 test('onExecute forwards AbortSignal to pollMeshJob', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
   storeBootstrapAndAuth();

@@ -1087,6 +1087,7 @@ export const en: TranslationKeys = {
   studioMeshToolPreviewNotConnected:
     'URDF+STL generated, but preview refresh is not connected',
   studioMeshToolGenerationFailed: 'URDF+STL regeneration failed',
+  studioMeshToolServiceCancelled: 'The service was cancelled. Please contact platform support.',
   studioMeshToolCancelled: 'Cancelled',
   studioMeshToolJobInProgress:
     'A URDF+STL regeneration job is already running. Please wait for it to finish.',

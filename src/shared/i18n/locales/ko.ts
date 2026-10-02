@@ -1046,6 +1046,7 @@ snapshotHideGrid: '그리드',
   studioMeshToolModelUpdated: 'URDF+STL이 업데이트되었습니다',
   studioMeshToolPreviewNotConnected: 'URDF+STL이 생성되었지만 미리보기 새로고침이 연결되지 않았습니다',
   studioMeshToolGenerationFailed: 'URDF+STL 재생성 실패',
+  studioMeshToolServiceCancelled: '서비스가 취소되었습니다. 플랫폼 고객센터로 문의해 주세요.',
   studioMeshToolCancelled: '취소됨',
   studioMeshToolJobInProgress: 'URDF+STL 재생성 작업이 진행 중입니다. 완료될 때까지 기다려 주세요',
   studioMeshToolPollTimeout:

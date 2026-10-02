@@ -1041,6 +1041,7 @@ export const zhHant: TranslationKeys = {
   studioMeshToolModelUpdated: 'URDF+STL 已更新',
   studioMeshToolPreviewNotConnected: 'URDF+STL 已生成，但預覽刷新未接入',
   studioMeshToolGenerationFailed: 'URDF+STL 再生成失敗',
+  studioMeshToolServiceCancelled: '服務已取消，請聯絡平台客服',
   studioMeshToolCancelled: '已取消',
   studioMeshToolJobInProgress: 'URDF+STL 再生成任務正在進行中，請等待完成',
   studioMeshToolPollTimeout:

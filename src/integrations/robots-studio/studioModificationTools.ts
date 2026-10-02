@@ -380,7 +380,9 @@ async function importFromMeshJob(
   const { importUrdfPackage } = options;
 
   if (job.status === 'failed') {
-    const failureMessage = formatMeshJobFailure(job, texts.studioMeshToolGenerationFailed);
+    const failureMessage = job.error_code === 'cancelled'
+      ? texts.studioMeshToolServiceCancelled
+      : formatMeshJobFailure(job, texts.studioMeshToolGenerationFailed);
     return {
       success: false,
       message: failureMessage,
