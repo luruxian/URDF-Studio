@@ -287,6 +287,16 @@ export function AIConversationModal({
   const skipNextBffSessionResetRef = useRef(false);
   const executingToolCallRef = useRef<ParsedToolCall | null>(null);
   const pendingProposeRevisionRef = useRef<ProposeRevisionText | null>(null);
+  // setState('executing') is not visible to another click in the same turn.
+  // This ref locks confirm, cancel, retry, and submitConversationTurn before the
+  // history POST. Cancel, send, or reset invalidates a writing lock so that POST
+  // cannot continue into onExecute.
+  const toolBarLockSeqRef = useRef(0);
+  const toolBarLockRef = useRef<{
+    id: number;
+    restore: 'parsed' | 'error';
+    phase: 'writing' | 'running';
+  } | null>(null);
 
   const isReportFollowup = launchContext?.mode === 'inspection-followup';
   const focusedIssue = isReportFollowup ? (launchContext?.focusedIssue ?? null) : null;
@@ -353,6 +363,7 @@ export function AIConversationModal({
       setLastSubmittedTurn(null);
       setPendingResetAction(null);
       setRequestError(null);
+      toolBarLockRef.current = null;
       setToolConfirmState('idle');
       setPendingToolCall(null);
       setToolResult(null);
@@ -522,12 +533,29 @@ export function AIConversationModal({
     }
   };
 
+  const refuseLockedToolBarTurn = (): boolean => {
+    const lock = toolBarLockRef.current;
+    if (!lock) {
+      return false;
+    }
+    if (lock.phase === 'writing') {
+      toolBarLockRef.current = null;
+      setToolConfirmState('idle');
+      setPendingToolCall(null);
+      setToolResult(null);
+    }
+    return true;
+  };
+
   const submitConversationTurn = async ({
     history,
     userMessage,
     replaceCurrentConversation = false,
     withTools = false,
   }: ConversationSubmissionState & { withTools?: boolean }) => {
+    if (refuseLockedToolBarTurn()) {
+      return;
+    }
     if (
       !launchContext
       || !userMessage.trim()
@@ -669,6 +697,9 @@ export function AIConversationModal({
     if (!trimmedInput) {
       return;
     }
+    if (refuseLockedToolBarTurn()) {
+      return;
+    }
 
     setInput('');
     await submitModificationTurn(trimmedInput, {
@@ -691,6 +722,9 @@ export function AIConversationModal({
     userMessage: string,
     turnOptions?: Pick<ConversationSubmissionState, 'history' | 'replaceCurrentConversation'>,
   ) => {
+    if (refuseLockedToolBarTurn()) {
+      return;
+    }
     if (
       !launchContext
       || !userMessage.trim()
@@ -767,6 +801,17 @@ export function AIConversationModal({
     setToolResult(null);
   }, [onMeshGenerationFailed, t.studioMeshToolModelUpdated]);
 
+  const acquireToolBarLock = useCallback((restore: 'parsed' | 'error'): number | null => {
+    if (toolBarLockRef.current) {
+      return null;
+    }
+    const lockId = toolBarLockSeqRef.current + 1;
+    toolBarLockSeqRef.current = lockId;
+    toolBarLockRef.current = { id: lockId, restore, phase: 'writing' };
+    setToolConfirmState('executing');
+    return lockId;
+  }, []);
+
   const handleToolConfirm = useCallback(async () => {
     if (!pendingToolCall || !toolsConfig) {
       return;
@@ -777,25 +822,64 @@ export function AIConversationModal({
       return;
     }
 
+    const toolCall = pendingToolCall;
+    const lockId = acquireToolBarLock('parsed');
+    if (lockId === null) {
+      return;
+    }
+
     try {
       await appendConversationMessage(activeSessionId, 'user', t.studioMeshToolConfirm);
     } catch (error) {
       console.error('Failed to append confirm message', error);
+      if (toolBarLockRef.current?.id === lockId) {
+        toolBarLockRef.current = null;
+        setToolConfirmState('parsed');
+      }
       return;
     }
 
-    executingToolCallRef.current = pendingToolCall;
-    setToolConfirmState('executing');
-    const result = await toolsConfig.onExecute(pendingToolCall);
+    if (toolBarLockRef.current?.id !== lockId) {
+      return;
+    }
+
+    toolBarLockRef.current = { id: lockId, restore: 'parsed', phase: 'running' };
+    executingToolCallRef.current = toolCall;
+    const result = await toolsConfig.onExecute(toolCall);
+    if (toolBarLockRef.current?.id !== lockId) {
+      return;
+    }
+    toolBarLockRef.current = null;
     applyMeshToolExecuteResult(result);
-  }, [applyMeshToolExecuteResult, pendingToolCall, t.studioMeshToolConfirm, toolsConfig]);
+  }, [acquireToolBarLock, applyMeshToolExecuteResult, pendingToolCall, t.studioMeshToolConfirm, toolsConfig]);
 
   const handleToolCancel = useCallback(async () => {
+    const lock = toolBarLockRef.current;
+    if (lock?.phase === 'writing') {
+      const restore = lock.restore;
+      toolBarLockRef.current = null;
+      setToolConfirmState('cancelled');
+      setPendingToolCall(null);
+      setToolResult(null);
+      if (restore === 'error') {
+        setMessages((prev) => [...prev, createConversationMessage('assistant', '已取消')]);
+      }
+      return;
+    }
+    if (lock) {
+      return;
+    }
+
     if (toolConfirmState === 'error') {
       setToolConfirmState('cancelled');
       setPendingToolCall(null);
       setToolResult(null);
       setMessages((prev) => [...prev, createConversationMessage('assistant', '已取消')]);
+      return;
+    }
+
+    const lockId = acquireToolBarLock('parsed');
+    if (lockId === null) {
       return;
     }
 
@@ -805,17 +889,33 @@ export function AIConversationModal({
         await appendConversationMessage(activeSessionId, 'user', t.studioMeshToolCancel);
       } catch (error) {
         console.error('Failed to append cancel message', error);
+        if (toolBarLockRef.current?.id === lockId) {
+          toolBarLockRef.current = null;
+          setToolConfirmState('parsed');
+        }
         return;
       }
     }
 
+    if (toolBarLockRef.current?.id !== lockId) {
+      return;
+    }
+    toolBarLockRef.current = null;
     setToolConfirmState('cancelled');
     setPendingToolCall(null);
     setToolResult(null);
-  }, [t.studioMeshToolCancel, toolConfirmState]);
+  }, [acquireToolBarLock, t.studioMeshToolCancel, toolConfirmState]);
 
   const handleToolRetry = useCallback(async () => {
     if (!pendingToolCall || !toolsConfig) {
+      return;
+    }
+
+    const toolCall = pendingToolCall;
+    const meshRetry = toolResult?.meshRetry;
+    const meshRevision = toolResult?.meshRevision;
+    const lockId = acquireToolBarLock('error');
+    if (lockId === null) {
       return;
     }
 
@@ -825,24 +925,33 @@ export function AIConversationModal({
         await appendConversationMessage(activeSessionId, 'user', t.studioMeshToolRetry);
       } catch (error) {
         console.error('Failed to append retry message', error);
+        if (toolBarLockRef.current?.id === lockId) {
+          toolBarLockRef.current = null;
+          setToolConfirmState('error');
+        }
         return;
       }
     }
 
-    executingToolCallRef.current = pendingToolCall;
-    setToolConfirmState('executing');
+    if (toolBarLockRef.current?.id !== lockId) {
+      return;
+    }
 
-    const meshRetry = toolResult?.meshRetry;
-    const meshRevision = toolResult?.meshRevision;
+    toolBarLockRef.current = { id: lockId, restore: 'error', phase: 'running' };
+    executingToolCallRef.current = toolCall;
     const result =
       meshRetry !== undefined
       && meshRevision !== undefined
       && toolsConfig.onRetry
-        ? await toolsConfig.onRetry(pendingToolCall, { meshRetry, meshRevision })
-        : await toolsConfig.onExecute(pendingToolCall);
+        ? await toolsConfig.onRetry(toolCall, { meshRetry, meshRevision })
+        : await toolsConfig.onExecute(toolCall);
 
+    if (toolBarLockRef.current?.id !== lockId) {
+      return;
+    }
+    toolBarLockRef.current = null;
     applyMeshToolExecuteResult(result);
-  }, [applyMeshToolExecuteResult, pendingToolCall, t.studioMeshToolRetry, toolResult, toolsConfig]);
+  }, [acquireToolBarLock, applyMeshToolExecuteResult, pendingToolCall, t.studioMeshToolRetry, toolResult, toolsConfig]);
 
   const handleInquireClick = useCallback(() => {
     if (!bootstrap) {

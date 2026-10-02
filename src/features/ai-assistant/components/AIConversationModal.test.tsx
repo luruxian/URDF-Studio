@@ -155,9 +155,13 @@ const getCopyButtons = (scope: ParentNode): HTMLButtonElement[] =>
     (button) => button.getAttribute('aria-label') === '複製到剪貼板',
   ) as HTMLButtonElement[];
 
+const dispatchClick = (button: HTMLButtonElement) => {
+  button.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+};
+
 const clickButton = async (button: HTMLButtonElement) => {
   await act(async () => {
-    button.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    dispatchClick(button);
   });
 };
 
@@ -257,7 +261,7 @@ const findSendButton = (scope: ParentNode): HTMLButtonElement => {
   return match as HTMLButtonElement;
 };
 
-const typeAndSend = async (container: ParentNode, text: string) => {
+const fillComposer = async (container: ParentNode, text: string) => {
   const textarea = getTextarea(container);
   const prototype = textarea.ownerDocument.defaultView?.HTMLTextAreaElement.prototype;
   const valueSetter = prototype
@@ -281,6 +285,10 @@ const typeAndSend = async (container: ParentNode, text: string) => {
       }) => void
     )({ target: textarea, currentTarget: textarea });
   });
+};
+
+const typeAndSend = async (container: ParentNode, text: string) => {
+  await fillComposer(container, text);
   await clickButton(findSendButton(container));
 };
 
@@ -1809,6 +1817,203 @@ test('the composer stays disabled while mesh generation is running', async () =>
     });
     await flush();
   } finally {
+    await harness.cleanup();
+  }
+});
+
+test('a second confirm click while the first history POST is pending does not call onExecute twice', async () => {
+  let releaseConfirm = () => {};
+  const held = new Promise<void>((resolve) => {
+    releaseConfirm = resolve;
+  });
+  const fetchSpy = installDialogFetch({ holdContent: '确认', held });
+  let executeCount = 0;
+  const toolsConfig: AIConversationToolsConfig = {
+    tools: stubToolDef,
+    parseToolCalls: createParseToolCalls('zh-CN'),
+    bannerTexts: zhCnBannerTexts,
+    onExecute: async () => {
+      executeCount += 1;
+      await fetch(`${ROBOTS_API_BASE}/me/projects/ord-9/studio/requirements-document`, { method: 'PATCH' });
+      return { success: true, message: 'ok' };
+    },
+  };
+  __setConversationTurnStreamForTests(async (input) => {
+    input.onToolCalls?.([proposeToolCall]);
+    return { status: 'completed', reply: PROPOSE_MODEL_TEXT, error: null };
+  });
+  const harness = await renderHistoryModal({ toolsConfig });
+
+  try {
+    await typeAndSend(harness.container, '把手臂加长');
+    await flush();
+    const confirmButton = findButtonByText(harness.container, '确认');
+    // Both clicks land before paint, while the bar is still parsed.
+    await act(async () => {
+      dispatchClick(confirmButton);
+      dispatchClick(confirmButton);
+    });
+    await flush();
+
+    assert.equal(
+      messagePosts(fetchSpy.calls).filter((call) => postBody(call).content === '确认').length,
+      1,
+    );
+    assert.equal(executeCount, 0);
+
+    releaseConfirm();
+    await flush();
+    await flush();
+    await flush();
+    assert.equal(executeCount, 1);
+  } finally {
+    releaseConfirm();
+    await harness.cleanup();
+  }
+});
+
+test('cancel while the confirm history POST is pending does not PATCH', async () => {
+  let releaseConfirm = () => {};
+  const held = new Promise<void>((resolve) => {
+    releaseConfirm = resolve;
+  });
+  const fetchSpy = installDialogFetch({ holdContent: '确认', held });
+  let executeCount = 0;
+  const toolsConfig: AIConversationToolsConfig = {
+    tools: stubToolDef,
+    parseToolCalls: createParseToolCalls('zh-CN'),
+    bannerTexts: zhCnBannerTexts,
+    onExecute: async () => {
+      executeCount += 1;
+      await fetch(`${ROBOTS_API_BASE}/me/projects/ord-9/studio/requirements-document`, { method: 'PATCH' });
+      return { success: true, message: 'ok' };
+    },
+  };
+  __setConversationTurnStreamForTests(async (input) => {
+    input.onToolCalls?.([proposeToolCall]);
+    return { status: 'completed', reply: PROPOSE_MODEL_TEXT, error: null };
+  });
+  const harness = await renderHistoryModal({ toolsConfig });
+
+  try {
+    await typeAndSend(harness.container, '把手臂加长');
+    await flush();
+    const confirmButton = findButtonByText(harness.container, '确认');
+    const cancelButton = findButtonByText(harness.container, '取消');
+    await act(async () => {
+      dispatchClick(confirmButton);
+      dispatchClick(cancelButton);
+    });
+
+    releaseConfirm();
+    await flush();
+    await flush();
+    await flush();
+    assert.equal(executeCount, 0);
+    assert.equal(fetchSpy.calls.some((call) => call.init?.method === 'PATCH'), false);
+  } finally {
+    releaseConfirm();
+    await harness.cleanup();
+  }
+});
+
+test('sending another message while the confirm history POST is pending does not PATCH', async () => {
+  let releaseConfirm = () => {};
+  const held = new Promise<void>((resolve) => {
+    releaseConfirm = resolve;
+  });
+  const fetchSpy = installDialogFetch({ holdContent: '确认', held });
+  let executeCount = 0;
+  const toolsConfig: AIConversationToolsConfig = {
+    tools: stubToolDef,
+    parseToolCalls: createParseToolCalls('zh-CN'),
+    bannerTexts: zhCnBannerTexts,
+    onExecute: async () => {
+      executeCount += 1;
+      await fetch(`${ROBOTS_API_BASE}/me/projects/ord-9/studio/requirements-document`, { method: 'PATCH' });
+      return { success: true, message: 'ok' };
+    },
+  };
+  __setConversationTurnStreamForTests(async (input) => {
+    input.onToolCalls?.([proposeToolCall]);
+    return { status: 'completed', reply: PROPOSE_MODEL_TEXT, error: null };
+  });
+  const harness = await renderHistoryModal({ toolsConfig });
+
+  try {
+    await typeAndSend(harness.container, '把手臂加长');
+    await flush();
+    await fillComposer(harness.container, '先别改，再说明一下');
+    const confirmButton = findButtonByText(harness.container, '确认');
+    const sendButton = findSendButton(harness.container);
+    await act(async () => {
+      dispatchClick(confirmButton);
+      dispatchClick(sendButton);
+    });
+
+    releaseConfirm();
+    await flush();
+    await flush();
+    await flush();
+    assert.equal(executeCount, 0);
+    assert.equal(fetchSpy.calls.some((call) => call.init?.method === 'PATCH'), false);
+  } finally {
+    releaseConfirm();
+    await harness.cleanup();
+  }
+});
+
+test('cancel on the failure banner while the retry history POST is pending does not start generation', async () => {
+  let releaseRetry = () => {};
+  const held = new Promise<void>((resolve) => {
+    releaseRetry = resolve;
+  });
+  const fetchSpy = installDialogFetch({ holdContent: '重试', held });
+  let executeCount = 0;
+  const toolsConfig: AIConversationToolsConfig = {
+    tools: stubToolDef,
+    parseToolCalls: createParseToolCalls('zh-CN'),
+    bannerTexts: zhCnBannerTexts,
+    onExecute: async () => {
+      executeCount += 1;
+      if (executeCount > 1) {
+        await fetch(`${ROBOTS_API_BASE}/me/projects/ord-9/studio/mesh/regenerate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ revision: 4 }),
+        });
+      }
+      return { success: false, message: FAILURE_STATUS, chatMessage: FAILURE_STATUS };
+    },
+  };
+  __setConversationTurnStreamForTests(async (input) => {
+    input.onToolCalls?.([proposeToolCall]);
+    return { status: 'completed', reply: PROPOSE_MODEL_TEXT, error: null };
+  });
+  const harness = await renderHistoryModal({ toolsConfig });
+
+  try {
+    await typeAndSend(harness.container, '把手臂加长');
+    await flush();
+    await clickButton(findButtonByText(harness.container, '确认'));
+    await flush();
+    assert.equal(executeCount, 1);
+
+    const retryButton = findButtonByText(harness.container, '重试');
+    const cancelButton = findButtonByText(harness.container, '取消');
+    await act(async () => {
+      dispatchClick(retryButton);
+      dispatchClick(cancelButton);
+    });
+
+    releaseRetry();
+    await flush();
+    await flush();
+    await flush();
+    assert.equal(executeCount, 1);
+    assert.equal(fetchSpy.calls.some((call) => call.url.includes('/mesh/regenerate')), false);
+  } finally {
+    releaseRetry();
     await harness.cleanup();
   }
 });
