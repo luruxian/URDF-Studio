@@ -49,6 +49,32 @@ type MockResponse = Response | (() => Response);
 const jsonResponse = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), { status });
 
+const proposeCall = {
+  toolName: 'propose_requirements_revision' as const,
+  args: {
+    change_summary: 'arm +5cm',
+    section_updates: { 性能參數: '臂展 +5cm' },
+    history_bullets: ['臂展 +5cm'],
+  },
+  summary: 'arm +5cm',
+};
+
+const savedDocument = () =>
+  jsonResponse({
+    order_id: 'order-123',
+    revision: 3,
+    requirements_document: '## doc',
+    updated_at: '2026-08-27T05:00:00Z',
+    package_type: 'urdf_stl',
+  });
+const patchedDocument = () =>
+  jsonResponse({
+    revision: 4,
+    requirements_document: '## doc\n## v4',
+    change_summary: 'arm +5cm',
+    updated_at: '2026-08-27T05:01:00Z',
+  });
+
 function installFetchMock(
   responses: MockResponse[],
   options?: { repeatLast?: boolean },
@@ -174,9 +200,8 @@ test('createStudioModificationTools returns config for urdf_stl bootstrap order'
   });
 
   assert.ok(config);
-  assert.equal(config.tools.length, 2);
+  assert.equal(config.tools.length, 1);
   assert.equal(config.tools[0].function.name, 'propose_requirements_revision');
-  assert.equal(config.tools[1].function.name, 'regenerate_robot_model');
 });
 
 // ============================================================
@@ -343,20 +368,19 @@ test('createParseToolCalls returns null when section_updates is empty', () => {
   );
 });
 
-test('createParseToolCalls parses regenerate_robot_model with revision label', () => {
+test('createParseToolCalls returns null for regenerate_robot_model', () => {
   const parseToolCalls = createParseToolCalls('zh-Hant');
-  const parsed = parseToolCalls([
-    {
-      function: {
-        name: 'regenerate_robot_model',
-        arguments: JSON.stringify({ revision: 4 }),
+  assert.equal(
+    parseToolCalls([
+      {
+        function: {
+          name: 'regenerate_robot_model',
+          arguments: JSON.stringify({ revision: 4 }),
+        },
       },
-    },
-  ]);
-
-  assert.ok(parsed);
-  assert.equal(parsed.toolName, 'regenerate_robot_model');
-  assert.match(parsed.summary, /\(rev 4\)/);
+    ]),
+    null,
+  );
 });
 
 test('createParseToolCalls returns null for invalid JSON arguments', () => {
@@ -546,63 +570,11 @@ test('onExecute retries mesh only after successful PATCH (single PATCH call)', a
   assert.equal(countPatchCalls(spy.calls), 1);
 });
 
-test('onExecute for regenerate_robot_model skips PATCH and runs mesh pipeline', async () => {
-  storeBootstrapAndAuth();
-  const importCalls: Array<{ importGrantId: string; fromOrigin: string }> = [];
-  const spy = installFetchMock([
-    jsonResponse(
-      {
-        job_id: 'job-1',
-        revision: 4,
-        status: 'queued',
-        external_job_id: 'ext-1',
-      },
-      202,
-    ),
-    jsonResponse({
-      job_id: 'job-1',
-      revision: 4,
-      status: 'done',
-      attachment_id: 'att-new',
-      package_type: 'urdf_stl',
-      error_code: null,
-      error_message: null,
-    }),
-    jsonResponse({
-      package_type: 'urdf_stl',
-      import_grant_id: 'pvw_abc',
-      from_origin: 'https://robots.example.com',
-      expires_at: '2026-08-27T06:00:00Z',
-      attachment_id: 'att-new',
-    }),
-  ]);
-
-  const config = await createStudioModificationTools({
-    lang: 'en',
-    packageType: 'urdf_stl',
-    importUrdfPackage: async (params) => {
-      importCalls.push(params);
-    },
-  });
-  assert.ok(config);
-
-  const result = await config.onExecute({
-    toolName: 'regenerate_robot_model',
-    args: { revision: 4 },
-    summary: 'regenerate',
-  });
-
-  assert.equal(result.success, true);
-  assert.equal(spy.calls.length, 3);
-  assert.ok(spy.calls[0].url.includes('/mesh/regenerate'));
-  assert.ok(spy.calls[1].url.includes('/mesh/job'));
-  assert.ok(spy.calls[2].url.includes('/mesh/import-grant'));
-  assert.equal(importCalls.length, 1);
-});
-
 test('onExecute puts result_summary in chatMessage on mesh success', async () => {
   storeBootstrapAndAuth();
   installFetchMock([
+    savedDocument,
+    patchedDocument,
     jsonResponse(
       {
         job_id: 'job-1',
@@ -638,11 +610,7 @@ test('onExecute puts result_summary in chatMessage on mesh success', async () =>
   });
   assert.ok(config);
 
-  const result = await config.onExecute({
-    toolName: 'regenerate_robot_model',
-    args: { revision: 4 },
-    summary: 'regenerate',
-  });
+  const result = await config.onExecute(proposeCall);
 
   assert.equal(result.success, true);
   assert.equal(result.chatMessage, 'Generated biped URDF package.');
@@ -720,6 +688,8 @@ test('onExecute maps duplicate_content 409 to a localized message', async () => 
 test('onExecute surfaces failed mesh jobs', async () => {
   storeBootstrapAndAuth();
   installFetchMock([
+    savedDocument,
+    patchedDocument,
     jsonResponse(
       {
         job_id: 'job-1',
@@ -747,11 +717,7 @@ test('onExecute surfaces failed mesh jobs', async () => {
   });
   assert.ok(config);
 
-  const result = await config.onExecute({
-    toolName: 'regenerate_robot_model',
-    args: { revision: 4 },
-    summary: 'regenerate',
-  });
+  const result = await config.onExecute(proposeCall);
 
   assert.equal(result.success, false);
   assert.equal(result.message, 'boom');
@@ -764,6 +730,8 @@ test('onExecute forwards AbortSignal to pollMeshJob', async (t) => {
   const controller = new AbortController();
   installFetchMock(
     [
+      savedDocument,
+      patchedDocument,
       jsonResponse(
         {
           job_id: 'job-1',
@@ -795,11 +763,7 @@ test('onExecute forwards AbortSignal to pollMeshJob', async (t) => {
   });
   assert.ok(config);
 
-  const resultPromise = config.onExecute({
-    toolName: 'regenerate_robot_model',
-    args: { revision: 4 },
-    summary: 'regenerate',
-  });
+  const resultPromise = config.onExecute(proposeCall);
   controller.abort();
   await drivePollUntilSettled(t, resultPromise, 2);
   const result = await resultPromise;
@@ -808,11 +772,13 @@ test('onExecute forwards AbortSignal to pollMeshJob', async (t) => {
   assert.match(result.message, /取消|Cancelled|cancel/i);
 });
 
-test('onExecute for regenerate_robot_model polls through timeout then imports once', async (t) => {
+test('onExecute polls through timeout then imports once', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
   storeBootstrapAndAuth();
   const importCalls: Array<{ importGrantId: string; fromOrigin: string }> = [];
   const spy = installFetchMock([
+    savedDocument,
+    patchedDocument,
     jsonResponse(
       {
         job_id: 'job-1',
@@ -860,11 +826,7 @@ test('onExecute for regenerate_robot_model polls through timeout then imports on
   });
   assert.ok(config);
 
-  const resultPromise = config.onExecute({
-    toolName: 'regenerate_robot_model',
-    args: { revision: 4 },
-    summary: 'regenerate',
-  });
+  const resultPromise = config.onExecute(proposeCall);
   await drivePollUntilSettled(t, resultPromise, 6);
   const result = await resultPromise;
 
@@ -878,6 +840,8 @@ test('onExecute reports import failure after the mesh job is done', async (t) =>
   storeBootstrapAndAuth();
   let importCalls = 0;
   installFetchMock([
+    savedDocument,
+    patchedDocument,
     jsonResponse(
       {
         job_id: 'job-1',
@@ -924,11 +888,7 @@ test('onExecute reports import failure after the mesh job is done', async (t) =>
   });
   assert.ok(config);
 
-  const resultPromise = config.onExecute({
-    toolName: 'regenerate_robot_model',
-    args: { revision: 4 },
-    summary: 'regenerate',
-  });
+  const resultPromise = config.onExecute(proposeCall);
   await drivePollUntilSettled(t, resultPromise, 4);
   const result = await resultPromise;
 

@@ -1107,7 +1107,6 @@ export const de: TranslationKeys = {
   studioMeshToolRetry: 'Erneut versuchen',
   studioMeshToolExecuting: 'Simulationsmodell wird neu generiert. Bitte warten Sie 15–30 Minuten.',
   studioMeshToolProposeSummary: 'Anforderungsdokument-Revision einreichen',
-  studioMeshToolRegenerateSummary: 'URDF+STL neu generieren',
   studioMeshToolSessionExpired:
     'Sitzung abgelaufen. Kehren Sie zur Hauptseite zurück und öffnen Sie die Vorschau erneut.',
   studioMeshToolModelUpdated: 'URDF+STL aktualisiert',

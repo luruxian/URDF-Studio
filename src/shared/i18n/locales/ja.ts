@@ -1092,7 +1092,6 @@ export const ja: TranslationKeys = {
   studioMeshToolRetry: '再試行',
   studioMeshToolExecuting: 'シミュレーションモデルを再生成しています。15〜30分ほどお待ちください。',
   studioMeshToolProposeSummary: '要件確認書の改訂を提出',
-  studioMeshToolRegenerateSummary: 'URDF+STL を再生成',
   studioMeshToolSessionExpired:
     'セッションの有効期限が切れました。メインサイトに戻り、プレビューを再度開いてください。',
   studioMeshToolModelUpdated: 'URDF+STL を更新しました',

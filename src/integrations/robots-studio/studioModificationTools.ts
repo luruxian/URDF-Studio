@@ -2,7 +2,7 @@
 // Studio modification tools: AI conversation tool defs + execute pipeline
 //
 // When bootstrapped on a urdf_stl order, returns AIConversationToolsConfig for
-// the AI conversation UI: parse propose/regenerate tool_calls and run the
+// the AI conversation UI: parse propose tool_calls and run the
 // PATCH → mesh regenerate → poll → import-grant → workspace import pipeline.
 // ============================================================
 
@@ -115,26 +115,6 @@ const TOOL_DEFS: AIConversationToolDef[] = [
           },
         },
         required: ['change_summary', 'section_updates', 'history_bullets'],
-        additionalProperties: false,
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'regenerate_robot_model',
-      description:
-        'Trigger URDF regeneration for urdf_stl orders after the ' +
-        'requirements document revision is saved.',
-      parameters: {
-        type: 'object',
-        properties: {
-          revision: {
-            type: 'integer',
-            description: 'Requirements document revision to regenerate.',
-          },
-        },
-        required: ['revision'],
         additionalProperties: false,
       },
     },
@@ -327,14 +307,6 @@ function buildSummary(
       typeof args.change_summary === 'string' ? args.change_summary.trim() : '';
     return summary ? truncateSummary(summary) : base;
   }
-  if (toolName === 'regenerate_robot_model') {
-    const revision = args.revision;
-    const revisionLabel =
-      typeof revision === 'number' && Number.isFinite(revision)
-        ? ` (rev ${revision})`
-        : '';
-    return `${getStudioMeshToolTexts(lang).studioMeshToolRegenerateSummary}${revisionLabel}`;
-  }
   return toolName;
 }
 
@@ -361,15 +333,15 @@ export function createParseToolCalls(lang: Language) {
     if (args === null || typeof args !== 'object') return null;
     if (!tc.function.name) return null;
 
-    if (tc.function.name === 'propose_requirements_revision') {
-      const parsed = parseProposeToolArgs(args);
-      if (!parsed) return null;
-      args = {
-        change_summary: parsed.changeSummary,
-        section_updates: parsed.sectionUpdates,
-        history_bullets: parsed.historyBullets,
-      };
-    }
+    if (tc.function.name !== 'propose_requirements_revision') return null;
+
+    const parsed = parseProposeToolArgs(args);
+    if (!parsed) return null;
+    args = {
+      change_summary: parsed.changeSummary,
+      section_updates: parsed.sectionUpdates,
+      history_bullets: parsed.historyBullets,
+    };
 
     return {
       toolName: tc.function.name,
@@ -555,15 +527,6 @@ function createOnExecute(
               payloadCacheKey,
               phaseCache,
             );
-
-        return await runMeshRegenerateAndImport(revision, options, texts);
-      }
-
-      if (toolCall.toolName === 'regenerate_robot_model') {
-        const revision = toolCall.args.revision;
-        if (typeof revision !== 'number' || !Number.isFinite(revision)) {
-          return meshToolFailure(texts.studioMeshToolUnknownError);
-        }
 
         return await runMeshRegenerateAndImport(revision, options, texts);
       }
