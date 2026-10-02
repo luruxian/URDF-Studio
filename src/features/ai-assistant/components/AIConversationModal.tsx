@@ -41,6 +41,13 @@ import {
   startNewConversationTimeline,
 } from '../utils/conversationTimeline';
 import type { AIConversationLaunchContext, AIConversationMessage } from '../types';
+import {
+  AI_CONVERSATION_DEFAULT_HEIGHT,
+  AI_CONVERSATION_DEFAULT_WIDTH,
+  AI_CONVERSATION_MIN_HEIGHT,
+  AI_CONVERSATION_MIN_WIDTH,
+  isAIConversationCompactLayout,
+} from './aiConversationWindowLayout';
 import { getBootstrap } from '@/integrations/agile-robot/bootstrap';
 import { ToolConfirmBanner } from '@/integrations/agile-robot/components/ToolConfirmBanner';
 import {
@@ -145,12 +152,21 @@ export function AIConversationModal({
   bffSessionIdRef.current = sessionId;
   const defaultWindowSize = useMemo(() => {
     if (typeof window === 'undefined') {
-      return { width: 760, height: 620 };
+      return {
+        width: AI_CONVERSATION_DEFAULT_WIDTH,
+        height: AI_CONVERSATION_DEFAULT_HEIGHT,
+      };
     }
 
     return {
-      width: Math.min(760, Math.max(480, window.innerWidth - 24)),
-      height: Math.min(620, Math.max(420, window.innerHeight - 64)),
+      width: Math.min(
+        AI_CONVERSATION_DEFAULT_WIDTH,
+        Math.max(AI_CONVERSATION_MIN_WIDTH, window.innerWidth - 24),
+      ),
+      height: Math.min(
+        AI_CONVERSATION_DEFAULT_HEIGHT,
+        Math.max(AI_CONVERSATION_MIN_HEIGHT, window.innerHeight - 64),
+      ),
     };
   }, []);
   const defaultPosition = useMemo(() => {
@@ -175,7 +191,7 @@ export function AIConversationModal({
     isOpen,
     defaultPosition,
     defaultSize: defaultWindowSize,
-    minSize: { width: 480, height: 420 },
+    minSize: { width: AI_CONVERSATION_MIN_WIDTH, height: AI_CONVERSATION_MIN_HEIGHT },
     viewportMinSize: { width: 360, height: 320 },
     centerOnMount: false,
     enableMinimize: true,
@@ -187,7 +203,7 @@ export function AIConversationModal({
     },
   });
   const { isMinimized, size, isResizing } = windowState;
-  const isCompactLayout = size.width < 700;
+  const isCompactLayout = isAIConversationCompactLayout(size.width);
 
   const [messages, setMessages] = useState<AIConversationMessage[]>([]);
   const [input, setInput] = useState('');

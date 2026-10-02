@@ -303,11 +303,11 @@ test('AIConversationModal opens anchored to the bottom-right corner by default',
     });
 
     const windowRoot = Array.from(container.querySelectorAll<HTMLDivElement>('div')).find(
-      (element) => element.style.position === 'fixed' && element.style.width === '760px',
+      (element) => element.style.position === 'fixed' && element.style.width === '507px',
     );
     assert.ok(windowRoot, 'conversation window should render with fixed positioning');
-    assert.equal(windowRoot.style.left, '496px');
-    assert.equal(windowRoot.style.top, '156px');
+    assert.equal(windowRoot.style.left, '749px');
+    assert.equal(windowRoot.style.top, '363px');
   } finally {
     await act(async () => {
       root.unmount();
@@ -379,7 +379,7 @@ test('AIConversationModal opens at the front and remains front when activated', 
 
 test('compact conversation layout fits the viewport and keeps content scrollable', async () => {
   const dom = installDom();
-  Object.defineProperty(dom.window, 'innerWidth', { value: 613, configurable: true });
+  Object.defineProperty(dom.window, 'innerWidth', { value: 530, configurable: true });
   Object.defineProperty(dom.window, 'innerHeight', { value: 618, configurable: true });
   const container = dom.window.document.getElementById('root');
   assert.ok(container, 'root container should exist');
@@ -403,7 +403,7 @@ test('compact conversation layout fits the viewport and keeps content scrollable
     await flush();
 
     const windowRoot = Array.from(container.querySelectorAll<HTMLDivElement>('div')).find(
-      (element) => element.style.width === '589px' && element.style.height === '554px',
+      (element) => element.style.width === '506px' && element.style.height === '413px',
     );
     assert.ok(windowRoot, 'expected the compact conversation window to fit inside the viewport');
 
