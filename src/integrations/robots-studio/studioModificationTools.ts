@@ -180,6 +180,20 @@ export function localeFromLang(lang: Language): string {
   }
 }
 
+/** Same revision text the BFF stores on the assistant row and the bubble shows. */
+export function composeProposeAssistantContent(
+  modelText: string,
+  changeSummary: string,
+  historyBullets: string[],
+): string {
+  const revision = `${changeSummary.trim()}\n${historyBullets.map((bullet) => `- ${bullet}`).join('\n')}`;
+  const text = modelText.trim();
+  if (!text) {
+    return revision;
+  }
+  return `${text}\n\n${revision}`;
+}
+
 function truncateSummary(text: string, maxLen = 80): string {
   return text.length > maxLen ? `${text.slice(0, maxLen)}…` : text;
 }

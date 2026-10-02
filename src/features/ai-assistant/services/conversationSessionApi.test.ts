@@ -11,6 +11,7 @@ import {
 } from '@/shared/hostIntegrationState';
 
 import {
+  appendConversationMessage,
   createConversationSession,
   deleteConversationSession,
   isRobotsStudioApiError,
@@ -192,4 +193,26 @@ test('deleteConversationSession DELETEs the session URL', async () => {
     `unexpected URL: ${url}`,
   );
   assert.equal(init?.method, 'DELETE');
+});
+
+test('appendConversationMessage POSTs role and content to the session messages URL', async () => {
+  storeBootstrapAndAuth();
+  const spy = installFetchMock([
+    jsonResponse({ id: 7, role: 'user', content: '确认' }, 201),
+  ]);
+
+  await appendConversationMessage('sess-abc', 'user', '确认');
+
+  assert.equal(spy.calls.length, 1);
+  const { url, init } = spy.calls[0];
+  assert.ok(
+    url.includes('/me/projects/order-123/studio/ai/conversation-sessions/sess-abc/messages'),
+    `unexpected URL: ${url}`,
+  );
+  assert.equal(init?.method, 'POST');
+  assert.deepEqual(init?.headers, {
+    Authorization: 'Bearer test-token',
+    'Content-Type': 'application/json',
+  });
+  assert.deepEqual(JSON.parse(String(init?.body)), { role: 'user', content: '确认' });
 });

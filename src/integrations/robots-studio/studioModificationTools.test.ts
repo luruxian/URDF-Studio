@@ -8,6 +8,7 @@ import { setAiBackendAuthTokenProvider } from '@/shared/hostIntegrationState';
 
 import {
   buildClientMutationId,
+  composeProposeAssistantContent,
   createParseToolCalls,
   createStudioModificationTools,
   normalizeSectionUpdates,
@@ -237,6 +238,20 @@ test('normalizeSectionUpdates turns over-escaped newlines into real line breaks'
   assert.deepEqual(normalizeSectionUpdates({ 性能參數: overEscaped }), {
     性能參數: '- 负载 5kg\n- 臂展 1.2m\n\n底座更紧凑',
   });
+});
+
+test('composeProposeAssistantContent joins model text, summary, and dash bullets', () => {
+  assert.equal(
+    composeProposeAssistantContent('已整理好', '手臂加长', ['手臂约 5 cm']),
+    '已整理好\n\n手臂加长\n- 手臂约 5 cm',
+  );
+});
+
+test('composeProposeAssistantContent drops empty model text and keeps the revision', () => {
+  assert.equal(
+    composeProposeAssistantContent('', '手臂加长', ['手臂约 5 cm']),
+    '手臂加长\n- 手臂约 5 cm',
+  );
 });
 
 test('normalizeSectionUpdates leaves already-real newlines unchanged', () => {

@@ -24,12 +24,16 @@ import { CLOSE_BUTTON_DANGER_TERTIARY_CLASS } from '@/shared/components/ui/close
 import { Dialog } from '@/shared/components/ui/Dialog';
 import { useManagedWindowLayer } from '@/store';
 import { useConversationSession } from '@/app/hooks/useConversationSession';
+import { composeProposeAssistantContent } from '@/integrations/robots-studio/studioModificationTools';
 import {
   sendConversationTurnStream,
   type ConversationHistoryTurn,
 } from '../services/conversationService';
 import { isRobotsAiConversationReady } from '../services/robotsConversationBackend';
-import { deleteConversationSession } from '../services/conversationSessionApi';
+import {
+  appendConversationMessage,
+  deleteConversationSession,
+} from '../services/conversationSessionApi';
 import { ConversationMessageMarkdown } from './ConversationMessageMarkdown';
 import { shouldSubmitConversationInput } from '../utils/conversationInput';
 import {
@@ -101,6 +105,55 @@ function replaceTrailingAssistantMessage(
 
   nextMessages.push(createConversationMessage('assistant', nextContent));
   return nextMessages;
+}
+
+function trailingAssistantContent(messages: AIConversationMessage[]): string {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (!message || !isConversationChatMessage(message)) {
+      break;
+    }
+    if (message.role !== 'assistant') {
+      continue;
+    }
+    return message.content;
+  }
+  return '';
+}
+
+interface ProposeRevisionText {
+  changeSummary: string;
+  historyBullets: string[];
+}
+
+function proposeRevisionFromToolCall(toolCall: ParsedToolCall): ProposeRevisionText | null {
+  const changeSummary = toolCall.args.change_summary;
+  const historyBullets = toolCall.args.history_bullets;
+  if (typeof changeSummary !== 'string' || !Array.isArray(historyBullets)) {
+    return null;
+  }
+  const bullets = historyBullets.filter((item): item is string => typeof item === 'string');
+  if (!changeSummary.trim() || bullets.length === 0) {
+    return null;
+  }
+  return { changeSummary, historyBullets: bullets };
+}
+
+function assistantBubbleAfterTurn(
+  messages: AIConversationMessage[],
+  reply: string,
+  revision: ProposeRevisionText | null,
+): AIConversationMessage[] {
+  if (revision) {
+    return replaceTrailingAssistantMessage(
+      messages,
+      composeProposeAssistantContent(reply, revision.changeSummary, revision.historyBullets),
+    );
+  }
+  if (reply) {
+    return replaceTrailingAssistantMessage(messages, reply);
+  }
+  return removeTrailingAssistantPlaceholder(messages);
 }
 
 function appendTrailingAssistantDelta(
@@ -233,6 +286,7 @@ export function AIConversationModal({
   const skipNextSessionResetRef = useRef(false);
   const skipNextBffSessionResetRef = useRef(false);
   const executingToolCallRef = useRef<ParsedToolCall | null>(null);
+  const pendingProposeRevisionRef = useRef<ProposeRevisionText | null>(null);
 
   const isReportFollowup = launchContext?.mode === 'inspection-followup';
   const focusedIssue = isReportFollowup ? (launchContext?.focusedIssue ?? null) : null;
@@ -487,6 +541,7 @@ export function AIConversationModal({
     }
 
     const trimmedMessage = userMessage.trim();
+    pendingProposeRevisionRef.current = null;
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
     const abortController = new AbortController();
@@ -555,6 +610,20 @@ export function AIConversationModal({
                 }
                 const parsed = toolsConfig.parseToolCalls(rawToolCalls);
                 if (parsed) {
+                  const revision = proposeRevisionFromToolCall(parsed);
+                  if (revision) {
+                    pendingProposeRevisionRef.current = revision;
+                    setMessages((prev) =>
+                      replaceTrailingAssistantMessage(
+                        prev,
+                        composeProposeAssistantContent(
+                          trailingAssistantContent(prev),
+                          revision.changeSummary,
+                          revision.historyBullets,
+                        ),
+                      ),
+                    );
+                  }
                   setPendingToolCall(parsed);
                   setToolConfirmState('parsed');
                   setToolResult(null);
@@ -564,34 +633,25 @@ export function AIConversationModal({
           : {}),
       });
 
+      const revision = pendingProposeRevisionRef.current;
+      pendingProposeRevisionRef.current = null;
+
       if (!isRequestActive()) {
         return;
       }
       if (result.status === 'aborted') {
         setRequestError(null);
-        setMessages((prev) =>
-          result.reply
-            ? replaceTrailingAssistantMessage(prev, result.reply)
-            : removeTrailingAssistantPlaceholder(prev),
-        );
+        setMessages((prev) => assistantBubbleAfterTurn(prev, result.reply, revision));
         return;
       }
       if (result.status === 'error') {
         setRequestError(result.error?.message ?? t.unknownError);
-        setMessages((prev) =>
-          result.reply
-            ? replaceTrailingAssistantMessage(prev, result.reply)
-            : removeTrailingAssistantPlaceholder(prev),
-        );
+        setMessages((prev) => assistantBubbleAfterTurn(prev, result.reply, revision));
         return;
       }
 
       setRequestError(null);
-      setMessages((prev) =>
-        result.reply
-          ? replaceTrailingAssistantMessage(prev, result.reply)
-          : removeTrailingAssistantPlaceholder(prev),
-      );
+      setMessages((prev) => assistantBubbleAfterTurn(prev, result.reply, revision));
     } finally {
       if (isRequestActive()) {
         abortControllerRef.current = null;
@@ -693,18 +753,34 @@ export function AIConversationModal({
     }
 
     executingToolCallRef.current = null;
-    const chatText = result.chatMessage?.trim();
-    if (chatText) {
-      setMessages((prev) => [...prev, createConversationMessage('assistant', chatText)]);
+    const successText = result.chatMessage?.trim() || t.studioMeshToolModelUpdated;
+    const activeSessionId = bffSessionIdRef.current;
+    if (activeSessionId) {
+      void appendConversationMessage(activeSessionId, 'assistant', successText).catch((error) => {
+        console.error('Failed to append mesh success message', error);
+      });
     }
+    setMessages((prev) => [...prev, createConversationMessage('assistant', successText)]);
 
     setToolConfirmState('idle');
     setPendingToolCall(null);
     setToolResult(null);
-  }, [onMeshGenerationFailed]);
+  }, [onMeshGenerationFailed, t.studioMeshToolModelUpdated]);
 
   const handleToolConfirm = useCallback(async () => {
     if (!pendingToolCall || !toolsConfig) {
+      return;
+    }
+
+    const activeSessionId = bffSessionIdRef.current;
+    if (!activeSessionId) {
+      return;
+    }
+
+    try {
+      await appendConversationMessage(activeSessionId, 'user', t.studioMeshToolConfirm);
+    } catch (error) {
+      console.error('Failed to append confirm message', error);
       return;
     }
 
@@ -712,18 +788,45 @@ export function AIConversationModal({
     setToolConfirmState('executing');
     const result = await toolsConfig.onExecute(pendingToolCall);
     applyMeshToolExecuteResult(result);
-  }, [applyMeshToolExecuteResult, pendingToolCall, toolsConfig]);
+  }, [applyMeshToolExecuteResult, pendingToolCall, t.studioMeshToolConfirm, toolsConfig]);
 
-  const handleToolCancel = useCallback(() => {
+  const handleToolCancel = useCallback(async () => {
+    if (toolConfirmState === 'error') {
+      setToolConfirmState('cancelled');
+      setPendingToolCall(null);
+      setToolResult(null);
+      setMessages((prev) => [...prev, createConversationMessage('assistant', '已取消')]);
+      return;
+    }
+
+    const activeSessionId = bffSessionIdRef.current;
+    if (activeSessionId) {
+      try {
+        await appendConversationMessage(activeSessionId, 'user', t.studioMeshToolCancel);
+      } catch (error) {
+        console.error('Failed to append cancel message', error);
+        return;
+      }
+    }
+
     setToolConfirmState('cancelled');
     setPendingToolCall(null);
     setToolResult(null);
-    setMessages((prev) => [...prev, createConversationMessage('assistant', '已取消')]);
-  }, []);
+  }, [t.studioMeshToolCancel, toolConfirmState]);
 
   const handleToolRetry = useCallback(async () => {
     if (!pendingToolCall || !toolsConfig) {
       return;
+    }
+
+    const activeSessionId = bffSessionIdRef.current;
+    if (activeSessionId) {
+      try {
+        await appendConversationMessage(activeSessionId, 'user', t.studioMeshToolRetry);
+      } catch (error) {
+        console.error('Failed to append retry message', error);
+        return;
+      }
     }
 
     executingToolCallRef.current = pendingToolCall;
@@ -739,7 +842,7 @@ export function AIConversationModal({
         : await toolsConfig.onExecute(pendingToolCall);
 
     applyMeshToolExecuteResult(result);
-  }, [applyMeshToolExecuteResult, pendingToolCall, toolResult, toolsConfig]);
+  }, [applyMeshToolExecuteResult, pendingToolCall, t.studioMeshToolRetry, toolResult, toolsConfig]);
 
   const handleInquireClick = useCallback(() => {
     if (!bootstrap) {
@@ -895,6 +998,8 @@ export function AIConversationModal({
                     return (
                       <div
                         key={messageKey}
+                        data-conversation-role={message.role}
+                        data-conversation-content={message.content}
                         className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                       >
                         <div className="max-w-[85%]">

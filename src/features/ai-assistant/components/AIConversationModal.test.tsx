@@ -12,7 +12,8 @@ import { BOOTSTRAP_STORAGE_KEY } from '@/integrations/agile-robot/constants';
 import { DEFAULT_MANAGED_WINDOW_ORDER, useUIStore } from '@/store';
 import { GeometryType, JointType, type RobotState } from '@/types';
 import type { AIConversationLaunchContext } from '../types';
-import type { AIConversationToolsConfig } from '@/integrations/agile-robot/types';
+import type { AIConversationToolsConfig, ToolResult } from '@/integrations/agile-robot/types';
+import { createParseToolCalls, createStudioModificationTools } from '@/integrations/robots-studio/studioModificationTools';
 
 const TEST_CONVERSATION_MESSAGE = '请帮我检查这个机器人结构是否合理';
 
@@ -218,6 +219,13 @@ const restoreRobotsConversationEnv = (snapshot: RobotsConversationEnvSnapshot) =
 const mockConversationSessionFetch = () => {
   globalThis.fetch = (async (url: unknown, init?: RequestInit) => {
     const requestUrl = String(url);
+    if (requestUrl.includes('/messages') && init?.method === 'POST') {
+      const body = init.body ? JSON.parse(String(init.body)) as { role?: string; content?: string } : {};
+      return new Response(
+        JSON.stringify({ id: 1, role: body.role, content: body.content }),
+        { status: 201, headers: { 'content-type': 'application/json' } },
+      );
+    }
     if (requestUrl.includes('/ai/conversation-sessions') && init?.method === 'POST') {
       return new Response(
         JSON.stringify({
@@ -1125,6 +1133,681 @@ test('mesh wait disables conversation reset and still shows the failure banner',
       findButtonByText(harness.container, '重试').textContent?.includes('重试'),
       true,
     );
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+const PROPOSE_MODEL_TEXT = '已整理好';
+const PROPOSE_CHANGE_SUMMARY = '手臂加长';
+const PROPOSE_BULLET = '手臂约 5 cm';
+const PROPOSE_BUBBLE = `${PROPOSE_MODEL_TEXT}\n\n${PROPOSE_CHANGE_SUMMARY}\n- ${PROPOSE_BULLET}`;
+const FAILURE_STATUS = '生成失败说明';
+const RESULT_SUMMARY = '模型已更新说明';
+
+interface RecordedFetch {
+  url: string;
+  init?: RequestInit;
+}
+
+const proposeToolCall = {
+  function: {
+    name: 'propose_requirements_revision',
+    arguments: JSON.stringify({
+      change_summary: PROPOSE_CHANGE_SUMMARY,
+      section_updates: { 性能参数: '臂展加长' },
+      history_bullets: [PROPOSE_BULLET],
+    }),
+  },
+};
+
+const messagePosts = (calls: RecordedFetch[]) =>
+  calls.filter((call) => call.url.includes('/messages') && call.init?.method === 'POST');
+
+const postBody = (call: RecordedFetch): { role?: string; content?: string } =>
+  JSON.parse(String(call.init?.body ?? '{}')) as { role?: string; content?: string };
+
+const chatRows = (container: ParentNode) =>
+  Array.from(container.querySelectorAll<HTMLElement>('[data-conversation-role]')).map((row) => ({
+    role: row.getAttribute('data-conversation-role'),
+    content: row.getAttribute('data-conversation-content'),
+  }));
+
+const lastAssistantRow = (container: ParentNode) => {
+  const rows = chatRows(container).filter((row) => row.role === 'assistant');
+  return rows[rows.length - 1];
+};
+
+function installDialogFetch(options?: {
+  failMessages?: boolean;
+  holdContent?: string;
+  held?: Promise<void>;
+}): { calls: RecordedFetch[] } {
+  const calls: RecordedFetch[] = [];
+  globalThis.fetch = (async (url: unknown, init?: RequestInit) => {
+    const requestUrl = String(url);
+    const method = init?.method ?? 'GET';
+    calls.push({ url: requestUrl, init });
+
+    if (requestUrl.includes('/messages') && method === 'POST') {
+      const body = postBody({ url: requestUrl, init });
+      if (options?.held && body.content === options.holdContent) {
+        await options.held;
+      }
+      if (options?.failMessages) {
+        return new Response(JSON.stringify({ detail: 'append_failed' }), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response(
+        JSON.stringify({ id: calls.length, role: body.role, content: body.content }),
+        { status: 201, headers: { 'content-type': 'application/json' } },
+      );
+    }
+
+    if (requestUrl.includes('/ai/conversation-sessions') && method === 'POST' && !requestUrl.includes('/messages')) {
+      return new Response(
+        JSON.stringify({
+          session_id: TEST_BFF_SESSION_ID,
+          expires_at: '2026-08-27T10:00:00Z',
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }
+    if (requestUrl.includes('/ai/conversation-sessions/') && method === 'PUT') {
+      return new Response(JSON.stringify({ snapshot_revision: 1 }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (requestUrl.includes('/ai/conversation-sessions/') && method === 'DELETE') {
+      return new Response(null, { status: 204 });
+    }
+    if (requestUrl.includes('/requirements-document') && method === 'GET') {
+      return new Response(
+        JSON.stringify({
+          order_id: 'ord-9',
+          revision: 3,
+          requirements_document: '## doc',
+          updated_at: '2026-08-27T05:00:00Z',
+          package_type: 'urdf_stl',
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }
+    if (requestUrl.includes('/requirements-document') && method === 'PATCH') {
+      return new Response(
+        JSON.stringify({
+          revision: 4,
+          requirements_document: '## doc\n## v4',
+          change_summary: PROPOSE_CHANGE_SUMMARY,
+          updated_at: '2026-08-27T05:01:00Z',
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }
+    if (requestUrl.includes('/mesh/regenerate') && method === 'POST') {
+      return new Response(
+        JSON.stringify({
+          job_id: 'job-1',
+          revision: 4,
+          status: 'queued',
+          external_job_id: 'ext-1',
+        }),
+        { status: 202, headers: { 'content-type': 'application/json' } },
+      );
+    }
+    if (requestUrl.includes('/mesh/job')) {
+      return new Response(
+        JSON.stringify({
+          job_id: 'job-1',
+          revision: 4,
+          status: 'done',
+          attachment_id: 'att-new',
+          package_type: 'urdf_stl',
+          error_code: null,
+          error_message: null,
+          result_summary: RESULT_SUMMARY,
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }
+    if (requestUrl.includes('/mesh/import-grant') && method === 'POST') {
+      return new Response(
+        JSON.stringify({
+          package_type: 'urdf_stl',
+          import_grant_id: 'pvw_abc',
+          from_origin: 'https://robots.example.com',
+          expires_at: '2026-08-27T06:00:00Z',
+          attachment_id: 'att-new',
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }
+    throw new Error(`Unexpected fetch in dialog history test: ${method} ${requestUrl}`);
+  }) as typeof fetch;
+  return { calls };
+}
+
+const stubToolDef: AIConversationToolsConfig['tools'] = [
+  {
+    type: 'function',
+    function: {
+      name: 'propose_requirements_revision',
+      description: 'Propose revision',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+];
+
+const zhCnBannerTexts = {
+  confirm: translations['zh-CN'].studioMeshToolConfirm,
+  cancel: translations['zh-CN'].studioMeshToolCancel,
+  retry: translations['zh-CN'].studioMeshToolRetry,
+  executing: translations['zh-CN'].studioMeshToolExecuting,
+};
+
+async function renderHistoryModal(options: {
+  toolsConfig: AIConversationToolsConfig;
+  onMeshGenerationFailed?: () => void;
+  dom?: ReturnType<typeof installDom>;
+  robotsEnv?: RobotsConversationEnvSnapshot;
+}) {
+  const dom = options.dom ?? installDom();
+  const robotsEnv = options.robotsEnv ?? setRobotsConversationEnv();
+  const container = dom.window.document.getElementById('root');
+  assert.ok(container, 'root container should exist');
+  const { AIConversationModal } = await import('./AIConversationModal.tsx');
+  const root = createRoot(container);
+
+  const render = async (isOpen: boolean) => {
+    await act(async () => {
+      root.render(
+        <AIConversationModal
+          isOpen={isOpen}
+          onClose={() => {}}
+          lang="zh-CN"
+          launchContext={createLaunchContext()}
+          onStartNewConversation={() => {}}
+          onApply={() => true}
+          toolsConfig={options.toolsConfig}
+          onMeshGenerationFailed={options.onMeshGenerationFailed}
+        />,
+      );
+    });
+  };
+
+  await render(true);
+  await flush();
+  await flush();
+
+  return {
+    dom,
+    container,
+    render,
+    cleanup: async () => {
+      __setConversationTurnStreamForTests(null);
+      await act(async () => {
+        root.unmount();
+      });
+      await flush();
+      await flush();
+      restoreRobotsConversationEnv(robotsEnv);
+      dom.window.close();
+    },
+  };
+}
+
+async function waitForFetch(predicate: () => boolean) {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    if (predicate()) {
+      return;
+    }
+    await flush();
+  }
+  assert.fail('timed out waiting for fetch');
+}
+
+test('propose tool bubble shows the revision text and not the banner summary', async () => {
+  const dom = installDom();
+  const robotsEnv = setRobotsConversationEnv();
+  installDialogFetch();
+  const container = dom.window.document.getElementById('root');
+  assert.ok(container, 'root container should exist');
+
+  const toolsConfig: AIConversationToolsConfig = {
+    tools: stubToolDef,
+    parseToolCalls: createParseToolCalls('zh-CN'),
+    bannerTexts: zhCnBannerTexts,
+    onExecute: async () => ({ success: true, message: 'ok' }),
+  };
+
+  __setConversationTurnStreamForTests(async (input) => {
+    input.onReplyDelta?.(PROPOSE_MODEL_TEXT);
+    input.onToolCalls?.([proposeToolCall]);
+    return { status: 'completed', reply: PROPOSE_MODEL_TEXT, error: null };
+  });
+
+  const { AIConversationModal } = await import('./AIConversationModal.tsx');
+  const root = createRoot(container);
+
+  try {
+    await act(async () => {
+      root.render(
+        <AIConversationModal
+          isOpen
+          onClose={() => {}}
+          lang="zh-CN"
+          launchContext={createLaunchContext()}
+          onStartNewConversation={() => {}}
+          onApply={() => true}
+          toolsConfig={toolsConfig}
+        />,
+      );
+    });
+    await flush();
+    await flush();
+    await typeAndSend(container, '把手臂加长');
+    await flush();
+
+    const assistant = lastAssistantRow(container);
+    assert.ok(assistant, 'expected an assistant bubble');
+    assert.equal(assistant.content, PROPOSE_BUBBLE);
+    assert.match(assistant.content ?? '', new RegExp(`- ${PROPOSE_BULLET}`));
+    assert.equal((assistant.content ?? '').includes('提交需求确认书修订'), false);
+    assert.match(container.textContent ?? '', /提交需求确认书修订/);
+  } finally {
+    __setConversationTurnStreamForTests(null);
+    await act(async () => {
+      root.unmount();
+    });
+    await flush();
+    restoreRobotsConversationEnv(robotsEnv);
+    dom.window.close();
+  }
+});
+
+test('confirm writes the button text before PATCH and skips PATCH when that post fails', async () => {
+  const dom = installDom();
+  const robotsEnv = setRobotsConversationEnv();
+  let releaseConfirm = () => {};
+  const held = new Promise<void>((resolve) => {
+    releaseConfirm = resolve;
+  });
+  const successFetch = installDialogFetch({ holdContent: '确认', held });
+  const toolsConfig = await createStudioModificationTools({
+    lang: 'zh-CN',
+    packageType: 'urdf_stl',
+    importUrdfPackage: async () => {},
+  });
+  assert.ok(toolsConfig);
+
+  __setConversationTurnStreamForTests(async (input) => {
+    input.onToolCalls?.([proposeToolCall]);
+    return { status: 'completed', reply: PROPOSE_MODEL_TEXT, error: null };
+  });
+
+  const harness = await renderHistoryModal({ toolsConfig, dom, robotsEnv });
+
+  try {
+    await typeAndSend(harness.container, '把手臂加长');
+    await flush();
+    await clickButton(findButtonByText(harness.container, '确认'));
+    await flush();
+
+    const confirmPosts = messagePosts(successFetch.calls).filter((call) => postBody(call).content === '确认');
+    assert.equal(confirmPosts.length, 1);
+    assert.deepEqual(postBody(confirmPosts[0]), { role: 'user', content: '确认' });
+    assert.equal(successFetch.calls.some((call) => call.init?.method === 'PATCH'), false);
+
+    releaseConfirm();
+    await waitForFetch(() => successFetch.calls.some((call) => call.url.includes('/mesh/regenerate')));
+
+    const confirmIndex = successFetch.calls.findIndex(
+      (call) => call.url.includes('/messages') && postBody(call).content === '确认',
+    );
+    const patchIndex = successFetch.calls.findIndex((call) => call.init?.method === 'PATCH');
+    const regenerateIndex = successFetch.calls.findIndex((call) => call.url.includes('/mesh/regenerate'));
+    assert.ok(confirmIndex >= 0 && confirmIndex < patchIndex && patchIndex < regenerateIndex);
+  } finally {
+    releaseConfirm();
+    await harness.cleanup();
+  }
+});
+
+test('a failed confirm post does not PATCH and is not retried', async () => {
+  const dom = installDom();
+  const robotsEnv = setRobotsConversationEnv();
+  const fetchSpy = installDialogFetch({ failMessages: true });
+  const toolsConfig = await createStudioModificationTools({
+    lang: 'zh-CN',
+    packageType: 'urdf_stl',
+    importUrdfPackage: async () => {},
+  });
+  assert.ok(toolsConfig);
+  __setConversationTurnStreamForTests(async (input) => {
+    input.onToolCalls?.([proposeToolCall]);
+    return { status: 'completed', reply: PROPOSE_MODEL_TEXT, error: null };
+  });
+  const harness = await renderHistoryModal({ toolsConfig, dom, robotsEnv });
+
+  try {
+    await typeAndSend(harness.container, '把手臂加长');
+    await flush();
+    await clickButton(findButtonByText(harness.container, '确认'));
+    await flush();
+    await flush();
+
+    assert.equal(messagePosts(fetchSpy.calls).length, 1);
+    assert.equal(postBody(messagePosts(fetchSpy.calls)[0]).content, '确认');
+    assert.equal(fetchSpy.calls.some((call) => call.init?.method === 'PATCH'), false);
+    assert.equal(fetchSpy.calls.some((call) => call.url.includes('/mesh/regenerate')), false);
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+test('confirm-banner cancel posts the cancel button text and does not append 已取消', async () => {
+  const fetchSpy = installDialogFetch();
+  let executeCount = 0;
+  const toolsConfig: AIConversationToolsConfig = {
+    tools: stubToolDef,
+    parseToolCalls: createParseToolCalls('zh-CN'),
+    bannerTexts: zhCnBannerTexts,
+    onExecute: async () => {
+      executeCount += 1;
+      await fetch(`${ROBOTS_API_BASE}/me/projects/ord-9/studio/requirements-document`, { method: 'PATCH' });
+      return { success: true, message: 'ok' };
+    },
+  };
+  __setConversationTurnStreamForTests(async (input) => {
+    input.onToolCalls?.([proposeToolCall]);
+    return { status: 'completed', reply: PROPOSE_MODEL_TEXT, error: null };
+  });
+  const harness = await renderHistoryModal({ toolsConfig });
+
+  try {
+    await typeAndSend(harness.container, '把手臂加长');
+    await flush();
+    await clickButton(findButtonByText(harness.container, '取消'));
+    await flush();
+
+    const posts = messagePosts(fetchSpy.calls);
+    assert.equal(posts.length, 1);
+    assert.deepEqual(postBody(posts[0]), {
+      role: 'user',
+      content: translations['zh-CN'].studioMeshToolCancel,
+    });
+    assert.equal(fetchSpy.calls.some((call) => call.init?.method === 'PATCH'), false);
+    assert.equal(executeCount, 0);
+    assert.equal(
+      chatRows(harness.container).some((row) => row.role === 'assistant' && row.content === '已取消'),
+      false,
+    );
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+test('failure retry posts the retry button text before the next generation request', async () => {
+  const fetchSpy = installDialogFetch();
+  let executeCount = 0;
+  const toolsConfig: AIConversationToolsConfig = {
+    tools: stubToolDef,
+    parseToolCalls: createParseToolCalls('zh-CN'),
+    bannerTexts: zhCnBannerTexts,
+    onExecute: async () => {
+      executeCount += 1;
+      if (executeCount === 1) {
+        return { success: false, message: FAILURE_STATUS, chatMessage: FAILURE_STATUS };
+      }
+      await fetch(`${ROBOTS_API_BASE}/me/projects/ord-9/studio/mesh/regenerate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ revision: 4 }),
+      });
+      return { success: false, message: FAILURE_STATUS, chatMessage: FAILURE_STATUS };
+    },
+  };
+  __setConversationTurnStreamForTests(async (input) => {
+    input.onToolCalls?.([proposeToolCall]);
+    return { status: 'completed', reply: PROPOSE_MODEL_TEXT, error: null };
+  });
+  const harness = await renderHistoryModal({ toolsConfig });
+
+  try {
+    await typeAndSend(harness.container, '把手臂加长');
+    await flush();
+    await clickButton(findButtonByText(harness.container, '确认'));
+    await flush();
+    await clickButton(findButtonByText(harness.container, '重试'));
+    await flush();
+
+    const retryIndex = fetchSpy.calls.findIndex(
+      (call) => call.url.includes('/messages') && postBody(call).content === translations['zh-CN'].studioMeshToolRetry,
+    );
+    const regenerateIndex = fetchSpy.calls.findIndex((call) => call.url.includes('/mesh/regenerate'));
+    assert.ok(retryIndex >= 0 && regenerateIndex > retryIndex);
+    assert.equal(postBody(fetchSpy.calls[retryIndex]).role, 'user');
+    assert.equal(
+      messagePosts(fetchSpy.calls).some((call) => postBody(call).content === FAILURE_STATUS),
+      false,
+    );
+    assert.equal(
+      messagePosts(fetchSpy.calls).some(
+        (call) => postBody(call).content === translations['zh-CN'].studioMeshToolExecuting,
+      ),
+      false,
+    );
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+test('failure-banner cancel does not post and appends a local 已取消 assistant message', async () => {
+  const fetchSpy = installDialogFetch();
+  const toolsConfig: AIConversationToolsConfig = {
+    tools: stubToolDef,
+    parseToolCalls: createParseToolCalls('zh-CN'),
+    bannerTexts: zhCnBannerTexts,
+    onExecute: async () => ({ success: false, message: FAILURE_STATUS, chatMessage: FAILURE_STATUS }),
+  };
+  __setConversationTurnStreamForTests(async (input) => {
+    input.onToolCalls?.([proposeToolCall]);
+    return { status: 'completed', reply: PROPOSE_MODEL_TEXT, error: null };
+  });
+  const harness = await renderHistoryModal({ toolsConfig });
+
+  try {
+    await typeAndSend(harness.container, '把手臂加长');
+    await flush();
+    await clickButton(findButtonByText(harness.container, '确认'));
+    await flush();
+    const postsBeforeCancel = messagePosts(fetchSpy.calls).length;
+    await clickButton(findButtonByText(harness.container, '取消'));
+    await flush();
+
+    assert.equal(messagePosts(fetchSpy.calls).length, postsBeforeCancel);
+    assert.equal(
+      messagePosts(fetchSpy.calls).some((call) => postBody(call).content === '已取消'),
+      false,
+    );
+    const cancelled = chatRows(harness.container).filter(
+      (row) => row.role === 'assistant' && row.content === '已取消',
+    );
+    assert.equal(cancelled.length, 1);
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+test('import success posts result_summary, or the localized success line when it is absent', async () => {
+  const fetchSpy = installDialogFetch();
+  const results: ToolResult[] = [
+    { success: true, message: 'updated', chatMessage: RESULT_SUMMARY },
+    { success: true, message: translations['zh-CN'].studioMeshToolModelUpdated },
+  ];
+  const toolsConfig: AIConversationToolsConfig = {
+    tools: stubToolDef,
+    parseToolCalls: createParseToolCalls('zh-CN'),
+    bannerTexts: zhCnBannerTexts,
+    onExecute: async () => {
+      const next = results.shift();
+      assert.ok(next);
+      return next;
+    },
+  };
+  let turn = 0;
+  __setConversationTurnStreamForTests(async (input) => {
+    turn += 1;
+    input.onToolCalls?.([proposeToolCall]);
+    return { status: 'completed', reply: turn === 1 ? PROPOSE_MODEL_TEXT : '第二次', error: null };
+  });
+  const harness = await renderHistoryModal({ toolsConfig });
+
+  try {
+    await typeAndSend(harness.container, '第一次修改');
+    await flush();
+    await clickButton(findButtonByText(harness.container, '确认'));
+    await flush();
+
+    const summaryPost = messagePosts(fetchSpy.calls).find((call) => postBody(call).content === RESULT_SUMMARY);
+    assert.ok(summaryPost);
+    assert.equal(postBody(summaryPost).role, 'assistant');
+    assert.match(harness.container.textContent ?? '', new RegExp(RESULT_SUMMARY));
+
+    await typeAndSend(harness.container, '第二次修改');
+    await flush();
+    await clickButton(findButtonByText(harness.container, '确认'));
+    await flush();
+
+    const fallback = translations['zh-CN'].studioMeshToolModelUpdated;
+    const fallbackPost = messagePosts(fetchSpy.calls).find((call) => postBody(call).content === fallback);
+    assert.ok(fallbackPost);
+    assert.equal(postBody(fallbackPost).role, 'assistant');
+    assert.match(harness.container.textContent ?? '', new RegExp(fallback.replace('+', '\\+')));
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+test('closed-dialog import success posts the assistant line and does not reopen the dialog', async () => {
+  const fetchSpy = installDialogFetch();
+  let resolveExecute: (result: ToolResult) => void = () => {};
+  const toolsConfig: AIConversationToolsConfig = {
+    tools: stubToolDef,
+    parseToolCalls: createParseToolCalls('zh-CN'),
+    bannerTexts: zhCnBannerTexts,
+    onExecute: () => new Promise((resolve) => {
+      resolveExecute = resolve;
+    }),
+  };
+  const openCalls = { count: 0 };
+  __setConversationTurnStreamForTests(async (input) => {
+    input.onToolCalls?.([proposeToolCall]);
+    return { status: 'completed', reply: PROPOSE_MODEL_TEXT, error: null };
+  });
+  const harness = await renderHistoryModal({
+    toolsConfig,
+    onMeshGenerationFailed: () => {
+      openCalls.count += 1;
+    },
+  });
+
+  try {
+    await typeAndSend(harness.container, '把手臂加长');
+    await flush();
+    await clickButton(findButtonByText(harness.container, '确认'));
+    await flush();
+    await harness.render(false);
+    await act(async () => {
+      resolveExecute({ success: true, message: 'updated', chatMessage: RESULT_SUMMARY });
+      await Promise.resolve();
+    });
+    await flush();
+
+    assert.equal(openCalls.count, 0);
+    const summaryPost = messagePosts(fetchSpy.calls).find(
+      (call) => postBody(call).role === 'assistant' && postBody(call).content === RESULT_SUMMARY,
+    );
+    assert.ok(summaryPost, 'expected the success line to be posted while the dialog is closed');
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+test('sending while the confirm banner is open does not post 已取消 or PATCH', async () => {
+  const fetchSpy = installDialogFetch();
+  const turns: string[] = [];
+  let executeCount = 0;
+  const toolsConfig: AIConversationToolsConfig = {
+    tools: stubToolDef,
+    parseToolCalls: createParseToolCalls('zh-CN'),
+    bannerTexts: zhCnBannerTexts,
+    onExecute: async () => {
+      executeCount += 1;
+      await fetch(`${ROBOTS_API_BASE}/me/projects/ord-9/studio/requirements-document`, { method: 'PATCH' });
+      return { success: true, message: 'ok' };
+    },
+  };
+  __setConversationTurnStreamForTests(async (input) => {
+    turns.push(input.userMessage);
+    if (turns.length === 1) {
+      input.onToolCalls?.([proposeToolCall]);
+      return { status: 'completed', reply: PROPOSE_MODEL_TEXT, error: null };
+    }
+    return { status: 'completed', reply: '继续', error: null };
+  });
+  const harness = await renderHistoryModal({ toolsConfig });
+
+  try {
+    await typeAndSend(harness.container, '把手臂加长');
+    await flush();
+    await typeAndSend(harness.container, '先别改，再说明一下');
+    await flush();
+
+    assert.deepEqual(turns, ['把手臂加长', '先别改，再说明一下']);
+    assert.equal(executeCount, 0);
+    assert.equal(fetchSpy.calls.some((call) => call.init?.method === 'PATCH'), false);
+    assert.equal(
+      messagePosts(fetchSpy.calls).some((call) => postBody(call).content === '已取消'),
+      false,
+    );
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+test('the composer stays disabled while mesh generation is running', async () => {
+  installDialogFetch();
+  let resolveExecute: (result: ToolResult) => void = () => {};
+  const toolsConfig: AIConversationToolsConfig = {
+    tools: stubToolDef,
+    parseToolCalls: createParseToolCalls('zh-CN'),
+    bannerTexts: zhCnBannerTexts,
+    onExecute: () => new Promise((resolve) => {
+      resolveExecute = resolve;
+    }),
+  };
+  __setConversationTurnStreamForTests(async (input) => {
+    input.onToolCalls?.([proposeToolCall]);
+    return { status: 'completed', reply: PROPOSE_MODEL_TEXT, error: null };
+  });
+  const harness = await renderHistoryModal({ toolsConfig });
+
+  try {
+    await typeAndSend(harness.container, '把手臂加长');
+    await flush();
+    await clickButton(findButtonByText(harness.container, '确认'));
+    await flush();
+
+    assert.equal(getTextarea(harness.container).disabled, true);
+    await act(async () => {
+      resolveExecute({ success: false, message: FAILURE_STATUS, chatMessage: FAILURE_STATUS });
+      await Promise.resolve();
+    });
+    await flush();
   } finally {
     await harness.cleanup();
   }

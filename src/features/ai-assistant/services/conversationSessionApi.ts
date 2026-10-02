@@ -178,6 +178,26 @@ export async function syncConversationSnapshot(
   await handleRobotsStudioResponse<ConversationSnapshotPutResponseWire>(response);
 }
 
+export interface ConversationMessageAppendResponse {
+  id: number;
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export async function appendConversationMessage(
+  sessionId: string,
+  role: 'user' | 'assistant',
+  content: string,
+): Promise<ConversationMessageAppendResponse> {
+  const context = requireRobotsStudioContext();
+  const response = await fetch(`${conversationSessionUrl(context, sessionId)}/messages`, {
+    method: 'POST',
+    headers: robotsStudioAuthHeaders(context),
+    body: JSON.stringify({ role, content }),
+  });
+  return handleRobotsStudioResponse<ConversationMessageAppendResponse>(response);
+}
+
 export async function deleteConversationSession(sessionId: string): Promise<void> {
   const context = requireRobotsStudioContext();
   const response = await fetch(conversationSessionUrl(context, sessionId), {
