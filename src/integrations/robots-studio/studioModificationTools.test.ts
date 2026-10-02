@@ -254,6 +254,84 @@ test('composeProposeAssistantContent drops empty model text and keeps the revisi
   );
 });
 
+test('createParseToolCalls composes the same trimmed unescaped revision the row stores', () => {
+  const parseToolCalls = createParseToolCalls('zh-Hant');
+  const parsed = parseToolCalls([
+    {
+      function: {
+        name: 'propose_requirements_revision',
+        arguments: JSON.stringify({
+          change_summary: '  手臂加长\\n再确认  ',
+          section_updates: { '## 性能参数': '完整参数' },
+          history_bullets: ['  手臂约 5 cm\\n底座不变  '],
+        }),
+      },
+    },
+  ]);
+
+  assert.ok(parsed);
+  const summary = parsed.args.change_summary;
+  const bullets = parsed.args.history_bullets;
+  if (typeof summary !== 'string' || !Array.isArray(bullets)) {
+    assert.fail('propose args were not normalized');
+  }
+  const historyBullets = bullets.filter((item): item is string => typeof item === 'string');
+  assert.equal(historyBullets.length, bullets.length);
+  assert.equal(
+    composeProposeAssistantContent('已整理好', summary, historyBullets),
+    '已整理好\n\n手臂加长\n再确认\n- 手臂约 5 cm\n底座不变',
+  );
+});
+
+test('createParseToolCalls rejects an unrecognized section or only-empty bullets', () => {
+  const parseToolCalls = createParseToolCalls('zh-Hant');
+  assert.equal(
+    parseToolCalls([
+      {
+        function: {
+          name: 'propose_requirements_revision',
+          arguments: JSON.stringify({
+            change_summary: '  原始摘要\\n不要入库  ',
+            section_updates: { Background: '完整参数' },
+            history_bullets: ['手臂约 5 cm'],
+          }),
+        },
+      },
+    ]),
+    null,
+  );
+  assert.equal(
+    parseToolCalls([
+      {
+        function: {
+          name: 'propose_requirements_revision',
+          arguments: JSON.stringify({
+            change_summary: '  原始摘要\\n不要入库  ',
+            section_updates: { 性能参数: '完整参数' },
+            history_bullets: ['  ', '', '\\n'],
+          }),
+        },
+      },
+    ]),
+    null,
+  );
+  assert.equal(
+    parseToolCalls([
+      {
+        function: {
+          name: 'propose_requirements_revision',
+          arguments: JSON.stringify({
+            change_summary: '  \\n  ',
+            section_updates: { 性能参数: '完整参数' },
+            history_bullets: ['手臂约 5 cm'],
+          }),
+        },
+      },
+    ]),
+    null,
+  );
+});
+
 test('normalizeSectionUpdates leaves already-real newlines unchanged', () => {
   assert.deepEqual(
     normalizeSectionUpdates({ 性能參數: '- 负载 5kg\n- 臂展 1.2m' }),

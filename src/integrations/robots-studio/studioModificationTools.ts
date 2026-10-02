@@ -275,10 +275,16 @@ export function normalizeSectionUpdates(
 }
 
 function parseHistoryBullets(raw: unknown): string[] | null {
-  if (!Array.isArray(raw) || raw.length === 0) return null;
-  const bullets = raw
-    .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
-    .map((item) => unescapeLiteralEscapes(item.trim()));
+  // A non-string rejects the call. Blanks are dropped after the same one-pass unescape as the summary.
+  if (!Array.isArray(raw)) return null;
+  const bullets: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== 'string') return null;
+    const bullet = unescapeLiteralEscapes(item.trim());
+    if (bullet.trim().length > 0) {
+      bullets.push(bullet);
+    }
+  }
   return bullets.length > 0 ? bullets : null;
 }
 
@@ -296,7 +302,8 @@ function parseProposeToolArgs(
   const sectionUpdates = normalizeSectionUpdates(args.section_updates);
   const historyBullets = parseHistoryBullets(args.history_bullets);
 
-  if (!changeSummary || !sectionUpdates || !historyBullets) {
+  // "\\n" alone unescapes to whitespace. Compose would trim it away, so it is not a revision.
+  if (!changeSummary.trim() || !sectionUpdates || !historyBullets) {
     return null;
   }
 
