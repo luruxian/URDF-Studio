@@ -321,3 +321,129 @@ test('renders English confirm banner labels when lang is en', async () => {
     dom.restore();
   }
 });
+
+test('executing mesh progress replaces the spinner with a bar and percent', async () => {
+  const dom = installDom();
+  try {
+    const rendered = await renderBanner(dom.dom, {
+      ...defaultBannerProps,
+      state: 'executing',
+      bannerTexts: {
+        confirm: '确认',
+        cancel: '取消',
+        retry: '重试',
+        executing: '正在生成...',
+      },
+      progressPercent: 40,
+    });
+    assert.match(rendered.text, /40%/);
+    assert.match(rendered.text, /正在生成\.\.\./);
+    assert.equal(rendered.root?.querySelector('[data-slot="progress"]') != null, true);
+    assert.equal(rendered.root?.querySelector('.animate-spin') != null, false);
+    assert.equal(rendered.root?.getAttribute('aria-busy'), 'true');
+    await rendered.unmount();
+  } finally {
+    dom.restore();
+  }
+});
+
+test('executing without progress keeps the spinner', async () => {
+  const dom = installDom();
+  try {
+    const rendered = await renderBanner(dom.dom, {
+      ...defaultBannerProps,
+      state: 'executing',
+      bannerTexts: {
+        confirm: '确认',
+        cancel: '取消',
+        retry: '重试',
+        executing: '正在生成...',
+      },
+      progressPercent: 0,
+    });
+    assert.match(rendered.text, /0%/);
+    assert.equal(rendered.root?.querySelector('.animate-spin') != null, false);
+
+    const spinning = await renderBanner(dom.dom, {
+      ...defaultBannerProps,
+      state: 'executing',
+      progressPercent: null,
+    });
+    assert.equal(spinning.root?.querySelector('.animate-spin') != null, true);
+    assert.equal(spinning.root?.querySelector('[data-slot="progress"]') != null, false);
+    await rendered.unmount();
+    await spinning.unmount();
+  } finally {
+    dom.restore();
+  }
+});
+
+test('poll failure keeps the last percent and renders no buttons', async () => {
+  const dom = installDom();
+  try {
+    const rendered = await renderBanner(dom.dom, {
+      ...defaultBannerProps,
+      state: 'error',
+      progressPercent: 40,
+      result: {
+        success: false,
+        message: '生成失败，请联系平台客服',
+        hideBannerActions: true,
+      },
+    });
+    assert.match(rendered.text, /40%/);
+    assert.match(rendered.text, /生成失败，请联系平台客服/);
+    assert.equal(rendered.root?.querySelector('.animate-spin') != null, false);
+    assert.equal(rendered.root?.querySelectorAll('button').length, 0);
+    assert.equal(rendered.root?.getAttribute('aria-busy'), 'false');
+    await rendered.unmount();
+  } finally {
+    dom.restore();
+  }
+});
+
+test('poll failure without a number shows only the support message', async () => {
+  const dom = installDom();
+  try {
+    const rendered = await renderBanner(dom.dom, {
+      ...defaultBannerProps,
+      state: 'error',
+      progressPercent: null,
+      result: {
+        success: false,
+        message: '生成失败，请联系平台客服',
+        hideBannerActions: true,
+      },
+    });
+    assert.match(rendered.text, /生成失败，请联系平台客服/);
+    assert.equal(rendered.text.includes('0%'), false);
+    assert.equal(rendered.root?.querySelector('.animate-spin') != null, false);
+    assert.equal(rendered.root?.querySelector('[data-slot="progress"]') != null, false);
+    assert.equal(rendered.root?.querySelectorAll('button').length, 0);
+    await rendered.unmount();
+  } finally {
+    dom.restore();
+  }
+});
+
+test('service cancellation keeps the last percent and renders no buttons', async () => {
+  const dom = installDom();
+  try {
+    const rendered = await renderBanner(dom.dom, {
+      ...defaultBannerProps,
+      state: 'error',
+      progressPercent: 40,
+      onRetry: () => {},
+      result: {
+        success: false,
+        message: '服务被取消，请联系平台客服',
+        hideBannerActions: true,
+      },
+    });
+    assert.match(rendered.text, /服务被取消，请联系平台客服/);
+    assert.equal(rendered.root?.querySelectorAll('button').length, 0);
+    await rendered.unmount();
+  } finally {
+    dom.restore();
+  }
+});

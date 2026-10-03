@@ -1,5 +1,6 @@
 import { AlertCircle, Check, Loader2 } from 'lucide-react';
 
+import { Progress } from '@/shared/components/ui/progress';
 import { translations, type Language } from '@/shared/i18n';
 import type { ParsedToolCall, ToolConfirmBannerTexts, ToolConfirmState, ToolResult } from '../types';
 
@@ -13,6 +14,7 @@ export interface ToolConfirmBannerProps {
   onRetry?: () => void;
   /** When set, overrides agileRobotTool* banner labels (e.g. URDF+STL mesh regenerate). */
   bannerTexts?: ToolConfirmBannerTexts;
+  progressPercent?: number | null;
 }
 
 /**
@@ -20,9 +22,10 @@ export interface ToolConfirmBannerProps {
  *
  * - idle / cancelled -> renders nothing
  * - parsed -> shows the tool summary with confirm/cancel actions
- * - executing -> spinner while the tool action runs
- * - done -> success message
- * - error -> failure message with retry/cancel actions (mesh poll timeout uses warning styling)
+ * - executing -> progress bar and percent when progressPercent is set, otherwise a spinner
+ * - done -> success message (does not read progressPercent)
+ * - error -> failure message with retry/cancel actions (mesh poll timeout uses warning styling).
+ *   hideBannerActions drops those buttons and may keep the last percent.
  *
  * The caller owns the state transitions; this component only renders the
  * current state and forwards the user's confirm/cancel/retry decisions back.
@@ -36,6 +39,7 @@ export function ToolConfirmBanner({
   onCancel,
   onRetry,
   bannerTexts,
+  progressPercent,
 }: ToolConfirmBannerProps) {
   const t = translations[lang];
   const confirmLabel = bannerTexts?.confirm ?? t.agileRobotToolConfirm;
@@ -50,7 +54,10 @@ export function ToolConfirmBanner({
   const isMeshPollTimeout = state === 'error' && result?.meshRetry !== undefined;
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-3">
+    <div
+      className="flex items-center gap-3 rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-3"
+      aria-busy={state === 'executing'}
+    >
       {state === 'parsed' && (
         <>
           <span className="text-base">🎨</span>
@@ -72,12 +79,22 @@ export function ToolConfirmBanner({
         </>
       )}
 
-      {state === 'executing' && (
+      {state === 'executing' && progressPercent !== null && progressPercent !== undefined && (
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <div className="flex w-full max-w-xs items-center gap-3">
+            <Progress value={progressPercent} className="flex-1" />
+            <span className="font-mono text-sm tabular-nums text-gray-600 dark:text-gray-400">
+              {progressPercent}%
+            </span>
+          </div>
+          <span className="text-sm text-gray-600 dark:text-gray-400">{executingLabel}</span>
+        </div>
+      )}
+
+      {state === 'executing' && (progressPercent === null || progressPercent === undefined) && (
         <>
           <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-          <span className="text-sm text-gray-600 dark:text-gray-400">
-            {executingLabel}
-          </span>
+          <span className="text-sm text-gray-600 dark:text-gray-400">{executingLabel}</span>
         </>
       )}
 
@@ -90,7 +107,24 @@ export function ToolConfirmBanner({
         </>
       )}
 
-      {state === 'error' && result && (
+      {state === 'error' && result?.hideBannerActions && (
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          {progressPercent !== null && progressPercent !== undefined && (
+            <div className="flex w-full max-w-xs items-center gap-3">
+              <Progress value={progressPercent} className="flex-1" />
+              <span className="font-mono text-sm tabular-nums text-gray-600 dark:text-gray-400">
+                {progressPercent}%
+              </span>
+            </div>
+          )}
+          <div className="flex items-center gap-3">
+            <AlertCircle className="h-5 w-5 text-red-500" />
+            <span className="flex-1 text-sm text-red-600 dark:text-red-400">{result.message}</span>
+          </div>
+        </div>
+      )}
+
+      {state === 'error' && result && !result.hideBannerActions && (
         <>
           <AlertCircle
             className={`h-5 w-5 ${isMeshPollTimeout ? 'text-warning' : 'text-red-500'}`}
