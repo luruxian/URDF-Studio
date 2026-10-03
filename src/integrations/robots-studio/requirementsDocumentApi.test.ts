@@ -355,12 +355,14 @@ test('getMeshJob GETs the mesh job endpoint without revision query by default', 
       package_type: 'urdf_stl',
       error_code: null,
       error_message: null,
+      progress: 40,
     }),
   ]);
 
   const result = await getMeshJob();
 
   assert.equal(result.status, 'running');
+  assert.equal(result.progress, 40);
   assert.equal(spy.calls.length, 1);
   const { url } = spy.calls[0];
   assert.ok(url.includes('/me/projects/order-123/studio/mesh/job'));
@@ -426,6 +428,7 @@ test('pollMeshJob polls across intervals until done', async (t) => {
       package_type: 'urdf_stl',
       error_code: null,
       error_message: null,
+      progress: 40,
     }),
     jsonResponse({
       job_id: 'job-1',
@@ -435,6 +438,7 @@ test('pollMeshJob polls across intervals until done', async (t) => {
       package_type: 'urdf_stl',
       error_code: null,
       error_message: null,
+      progress: 100,
     }),
   ]);
 
@@ -444,6 +448,7 @@ test('pollMeshJob polls across intervals until done', async (t) => {
   const result = await pollPromise;
   assert.equal(result.status, 'done');
   assert.equal(result.attachment_id, 'att-new');
+  assert.equal(result.progress, 100);
   assert.equal(spy.calls.length, 2);
 });
 

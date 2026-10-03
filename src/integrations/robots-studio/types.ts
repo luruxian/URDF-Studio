@@ -69,6 +69,7 @@ export interface MeshJobResponse {
   error_code: string | null;
   error_message: string | null;
   result_summary?: string | null;
+  progress?: number | null;
 }
 
 export interface MeshImportGrantRequest {
