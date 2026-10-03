@@ -925,12 +925,15 @@ const installMeshToolCallStream = () => {
   });
 };
 
+interface DeferredMeshExecuteResult {
+  success: boolean;
+  message: string;
+  chatMessage: string;
+  hideBannerActions?: boolean;
+}
+
 const createDeferredMeshToolsConfig = () => {
-  let resolveExecute: (result: {
-    success: boolean;
-    message: string;
-    chatMessage: string;
-  }) => void = () => {};
+  let resolveExecute: (result: DeferredMeshExecuteResult) => void = () => {};
   let executeCallCount = 0;
   const toolsConfig: AIConversationToolsConfig = {
     tools: [
@@ -968,16 +971,15 @@ const createDeferredMeshToolsConfig = () => {
 
   return {
     toolsConfig,
-    resolveExecute: (result: {
-      success: boolean;
-      message: string;
-      chatMessage: string;
-    }) => resolveExecute(result),
+    resolveExecute: (result: DeferredMeshExecuteResult) => resolveExecute(result),
     getExecuteCallCount: () => executeCallCount,
   };
 };
 
-const startClosedDialogMeshExecution = async () => {
+const startClosedDialogMeshExecution = async (options?: {
+  onMeshProgressChange?: (progress: number | null) => void;
+  stopBeforeConfirm?: boolean;
+}) => {
   const dom = installDom();
   const robotsEnv = setRobotsConversationEnv();
   mockConversationSessionFetch();
@@ -1006,6 +1008,7 @@ const startClosedDialogMeshExecution = async () => {
           onApply={() => true}
           toolsConfig={deferred.toolsConfig}
           onMeshGenerationFailed={onMeshGenerationFailed}
+          onMeshProgressChange={options?.onMeshProgressChange}
         />,
       );
     });
@@ -1016,11 +1019,13 @@ const startClosedDialogMeshExecution = async () => {
   await flush();
   await typeAndSend(container, '把手臂加长 5cm');
   await flush();
-  await clickButton(findButtonByText(container, '确认'));
-  await flush();
+  if (!options?.stopBeforeConfirm) {
+    await clickButton(findButtonByText(container, '确认'));
+    await flush();
 
-  assert.match(container.textContent || '', new RegExp(MESH_TOOL_EXECUTING_BANNER));
-  assert.equal(deferred.getExecuteCallCount(), 1);
+    assert.match(container.textContent || '', new RegExp(MESH_TOOL_EXECUTING_BANNER));
+    assert.equal(deferred.getExecuteCallCount(), 1);
+  }
 
   return {
     container,
@@ -1086,6 +1091,57 @@ test('closed dialog mesh success does not reopen the dialog', async () => {
     await flush();
 
     assert.equal(harness.meshGenerationFailedCalls.count, 0);
+  } finally {
+    await harness.cleanup();
+  }
+});
+
+test('mesh progress clears on execute and plain error, and stays on a hidden-action failure', async () => {
+  const progressCalls: Array<number | null> = [];
+  const harness = await startClosedDialogMeshExecution({
+    onMeshProgressChange: (progress) => {
+      progressCalls.push(progress);
+    },
+    stopBeforeConfirm: true,
+  });
+
+  const resolveExecute = async (result: DeferredMeshExecuteResult) => {
+    await act(async () => {
+      harness.deferred.resolveExecute(result);
+      await Promise.resolve();
+    });
+    await flush();
+  };
+
+  try {
+    const beforeExecute = progressCalls.length;
+    await clickButton(findButtonByText(harness.container, '确认'));
+    await flush();
+    assert.equal(harness.deferred.getExecuteCallCount(), 1);
+    assert.deepEqual(progressCalls.slice(beforeExecute), [null]);
+
+    const callsAfterExecute = progressCalls.length;
+    await resolveExecute({
+      success: false,
+      message: '生成失败，请联系平台客服',
+      chatMessage: '生成失败，请联系平台客服',
+      hideBannerActions: true,
+    });
+    assert.equal(progressCalls.length, callsAfterExecute);
+    assert.match(harness.container.textContent || '', /生成失败，请联系平台客服/);
+
+    await typeAndSend(harness.container, '再改一次手臂');
+    await flush();
+    await clickButton(findButtonByText(harness.container, '确认'));
+    await flush();
+    const beforePlainError = progressCalls.length;
+    await resolveExecute({
+      success: false,
+      message: 'URDF+STL regeneration failed',
+      chatMessage: 'URDF+STL regeneration failed',
+    });
+    assert.deepEqual(progressCalls.slice(beforePlainError), [null]);
+    assert.match(harness.container.textContent || '', /URDF\+STL regeneration failed/);
   } finally {
     await harness.cleanup();
   }

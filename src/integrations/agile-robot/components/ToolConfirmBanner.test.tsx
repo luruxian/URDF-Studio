@@ -169,7 +169,7 @@ test('renders the parsed tool summary with confirm and cancel actions', async ()
       state: 'parsed',
     });
     assert.match(rendered.text, /将机身改为橙色，保留原视角/);
-    assert.match(rendered.text, /确认/);
+    assert.match(rendered.text, /確認/);
     assert.match(rendered.text, /取消/);
     await rendered.unmount();
   } finally {
@@ -188,7 +188,7 @@ test('calls onConfirm when the confirm button is clicked', async () => {
         confirmed += 1;
       },
     });
-    await rendered.click('确认');
+    await rendered.click('確認');
     assert.equal(confirmed, 1);
     await rendered.unmount();
   } finally {
@@ -281,7 +281,7 @@ test('renders the error message and calls onRetry when retry is clicked', async 
     });
     assert.match(rendered.text, /生成失败：上游错误/);
     assert.match(rendered.text, /取消/);
-    await rendered.click('重试');
+    await rendered.click('重試');
     assert.equal(retried, 1);
     await rendered.unmount();
   } finally {
@@ -298,7 +298,7 @@ test('renders the error state without a retry button when onRetry is omitted', a
       result: { success: false, message: '生成失败：上游错误' },
     });
     assert.match(rendered.text, /生成失败：上游错误/);
-    assert.doesNotMatch(rendered.text, /重试/);
+    assert.doesNotMatch(rendered.text, /重試/);
     assert.match(rendered.text, /取消/);
     await rendered.unmount();
   } finally {
