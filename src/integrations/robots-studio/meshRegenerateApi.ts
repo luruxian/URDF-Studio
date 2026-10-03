@@ -101,6 +101,7 @@ function throwIfPollAborted(signal?: AbortSignal): void {
 export async function pollMeshJob(
   revision?: number,
   signal?: AbortSignal,
+  onProgress?: (progress: number | null) => void,
 ): Promise<MeshJobResponse> {
   while (true) {
     throwIfPollAborted(signal);
@@ -110,6 +111,7 @@ export async function pollMeshJob(
       if (isTerminalMeshJobStatus(job.status)) {
         return job;
       }
+      onProgress?.(job.progress ?? null);
     } catch {
       // A failure during getMeshJob can race with abort. Cancellation wins; otherwise wait and query again.
       throwIfPollAborted(signal);

@@ -628,3 +628,68 @@ test('createMeshImportGrant omits attachment_id when not provided', async () => 
 
   assert.deepEqual(JSON.parse(String(spy.calls[0].init?.body)), {});
 });
+
+test('pollMeshJob reports in-progress values and skips errors and the terminal response', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  storeBootstrapAndAuth();
+  installFetchMock([
+    () => {
+      throw new TypeError('network down');
+    },
+    jsonResponse({
+      job_id: 'job-1',
+      revision: 4,
+      status: 'running',
+      attachment_id: null,
+      package_type: 'urdf_stl',
+      error_code: null,
+      error_message: null,
+      progress: 40,
+    }),
+    jsonResponse({
+      job_id: 'job-1',
+      revision: 4,
+      status: 'running',
+      attachment_id: null,
+      package_type: 'urdf_stl',
+      error_code: null,
+      error_message: null,
+      progress: null,
+    }),
+    jsonResponse({
+      job_id: 'job-1',
+      revision: 4,
+      status: 'failed',
+      attachment_id: null,
+      package_type: 'urdf_stl',
+      error_code: 'mesh_failed',
+      error_message: 'boom',
+      progress: 90,
+    }),
+  ]);
+
+  const seen: Array<number | null> = [];
+  const pollPromise = pollMeshJob(4, undefined, (progress) => {
+    seen.push(progress);
+  });
+  await drivePollUntilSettled(t, pollPromise, 6);
+  const result = await pollPromise;
+
+  assert.deepEqual(seen, [40, null]);
+  assert.equal(result.status, 'failed');
+  assert.equal(result.progress, 90);
+});
+
+test('pollMeshJob does not report progress when the request is already aborted', async () => {
+  storeBootstrapAndAuth();
+  const controller = new AbortController();
+  controller.abort();
+  const seen: Array<number | null> = [];
+
+  await assert.rejects(
+    () => pollMeshJob(4, controller.signal, (progress) => {
+      seen.push(progress);
+    }),
+  );
+  assert.deepEqual(seen, []);
+});
