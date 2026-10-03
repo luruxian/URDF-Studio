@@ -877,8 +877,9 @@ test('onExecute surfaces failed mesh jobs', async () => {
   const result = await config.onExecute(proposeCall);
 
   assert.equal(result.success, false);
-  assert.equal(result.message, 'boom');
-  assert.equal(result.chatMessage, 'boom');
+  assert.equal(result.message, 'Generation failed. Please contact platform support.');
+  assert.equal(result.chatMessage, 'Generation failed. Please contact platform support.');
+  assert.equal(result.hideBannerActions, true);
 });
 
 test('onExecute replaces a service cancellation with the support message', async () => {
@@ -918,6 +919,90 @@ test('onExecute replaces a service cancellation with the support message', async
   assert.equal(result.success, false);
   assert.equal(result.message, '服务被取消，请联系平台客服');
   assert.equal(result.chatMessage, '服务被取消，请联系平台客服');
+  assert.equal(result.hideBannerActions, true);
+});
+
+test('onExecute reports coerced mesh progress and omits the terminal update', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  storeBootstrapAndAuth();
+  const seen: Array<number | null> = [];
+  installFetchMock([
+    savedDocument,
+    patchedDocument,
+    jsonResponse(
+      {
+        job_id: 'job-1',
+        revision: 4,
+        status: 'queued',
+        external_job_id: 'ext-1',
+      },
+      202,
+    ),
+    jsonResponse({
+      job_id: 'job-1',
+      revision: 4,
+      status: 'running',
+      attachment_id: null,
+      package_type: 'urdf_stl',
+      error_code: null,
+      error_message: null,
+      progress: 40,
+    }),
+    jsonResponse({
+      job_id: 'job-1',
+      revision: 4,
+      status: 'running',
+      attachment_id: null,
+      package_type: 'urdf_stl',
+      error_code: null,
+      error_message: null,
+      progress: 101,
+    }),
+    jsonResponse({
+      job_id: 'job-1',
+      revision: 4,
+      status: 'running',
+      attachment_id: null,
+      package_type: 'urdf_stl',
+      error_code: null,
+      error_message: null,
+      progress: 10,
+    }),
+    jsonResponse({
+      job_id: 'job-1',
+      revision: 4,
+      status: 'done',
+      attachment_id: 'att-new',
+      package_type: 'urdf_stl',
+      error_code: null,
+      error_message: null,
+      progress: 100,
+    }),
+    jsonResponse({
+      package_type: 'urdf_stl',
+      import_grant_id: 'pvw_abc',
+      from_origin: 'https://robots.example.com',
+      expires_at: '2026-08-27T06:00:00Z',
+      attachment_id: 'att-new',
+    }),
+  ]);
+
+  const config = await createStudioModificationTools({
+    lang: 'zh-CN',
+    packageType: 'urdf_stl',
+    importUrdfPackage: async () => {},
+    onMeshProgress: (progress) => {
+      seen.push(progress);
+    },
+  });
+  assert.ok(config);
+
+  const resultPromise = config.onExecute(proposeCall);
+  await drivePollUntilSettled(t, resultPromise, 8);
+  const result = await resultPromise;
+
+  assert.equal(result.success, true);
+  assert.deepEqual(seen, [40, null, 10]);
 });
 
 test('onExecute forwards AbortSignal to pollMeshJob', async (t) => {

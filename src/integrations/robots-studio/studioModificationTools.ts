@@ -18,10 +18,10 @@ import type { Language } from '@/shared/i18n';
 
 import {
   createMeshImportGrant,
-  formatMeshJobFailure,
   pollMeshJob,
   regenerateMesh,
 } from './meshRegenerateApi';
+import { meshJobProgressPercent } from './meshJobProgress';
 import type { MeshJobResponse } from './types';
 import {
   getRequirementsDocument,
@@ -54,6 +54,8 @@ export interface CreateStudioModificationToolsOptions {
   signal?: AbortSignal;
   /** When omitted, resolved once via getRequirementsDocument(). */
   packageType?: StudioPackageType;
+  /** Coerced 0–100 progress, or null when the latest in-progress payload has none. */
+  onMeshProgress?: (progress: number | null) => void;
 }
 
 interface RawToolCall {
@@ -382,11 +384,12 @@ async function importFromMeshJob(
   if (job.status === 'failed') {
     const failureMessage = job.error_code === 'cancelled'
       ? texts.studioMeshToolServiceCancelled
-      : formatMeshJobFailure(job, texts.studioMeshToolGenerationFailed);
+      : texts.studioMeshToolGenerationFailed;
     return {
       success: false,
       message: failureMessage,
       chatMessage: failureMessage,
+      hideBannerActions: true,
     };
   }
 
@@ -428,7 +431,9 @@ async function waitMeshJobAndImport(
   options: CreateStudioModificationToolsOptions,
   texts: ReturnType<typeof getStudioMeshToolTexts>,
 ): Promise<ToolResult> {
-  const job = await pollMeshJob(revision, options.signal);
+  const job = await pollMeshJob(revision, options.signal, (progress) => {
+    options.onMeshProgress?.(meshJobProgressPercent(progress));
+  });
   return importFromMeshJob(job, options, texts);
 }
 

@@ -86,6 +86,8 @@ export interface ToolResult {
   /** When set, tool retry should resume/continue mesh polling instead of re-running the tool. */
   meshRetry?: MeshToolRetryAction;
   meshRevision?: number;
+  /** Poll failure/cancellation renders the message without action buttons. */
+  hideBannerActions?: boolean;
 }
 
 /** Localized labels for ToolConfirmBanner when a tools config supplies custom copy. */
