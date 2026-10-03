@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { AIConversationModal } from '@/features/ai-assistant';
 import type { AIConversationLaunchContext } from '@/features/ai-assistant';
 import type { UrdfPackageImportPort } from '@/integrations/robots-studio';
@@ -16,17 +17,23 @@ interface AIConversationConnectorProps {
   onMeshGenerationFailed?: () => void;
 }
 
-export function AIConversationConnector({
-  isOpen,
-  onClose,
-  lang,
-  launchContext,
-  onStartNewConversation,
-  onApply,
-  importUrdfPackage,
-  onMeshGenerationFailed,
-}: AIConversationConnectorProps) {
-  const toolsConfig = useStudioModificationTools({ importUrdfPackage, lang });
+export function AIConversationConnector(props: AIConversationConnectorProps) {
+  const {
+    isOpen,
+    onClose,
+    lang,
+    launchContext,
+    onStartNewConversation,
+    onApply,
+    importUrdfPackage,
+    onMeshGenerationFailed,
+  } = props;
+  const [meshProgress, setMeshProgress] = useState<number | null>(null);
+  const toolsConfig = useStudioModificationTools({
+    importUrdfPackage,
+    lang,
+    onMeshProgress: setMeshProgress,
+  });
 
   return (
     <AIConversationModal
@@ -38,6 +45,8 @@ export function AIConversationConnector({
       onApply={onApply}
       toolsConfig={toolsConfig}
       onMeshGenerationFailed={onMeshGenerationFailed}
+      meshProgress={meshProgress}
+      onMeshProgressChange={setMeshProgress}
     />
   );
 }

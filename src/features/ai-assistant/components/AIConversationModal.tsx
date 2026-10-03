@@ -74,6 +74,8 @@ interface AIConversationModalProps {
   onApply: (componentId: string, proposedUrdf: string) => boolean;
   toolsConfig?: AIConversationToolsConfig | null;
   onMeshGenerationFailed?: () => void;
+  meshProgress?: number | null;
+  onMeshProgressChange?: (progress: number | null) => void;
 }
 
 interface ConversationSubmissionState {
@@ -191,6 +193,8 @@ export function AIConversationModal({
   onApply: _onApply,
   toolsConfig,
   onMeshGenerationFailed,
+  meshProgress,
+  onMeshProgressChange,
 }: AIConversationModalProps) {
   const t = translations[lang];
   const bootstrap = getBootstrap();
@@ -272,6 +276,22 @@ export function AIConversationModal({
   const [toolConfirmState, setToolConfirmState] = useState<ToolConfirmState>('idle');
   const [pendingToolCall, setPendingToolCall] = useState<ParsedToolCall | null>(null);
   const [toolResult, setToolResult] = useState<ToolResult | null>(null);
+  const toolConfirmStateRef = useRef(toolConfirmState);
+  useEffect(() => {
+    const previous = toolConfirmStateRef.current;
+    toolConfirmStateRef.current = toolConfirmState;
+    if (previous === toolConfirmState) {
+      return;
+    }
+    if (toolConfirmState === 'executing') {
+      onMeshProgressChange?.(null);
+      return;
+    }
+    if (toolConfirmState === 'error' && toolResult?.hideBannerActions) {
+      return;
+    }
+    onMeshProgressChange?.(null);
+  }, [onMeshProgressChange, toolConfirmState, toolResult]);
 
   const isMountedRef = useRef(false);
   const requestIdRef = useRef(0);
@@ -1185,6 +1205,7 @@ export function AIConversationModal({
                   toolCall={pendingToolCall}
                   result={toolResult ?? undefined}
                   bannerTexts={toolsConfig.bannerTexts}
+                  progressPercent={meshProgress}
                   onConfirm={() => {
                     void handleToolConfirm();
                   }}

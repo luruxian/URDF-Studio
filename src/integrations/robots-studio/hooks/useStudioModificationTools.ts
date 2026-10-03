@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AIConversationToolsConfig } from '@/integrations/agile-robot/types';
 import type { Language } from '@/shared/i18n';
 
@@ -10,6 +10,7 @@ import {
 export interface UseStudioModificationToolsOptions {
   lang: Language;
   importUrdfPackage: UrdfPackageImportPort['importUrdfPackage'];
+  onMeshProgress?: (progress: number | null) => void;
 }
 
 /**
@@ -19,13 +20,21 @@ export interface UseStudioModificationToolsOptions {
 export function useStudioModificationTools(
   options: UseStudioModificationToolsOptions,
 ): AIConversationToolsConfig | null {
-  const { lang, importUrdfPackage } = options;
+  const { lang, importUrdfPackage, onMeshProgress } = options;
+  const onMeshProgressRef = useRef(onMeshProgress);
+  onMeshProgressRef.current = onMeshProgress;
   const [toolsConfig, setToolsConfig] = useState<AIConversationToolsConfig | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    void createStudioModificationTools({ lang, importUrdfPackage }).then((config) => {
+    void createStudioModificationTools({
+      lang,
+      importUrdfPackage,
+      onMeshProgress: (progress) => {
+        onMeshProgressRef.current?.(progress);
+      },
+    }).then((config) => {
       if (!cancelled) {
         setToolsConfig(config);
       }
