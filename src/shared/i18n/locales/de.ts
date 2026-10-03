@@ -1105,14 +1105,14 @@ export const de: TranslationKeys = {
   studioMeshToolConfirm: 'Bestätigen',
   studioMeshToolCancel: 'Abbrechen',
   studioMeshToolRetry: 'Erneut versuchen',
-  studioMeshToolExecuting: 'Simulationsmodell wird neu generiert. Bitte warten Sie 15–30 Minuten.',
+  studioMeshToolExecuting: 'Wird generiert...',
   studioMeshToolProposeSummary: 'Anforderungsdokument-Revision einreichen',
   studioMeshToolSessionExpired:
     'Sitzung abgelaufen. Kehren Sie zur Hauptseite zurück und öffnen Sie die Vorschau erneut.',
   studioMeshToolModelUpdated: 'URDF+STL aktualisiert',
   studioMeshToolPreviewNotConnected:
     'URDF+STL erstellt, aber die Vorschau-Aktualisierung ist nicht angebunden',
-  studioMeshToolGenerationFailed: 'URDF+STL-Neugenerierung fehlgeschlagen',
+  studioMeshToolGenerationFailed: 'Die Generierung ist fehlgeschlagen. Bitte wenden Sie sich an den Plattform-Support.',
   studioMeshToolServiceCancelled: 'Der Dienst wurde abgebrochen. Bitte wenden Sie sich an den Plattform-Support.',
   studioMeshToolCancelled: 'Abgebrochen',
   studioMeshToolJobInProgress:

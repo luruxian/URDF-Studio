@@ -1105,14 +1105,14 @@ export const fr: TranslationKeys = {
   studioMeshToolConfirm: 'Confirmer',
   studioMeshToolCancel: 'Annuler',
   studioMeshToolRetry: 'Réessayer',
-  studioMeshToolExecuting: 'Régénération du modèle de simulation. Veuillez patienter 15 à 30 minutes.',
+  studioMeshToolExecuting: 'Génération...',
   studioMeshToolProposeSummary: 'Soumettre une révision du document d’exigences',
   studioMeshToolSessionExpired:
     'Session expirée. Retournez sur le site principal et rouvrez l’aperçu.',
   studioMeshToolModelUpdated: 'URDF+STL mis à jour',
   studioMeshToolPreviewNotConnected:
     'URDF+STL généré, mais l’actualisation de l’aperçu n’est pas connectée',
-  studioMeshToolGenerationFailed: 'Échec de la régénération URDF+STL',
+  studioMeshToolGenerationFailed: 'La génération a échoué. Veuillez contacter le support de la plateforme.',
   studioMeshToolServiceCancelled: 'Le service a été annulé. Veuillez contacter le support de la plateforme.',
   studioMeshToolCancelled: 'Annulé',
   studioMeshToolJobInProgress:

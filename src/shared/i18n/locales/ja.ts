@@ -1090,14 +1090,14 @@ export const ja: TranslationKeys = {
   studioMeshToolConfirm: '確認',
   studioMeshToolCancel: 'キャンセル',
   studioMeshToolRetry: '再試行',
-  studioMeshToolExecuting: 'シミュレーションモデルを再生成しています。15〜30分ほどお待ちください。',
+  studioMeshToolExecuting: '生成中...',
   studioMeshToolProposeSummary: '要件確認書の改訂を提出',
   studioMeshToolSessionExpired:
     'セッションの有効期限が切れました。メインサイトに戻り、プレビューを再度開いてください。',
   studioMeshToolModelUpdated: 'URDF+STL を更新しました',
   studioMeshToolPreviewNotConnected:
     'URDF+STL は生成されましたが、プレビューの更新が接続されていません',
-  studioMeshToolGenerationFailed: 'URDF+STL の再生成に失敗しました',
+  studioMeshToolGenerationFailed: '生成に失敗しました。プラットフォームのサポートへご連絡ください。',
   studioMeshToolServiceCancelled: 'サービスがキャンセルされました。プラットフォームのサポートへご連絡ください。',
   studioMeshToolCancelled: 'キャンセルしました',
   studioMeshToolJobInProgress:

@@ -2018,13 +2018,25 @@ test('cancel on the failure banner while the retry history POST is pending does 
   }
 });
 
-test('studioMeshToolExecuting asks the user to wait 15 to 30 minutes', () => {
-  assert.equal(translations['zh-CN'].studioMeshToolExecuting, '正在重新生成仿真模型，请稍候15-30分钟');
-  assert.equal(translations['zh-Hant'].studioMeshToolExecuting, '正在重新生成仿真模型，請稍候15-30分鐘');
-  assert.equal(translations.en.studioMeshToolExecuting, 'Regenerating the simulation model. Please wait 15–30 minutes.');
-  assert.equal(translations.ja.studioMeshToolExecuting, 'シミュレーションモデルを再生成しています。15〜30分ほどお待ちください。');
-  assert.equal(translations.ko.studioMeshToolExecuting, '시뮬레이션 모델을 다시 생성하는 중입니다. 15–30분 정도 기다려 주세요.');
-  assert.equal(translations.fr.studioMeshToolExecuting, 'Régénération du modèle de simulation. Veuillez patienter 15 à 30 minutes.');
-  assert.equal(translations.de.studioMeshToolExecuting, 'Simulationsmodell wird neu generiert. Bitte warten Sie 15–30 Minuten.');
-  assert.equal(translations.es.studioMeshToolExecuting, 'Regenerando el modelo de simulación. Espere 15–30 minutos.');
+test('studio mesh tool copy uses the short executing label and support failure message', () => {
+  assert.equal(translations['zh-CN'].studioMeshToolExecuting, '正在生成...');
+  assert.equal(translations['zh-Hant'].studioMeshToolExecuting, '正在生成...');
+  assert.equal(translations.en.studioMeshToolExecuting, 'Generating...');
+  assert.equal(translations.ja.studioMeshToolExecuting, '生成中...');
+  assert.equal(translations.ko.studioMeshToolExecuting, '생성 중...');
+  assert.equal(translations.fr.studioMeshToolExecuting, 'Génération...');
+  assert.equal(translations.de.studioMeshToolExecuting, 'Wird generiert...');
+  assert.equal(translations.es.studioMeshToolExecuting, 'Generando...');
+
+  assert.equal(translations['zh-CN'].studioMeshToolGenerationFailed, '生成失败，请联系平台客服');
+  assert.equal(translations['zh-Hant'].studioMeshToolGenerationFailed, '生成失敗，請聯絡平台客服');
+  assert.equal(translations.en.studioMeshToolGenerationFailed, 'Generation failed. Please contact platform support.');
+  assert.equal(translations.ja.studioMeshToolGenerationFailed, '生成に失敗しました。プラットフォームのサポートへご連絡ください。');
+  assert.equal(translations.ko.studioMeshToolGenerationFailed, '생성에 실패했습니다. 플랫폼 고객센터로 문의해 주세요.');
+  assert.equal(translations.fr.studioMeshToolGenerationFailed, 'La génération a échoué. Veuillez contacter le support de la plateforme.');
+  assert.equal(translations.de.studioMeshToolGenerationFailed, 'Die Generierung ist fehlgeschlagen. Bitte wenden Sie sich an den Plattform-Support.');
+  assert.equal(translations.es.studioMeshToolGenerationFailed, 'La generación falló. Contacte al soporte de la plataforma.');
+
+  assert.equal(translations['zh-CN'].studioMeshToolServiceCancelled, '服务被取消，请联系平台客服');
+  assert.equal(translations.en.studioMeshToolServiceCancelled, 'The service was cancelled. Please contact platform support.');
 });
