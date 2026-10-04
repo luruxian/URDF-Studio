@@ -1098,6 +1098,7 @@ export const ja: TranslationKeys = {
   studioMeshToolPreviewNotConnected:
     'URDF+STL は生成されましたが、プレビューの更新が接続されていません',
   studioMeshToolGenerationFailed: '生成に失敗しました。プラットフォームのサポートへご連絡ください。',
+  studioMeshToolGenerationStopped: 'ご要望の複雑度が高いため、モデル生成を中止しました。プラットフォームのサポートまでご連絡ください。',
   studioMeshToolServiceCancelled: 'サービスがキャンセルされました。プラットフォームのサポートへご連絡ください。',
   studioMeshToolCancelled: 'キャンセルしました',
   studioMeshToolJobInProgress:

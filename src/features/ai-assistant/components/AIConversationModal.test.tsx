@@ -1123,12 +1123,18 @@ test('mesh progress clears on execute and plain error, and stays on a hidden-act
     const callsAfterExecute = progressCalls.length;
     await resolveExecute({
       success: false,
-      message: '生成失败，请联系平台客服',
-      chatMessage: '生成失败，请联系平台客服',
+      message: '由于您的需求复杂度较高，模型生成已中止，请与平台客服联系。',
+      chatMessage: '由于您的需求复杂度较高，模型生成已中止，请与平台客服联系。',
       hideBannerActions: true,
     });
     assert.equal(progressCalls.length, callsAfterExecute);
-    assert.match(harness.container.textContent || '', /生成失败，请联系平台客服/);
+    assert.match(harness.container.textContent || '', /由于您的需求复杂度较高，模型生成已中止，请与平台客服联系。/);
+    const transcript = [...harness.container.querySelectorAll('[data-conversation-content]')]
+      .map((node) => node.getAttribute('data-conversation-content'));
+    assert.equal(
+      transcript.includes('由于您的需求复杂度较高，模型生成已中止，请与平台客服联系。'),
+      false,
+    );
 
     await typeAndSend(harness.container, '再改一次手臂');
     await flush();
@@ -2092,6 +2098,15 @@ test('studio mesh tool copy uses the short executing label and support failure m
   assert.equal(translations.fr.studioMeshToolGenerationFailed, 'La génération a échoué. Veuillez contacter le support de la plateforme.');
   assert.equal(translations.de.studioMeshToolGenerationFailed, 'Die Generierung ist fehlgeschlagen. Bitte wenden Sie sich an den Plattform-Support.');
   assert.equal(translations.es.studioMeshToolGenerationFailed, 'La generación falló. Contacte al soporte de la plataforma.');
+
+  assert.equal(translations['zh-CN'].studioMeshToolGenerationStopped, '由于您的需求复杂度较高，模型生成已中止，请与平台客服联系。');
+  assert.equal(translations['zh-Hant'].studioMeshToolGenerationStopped, '由於您的需求複雜度較高，模型生成已中止，請與平台客服聯絡。');
+  assert.equal(translations.en.studioMeshToolGenerationStopped, 'Model generation has been stopped because your request is highly complex. Please contact platform support.');
+  assert.equal(translations.ja.studioMeshToolGenerationStopped, 'ご要望の複雑度が高いため、モデル生成を中止しました。プラットフォームのサポートまでご連絡ください。');
+  assert.equal(translations.ko.studioMeshToolGenerationStopped, '요청하신 내용의 복잡도가 높아 모델 생성이 중단되었습니다. 플랫폼 고객센터로 문의해 주세요.');
+  assert.equal(translations.fr.studioMeshToolGenerationStopped, 'La génération du modèle a été interrompue, car votre demande est très complexe. Veuillez contacter le support de la plateforme.');
+  assert.equal(translations.de.studioMeshToolGenerationStopped, 'Die Modellgenerierung wurde abgebrochen, weil Ihre Anforderung sehr komplex ist. Bitte kontaktieren Sie den Plattform-Support.');
+  assert.equal(translations.es.studioMeshToolGenerationStopped, 'La generación del modelo se ha interrumpido porque su solicitud es muy compleja. Contacte con el soporte de la plataforma.');
 
   assert.equal(translations['zh-CN'].studioMeshToolServiceCancelled, '服务被取消，请联系平台客服');
   assert.equal(translations.en.studioMeshToolServiceCancelled, 'The service was cancelled. Please contact platform support.');

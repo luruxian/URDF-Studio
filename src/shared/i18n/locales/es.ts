@@ -1111,6 +1111,7 @@ export const es: TranslationKeys = {
   studioMeshToolPreviewNotConnected:
     'URDF+STL generado, pero la actualización de la vista previa no está conectada',
   studioMeshToolGenerationFailed: 'La generación falló. Contacte al soporte de la plataforma.',
+  studioMeshToolGenerationStopped: 'La generación del modelo se ha interrumpido porque su solicitud es muy compleja. Contacte con el soporte de la plataforma.',
   studioMeshToolServiceCancelled: 'El servicio fue cancelado. Contacte al soporte de la plataforma.',
   studioMeshToolCancelled: 'Cancelado',
   studioMeshToolJobInProgress:

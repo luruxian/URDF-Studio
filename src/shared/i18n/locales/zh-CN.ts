@@ -1043,6 +1043,7 @@ export const zhCn: TranslationKeys = {
   studioMeshToolModelUpdated: 'URDF+STL 已更新',
   studioMeshToolPreviewNotConnected: 'URDF+STL 已生成，但预览刷新未接入',
   studioMeshToolGenerationFailed: '生成失败，请联系平台客服',
+  studioMeshToolGenerationStopped: '由于您的需求复杂度较高，模型生成已中止，请与平台客服联系。',
   studioMeshToolServiceCancelled: '服务被取消，请联系平台客服',
   studioMeshToolCancelled: '已取消',
   studioMeshToolJobInProgress: 'URDF+STL 再生成任务正在进行中，请等待完成',

@@ -384,7 +384,7 @@ async function importFromMeshJob(
   if (job.status === 'failed') {
     const failureMessage = job.error_code === 'cancelled'
       ? texts.studioMeshToolServiceCancelled
-      : texts.studioMeshToolGenerationFailed;
+      : texts.studioMeshToolGenerationStopped;
     return {
       success: false,
       message: failureMessage,

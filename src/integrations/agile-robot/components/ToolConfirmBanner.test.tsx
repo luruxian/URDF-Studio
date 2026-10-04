@@ -387,12 +387,12 @@ test('poll failure keeps the last percent and renders no buttons', async () => {
       progressPercent: 40,
       result: {
         success: false,
-        message: '生成失败，请联系平台客服',
+        message: '由于您的需求复杂度较高，模型生成已中止，请与平台客服联系。',
         hideBannerActions: true,
       },
     });
     assert.match(rendered.text, /40%/);
-    assert.match(rendered.text, /生成失败，请联系平台客服/);
+    assert.match(rendered.text, /由于您的需求复杂度较高，模型生成已中止，请与平台客服联系。/);
     assert.equal(rendered.root?.querySelector('.animate-spin') != null, false);
     assert.equal(rendered.root?.querySelectorAll('button').length, 0);
     assert.equal(rendered.root?.getAttribute('aria-busy'), 'false');
@@ -411,11 +411,11 @@ test('poll failure without a number shows only the support message', async () =>
       progressPercent: null,
       result: {
         success: false,
-        message: '生成失败，请联系平台客服',
+        message: '由于您的需求复杂度较高，模型生成已中止，请与平台客服联系。',
         hideBannerActions: true,
       },
     });
-    assert.match(rendered.text, /生成失败，请联系平台客服/);
+    assert.match(rendered.text, /由于您的需求复杂度较高，模型生成已中止，请与平台客服联系。/);
     assert.equal(rendered.text.includes('0%'), false);
     assert.equal(rendered.root?.querySelector('.animate-spin') != null, false);
     assert.equal(rendered.root?.querySelector('[data-slot="progress"]') != null, false);

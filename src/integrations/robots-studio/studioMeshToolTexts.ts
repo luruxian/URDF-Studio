@@ -11,6 +11,7 @@ export type StudioMeshToolTexts = Pick<
   | 'studioMeshToolModelUpdated'
   | 'studioMeshToolPreviewNotConnected'
   | 'studioMeshToolGenerationFailed'
+  | 'studioMeshToolGenerationStopped'
   | 'studioMeshToolServiceCancelled'
   | 'studioMeshToolCancelled'
   | 'studioMeshToolJobInProgress'
@@ -40,6 +41,7 @@ export function getStudioMeshToolTexts(lang: Language): StudioMeshToolTexts {
     studioMeshToolModelUpdated: t.studioMeshToolModelUpdated,
     studioMeshToolPreviewNotConnected: t.studioMeshToolPreviewNotConnected,
     studioMeshToolGenerationFailed: t.studioMeshToolGenerationFailed,
+    studioMeshToolGenerationStopped: t.studioMeshToolGenerationStopped,
     studioMeshToolServiceCancelled: t.studioMeshToolServiceCancelled,
     studioMeshToolCancelled: t.studioMeshToolCancelled,
     studioMeshToolJobInProgress: t.studioMeshToolJobInProgress,

@@ -877,9 +877,94 @@ test('onExecute surfaces failed mesh jobs', async () => {
   const result = await config.onExecute(proposeCall);
 
   assert.equal(result.success, false);
-  assert.equal(result.message, 'Generation failed. Please contact platform support.');
-  assert.equal(result.chatMessage, 'Generation failed. Please contact platform support.');
+  assert.equal(
+    result.message,
+    'Model generation has been stopped because your request is highly complex. Please contact platform support.',
+  );
+  assert.equal(
+    result.chatMessage,
+    'Model generation has been stopped because your request is highly complex. Please contact platform support.',
+  );
   assert.equal(result.hideBannerActions, true);
+});
+
+test('onExecute uses the complexity notice when a failed mesh job has no error code', async () => {
+  storeBootstrapAndAuth();
+  installFetchMock([
+    savedDocument,
+    patchedDocument,
+    jsonResponse(
+      {
+        job_id: 'job-1',
+        revision: 4,
+        status: 'queued',
+        external_job_id: 'ext-1',
+      },
+      202,
+    ),
+    jsonResponse({
+      job_id: 'job-1',
+      revision: 4,
+      status: 'failed',
+      attachment_id: null,
+      package_type: 'urdf_stl',
+      error_message: 'boom',
+    }),
+  ]);
+
+  const config = await createStudioModificationTools({
+    lang: 'zh-CN',
+    packageType: 'urdf_stl',
+    importUrdfPackage: async () => {},
+  });
+  assert.ok(config);
+
+  const result = await config.onExecute(proposeCall);
+
+  assert.equal(result.success, false);
+  assert.equal(result.message, '由于您的需求复杂度较高，模型生成已中止，请与平台客服联系。');
+  assert.equal(result.chatMessage, '由于您的需求复杂度较高，模型生成已中止，请与平台客服联系。');
+  assert.equal(result.hideBannerActions, true);
+});
+
+test('onExecute keeps the generic failure when a done mesh job has no attachment', async () => {
+  storeBootstrapAndAuth();
+  installFetchMock([
+    savedDocument,
+    patchedDocument,
+    jsonResponse(
+      {
+        job_id: 'job-1',
+        revision: 4,
+        status: 'queued',
+        external_job_id: 'ext-1',
+      },
+      202,
+    ),
+    jsonResponse({
+      job_id: 'job-1',
+      revision: 4,
+      status: 'done',
+      attachment_id: null,
+      package_type: 'urdf_stl',
+      error_code: null,
+      error_message: null,
+    }),
+  ]);
+
+  const config = await createStudioModificationTools({
+    lang: 'zh-CN',
+    packageType: 'urdf_stl',
+    importUrdfPackage: async () => {},
+  });
+  assert.ok(config);
+
+  const result = await config.onExecute(proposeCall);
+
+  assert.equal(result.success, false);
+  assert.equal(result.message, '生成失败，请联系平台客服');
+  assert.equal(result.chatMessage, '生成失败，请联系平台客服');
+  assert.equal(result.hideBannerActions, undefined);
 });
 
 test('onExecute replaces a service cancellation with the support message', async () => {
