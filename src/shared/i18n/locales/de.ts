@@ -1105,7 +1105,7 @@ export const de: TranslationKeys = {
   studioMeshToolConfirm: 'Bestätigen',
   studioMeshToolCancel: 'Abbrechen',
   studioMeshToolRetry: 'Erneut versuchen',
-  studioMeshToolExecuting: 'Wird generiert...',
+  studioMeshToolExecuting: 'Simulationsmodell wird neu generiert. Bitte warten Sie 15–30 Minuten.',
   studioMeshToolProposeSummary: 'Anforderungsdokument-Revision einreichen',
   studioMeshToolSessionExpired:
     'Sitzung abgelaufen. Kehren Sie zur Hauptseite zurück und öffnen Sie die Vorschau erneut.',

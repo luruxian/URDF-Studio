@@ -22,7 +22,7 @@ export interface ToolConfirmBannerProps {
  *
  * - idle / cancelled -> renders nothing
  * - parsed -> shows the tool summary with confirm/cancel actions
- * - executing -> progress bar and percent when progressPercent is set, otherwise a spinner
+ * - executing -> spinner and the executing label. progressPercent is not shown while polling.
  * - done -> success message (does not read progressPercent)
  * - error -> failure message with retry/cancel actions (mesh poll timeout uses warning styling).
  *   hideBannerActions drops those buttons and may keep the last percent.
@@ -79,19 +79,7 @@ export function ToolConfirmBanner({
         </>
       )}
 
-      {state === 'executing' && progressPercent !== null && progressPercent !== undefined && (
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
-          <div className="flex w-full max-w-xs items-center gap-3">
-            <Progress value={progressPercent} className="flex-1" />
-            <span className="font-mono text-sm tabular-nums text-gray-600 dark:text-gray-400">
-              {progressPercent}%
-            </span>
-          </div>
-          <span className="text-sm text-gray-600 dark:text-gray-400">{executingLabel}</span>
-        </div>
-      )}
-
-      {state === 'executing' && (progressPercent === null || progressPercent === undefined) && (
+      {state === 'executing' && (
         <>
           <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
           <span className="text-sm text-gray-600 dark:text-gray-400">{executingLabel}</span>

@@ -1090,7 +1090,7 @@ export const ja: TranslationKeys = {
   studioMeshToolConfirm: '確認',
   studioMeshToolCancel: 'キャンセル',
   studioMeshToolRetry: '再試行',
-  studioMeshToolExecuting: '生成中...',
+  studioMeshToolExecuting: 'シミュレーションモデルを再生成しています。15〜30分ほどお待ちください。',
   studioMeshToolProposeSummary: '要件確認書の改訂を提出',
   studioMeshToolSessionExpired:
     'セッションの有効期限が切れました。メインサイトに戻り、プレビューを再度開いてください。',

@@ -322,7 +322,7 @@ test('renders English confirm banner labels when lang is en', async () => {
   }
 });
 
-test('executing mesh progress replaces the spinner with a bar and percent', async () => {
+test('executing keeps the spinner and label even when a percent is known', async () => {
   const dom = installDom();
   try {
     const rendered = await renderBanner(dom.dom, {
@@ -332,14 +332,14 @@ test('executing mesh progress replaces the spinner with a bar and percent', asyn
         confirm: '确认',
         cancel: '取消',
         retry: '重试',
-        executing: '正在生成...',
+        executing: '正在重新生成仿真模型，请稍候15-30分钟',
       },
       progressPercent: 40,
     });
-    assert.match(rendered.text, /40%/);
-    assert.match(rendered.text, /正在生成\.\.\./);
-    assert.equal(rendered.root?.querySelector('[data-slot="progress"]') != null, true);
-    assert.equal(rendered.root?.querySelector('.animate-spin') != null, false);
+    assert.match(rendered.text, /正在重新生成仿真模型，请稍候15-30分钟/);
+    assert.equal(rendered.text.includes('40%'), false);
+    assert.equal(rendered.root?.querySelector('[data-slot="progress"]') != null, false);
+    assert.equal(rendered.root?.querySelector('.animate-spin') != null, true);
     assert.equal(rendered.root?.getAttribute('aria-busy'), 'true');
     await rendered.unmount();
   } finally {
@@ -357,12 +357,14 @@ test('executing without progress keeps the spinner', async () => {
         confirm: '确认',
         cancel: '取消',
         retry: '重试',
-        executing: '正在生成...',
+        executing: '正在重新生成仿真模型，请稍候15-30分钟',
       },
       progressPercent: 0,
     });
-    assert.match(rendered.text, /0%/);
-    assert.equal(rendered.root?.querySelector('.animate-spin') != null, false);
+    assert.match(rendered.text, /正在重新生成仿真模型，请稍候15-30分钟/);
+    assert.equal(rendered.text.includes('0%'), false);
+    assert.equal(rendered.root?.querySelector('.animate-spin') != null, true);
+    assert.equal(rendered.root?.querySelector('[data-slot="progress"]') != null, false);
 
     const spinning = await renderBanner(dom.dom, {
       ...defaultBannerProps,
