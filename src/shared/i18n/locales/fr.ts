@@ -1105,7 +1105,7 @@ export const fr: TranslationKeys = {
   studioMeshToolConfirm: 'Confirmer',
   studioMeshToolCancel: 'Annuler',
   studioMeshToolRetry: 'Réessayer',
-  studioMeshToolExecuting: 'Régénération du modèle de simulation. Veuillez patienter 15 à 30 minutes.',
+  studioMeshToolExecuting: 'Régénération du modèle de simulation. Veuillez patienter environ 10 minutes.',
   studioMeshToolProposeSummary: 'Soumettre une révision du document d’exigences',
   studioMeshToolSessionExpired:
     'Session expirée. Retournez sur le site principal et rouvrez l’aperçu.',

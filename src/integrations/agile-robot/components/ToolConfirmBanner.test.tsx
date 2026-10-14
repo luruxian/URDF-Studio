@@ -332,11 +332,11 @@ test('executing keeps the spinner and label even when a percent is known', async
         confirm: '确认',
         cancel: '取消',
         retry: '重试',
-        executing: '正在重新生成仿真模型，请稍候15-30分钟',
+        executing: '正在重新生成仿真模型，请稍候10分钟左右',
       },
       progressPercent: 40,
     });
-    assert.match(rendered.text, /正在重新生成仿真模型，请稍候15-30分钟/);
+    assert.match(rendered.text, /正在重新生成仿真模型，请稍候10分钟左右/);
     assert.equal(rendered.text.includes('40%'), false);
     assert.equal(rendered.root?.querySelector('[data-slot="progress"]') != null, false);
     assert.equal(rendered.root?.querySelector('.animate-spin') != null, true);
@@ -357,11 +357,11 @@ test('executing without progress keeps the spinner', async () => {
         confirm: '确认',
         cancel: '取消',
         retry: '重试',
-        executing: '正在重新生成仿真模型，请稍候15-30分钟',
+        executing: '正在重新生成仿真模型，请稍候10分钟左右',
       },
       progressPercent: 0,
     });
-    assert.match(rendered.text, /正在重新生成仿真模型，请稍候15-30分钟/);
+    assert.match(rendered.text, /正在重新生成仿真模型，请稍候10分钟左右/);
     assert.equal(rendered.text.includes('0%'), false);
     assert.equal(rendered.root?.querySelector('.animate-spin') != null, true);
     assert.equal(rendered.root?.querySelector('[data-slot="progress"]') != null, false);

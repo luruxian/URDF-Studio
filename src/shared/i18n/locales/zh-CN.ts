@@ -1037,7 +1037,7 @@ export const zhCn: TranslationKeys = {
   studioMeshToolConfirm: '确认',
   studioMeshToolCancel: '取消',
   studioMeshToolRetry: '重试',
-  studioMeshToolExecuting: '正在重新生成仿真模型，请稍候15-30分钟',
+  studioMeshToolExecuting: '正在重新生成仿真模型，请稍候10分钟左右',
   studioMeshToolProposeSummary: '提交需求确认书修订',
   studioMeshToolSessionExpired: '会话已过期，请回到主站重新点击预览',
   studioMeshToolModelUpdated: 'URDF+STL 已更新',
