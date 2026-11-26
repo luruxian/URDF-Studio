@@ -14,6 +14,9 @@ test('simplified Chinese is the switcher entry after English', () => {
   assert.equal(LANGUAGE_OPTIONS[1]?.label, '简体中文');
   assert.equal(getLanguageShortLabel('zh-CN'), '简');
   assert.equal(LANGUAGE_OPTIONS[2]?.value, 'zh-Hant');
+  assert.equal(LANGUAGE_OPTIONS[3]?.value, 'ja');
+  assert.equal(LANGUAGE_OPTIONS[3]?.label, '日本語');
+  assert.equal(getLanguageShortLabel('ja'), '日');
 });
 
 test('simplified Chinese document and date locales stay zh-CN', () => {
